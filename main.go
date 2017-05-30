@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/urfave/cli"
 )
 
@@ -14,10 +15,32 @@ func main() {
 	app.Name = "pipeline"
 	app.Version = VERSION
 	app.Usage = "You need help!"
-	app.Action = func(c *cli.Context) error {
-		logrus.Info("I'm a turkey")
-		return nil
+	app.Action = checkAndRun
+	app.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:   "jenkins_user",
+			Usage:  "User of jenkins admin",
+			EnvVar: "JENKINS_USER",
+		},
+		cli.StringFlag{
+			Name:   "jenkins_token",
+			Usage:  "token of jenkins admin",
+			EnvVar: "JENKINS_TOKEN",
+		},
 	}
-
 	app.Run(os.Args)
+}
+
+func checkAndRun(c *cli.Context) (rtnerr error) {
+	defer func() {
+		if rtnerr != nil {
+			logrus.Fatal(rtnerr)
+		}
+	}()
+	if err := c.GlobalSet("jenkins_user", c.String("jenkins_user")); err != nil {
+		return err
+	}
+	c.GlobalSet("jenkins_user", c.String("jenkins_user"))
+	logrus.Info("get in")
+	return nil
 }
