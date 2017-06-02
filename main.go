@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/rancher/pipeline/restfulserver"
 	"github.com/urfave/cli"
 )
 
@@ -32,15 +33,15 @@ func main() {
 }
 
 func checkAndRun(c *cli.Context) (rtnerr error) {
-	defer func() {
-		if rtnerr != nil {
-			logrus.Fatal(rtnerr)
-		}
-	}()
 	if err := c.GlobalSet("jenkins_user", c.String("jenkins_user")); err != nil {
-		return err
+		logrus.Fatal(err)
 	}
-	c.GlobalSet("jenkins_user", c.String("jenkins_user"))
-	logrus.Info("get in")
+	if err := c.GlobalSet("jenkins_user", c.String("jenkins_user")); err != nil {
+		logrus.Fatal(err)
+	}
+	errChan := make(chan bool)
+	go restfulserver.ListenAndServe(errChan)
+	<-errChan
+	logrus.Info("Going down")
 	return nil
 }
