@@ -4,7 +4,7 @@ import (
 	"net/http"
 )
 
-// for /external-interceptor
+//HandlerInterceptor for /external-interceptor
 func HandlerInterceptor(rw http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
