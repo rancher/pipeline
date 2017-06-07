@@ -26,3 +26,34 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
+
+## Pipeline file example
+```yaml
+---
+name: test1
+repository: http://github.com/orangedeng/ui.git
+branch: master
+build_command: npm run build
+build_vairables:
+    - "env=dev"
+target_image: rancher/ui:v0.1
+stages:
+  - name: stage zero
+    need_approve: false
+    steps:
+    - name: build step
+        image: test/build:v0.1
+        command: echo 'i am turkey'
+  - name: stage test
+    need_approve: false
+    steps:
+    - name: source code check
+        image: test/test:v0.1
+        command: echo 'i am test'
+    - name: server run test
+        image: test/run-bin:v0.1
+        command: /startup.sh
+    - name: API test 
+        image: test/api-test:v0.1
+        command: /startup.sh && /api_test.sh
+```
