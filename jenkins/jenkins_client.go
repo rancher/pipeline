@@ -1,35 +1,42 @@
 package jenkins
 
-import "net/http"
-import "net/url"
-import "io/ioutil"
-import "bytes"
-import "github.com/Sirupsen/logrus"
-import "strings"
+import (
+	"bytes"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"strings"
 
-const user = "admin"
-const token = "9823967c90e16797c5c8e7fe5c066979"
-const jenkinsAddress = "192.168.99.100:8888"
-const jenkinsSchema = "http"
-const createJobURI = "/createItem"
-const getCrumbURI = "/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)"
+	"github.com/Sirupsen/logrus"
+)
 
-var crumbHeader = ""
-var crumb = ""
+var (
+	ErrCreateJobFail = errors.New("Create Job fail")
+	ErrBuildJobFail  = errors.New("Build Job fail")
+)
 
-func callJenkins(req http.Request) error {
-	return nil
+func InitJenkins(jenkinsServerAddress, user, token string) {
+	JenkinsConfig.Set(JenkinsServerAddress, jenkinsServerAddress)
+	JenkinsConfig.Set(JenkinsUser, user)
+	JenkinsConfig.Set(JenkinsToken, token)
+	logrus.Info("Connectting to Jenkins...")
+	if err := GetCSRF(); err != nil {
+		logrus.Fatalf("Error Connectting to Jenkins err:%s", err.Error())
+	}
+	logrus.Info("Connected to Jenkins")
 }
 
 func GetCSRF() error {
-	println("get in")
-	sah := jenkinsSchema + `://` + jenkinsAddress
-	println(sah)
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	getCrumbURI, _ := JenkinsConfig.Get(GetCrumbURI)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
 	getCrumbURL, err := url.Parse(sah + getCrumbURI)
 	if err != nil {
 		logrus.Error(err)
 	}
-	println(getCrumbURL)
 	req, _ := http.NewRequest(http.MethodGet, getCrumbURL.String(), nil)
 	req.SetBasicAuth(user, token)
 	client := http.Client{}
@@ -39,32 +46,38 @@ func GetCSRF() error {
 		return err
 	}
 	data, _ := ioutil.ReadAll(resp.Body)
-	println(string(data))
-	crumbHeader = strings.Split(string(data), ":")[0]
-	crumb = strings.Split(string(data), ":")[1]
+	Crumbs := strings.Split(string(data), ":")
+	if len(Crumbs) != 2 {
+		return fmt.Errorf("Return Crumbs From Jenkins Error:<%s>", err.Error())
+	}
+	JenkinsConfig.Set(JenkinsCrumbHeader, Crumbs[0])
+	JenkinsConfig.Set(JenkinsCrumb, Crumbs[1])
 	return nil
 }
 
 func CreateJob(jobname string) error {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	createJobURI, _ := JenkinsConfig.Get(CreateJobURI)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
 	//url part
-	println("get in")
-	sah := jenkinsSchema + `://` + jenkinsAddress
-	println(sah)
 	createJobURL, err := url.Parse(sah + createJobURI)
 	if err != nil {
 		logrus.Error(err)
 		return err
 	}
-	println(createJobURL.String())
 	qry := createJobURL.Query()
 	qry.Add("name", jobname)
 	createJobURL.RawQuery = qry.Encode()
-	println("query raw is ", qry.Encode())
+
 	//body part
 	body, _ := ioutil.ReadFile("jenkins/example_job.xml")
 	//send request part
 	req, _ := http.NewRequest(http.MethodPost, createJobURL.String(), bytes.NewReader(body))
-	req.Header.Add("Jenkins-Crumb", crumb)
+	req.Header.Add(CrumbHeader, Crumb)
 	req.Header.Set("Content-Type", "application/xml")
 	req.SetBasicAuth(user, token)
 	client := http.Client{}
@@ -73,8 +86,53 @@ func CreateJob(jobname string) error {
 		logrus.Error(err)
 		return err
 	}
-	data, _ := ioutil.ReadAll(resp.Body)
-	println(string(data))
-	//
+	// data, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != 200 {
+		data, _ := ioutil.ReadAll(resp.Body)
+		println(string(data))
+		return ErrCreateJobFail
+	}
+	return nil
+}
+
+func BuildJob(jobname string, params map[string]string) error {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	buildURI, _ := JenkinsConfig.Get(JenkinsJobBuildURI)
+	buildWithParamsURI, _ := JenkinsConfig.Get(JenkinsJobBuildWithParamsURI)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	withParams := false
+	if len(params) == 0 {
+		withParams = true
+	}
+	var targetURL *url.URL
+	var err error
+	if withParams {
+		targetURL, err = url.Parse(sah + buildWithParamsURI)
+	} else {
+		targetURL, err = url.Parse(sah + buildURI)
+	}
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	req, _ := http.NewRequest(http.MethodPost, targetURL.String(), nil)
+
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	if resp.StatusCode != 201 {
+		logrus.Error(ErrBuildJobFail)
+		return ErrBuildJobFail
+	}
+	logrus.Infof("job queue is %s", resp.Header.Get("location"))
 	return nil
 }
