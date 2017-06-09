@@ -1,10 +1,8 @@
 package restfulserver
 
 import (
-	"time"
-
-	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
+	"github.com/rancher/pipeline/pipeline"
 )
 
 const pipelineFileExample = `---
@@ -16,15 +14,22 @@ stage_zero:
 	    image: test/build:v0.1
 		command: echo 'i am turkey'
 `
-const ActivityStepWaitting = "waitting"
-const ActivityStepRunning = "running"
-const ActivityStepFinished = "finished"
-const ActivityStepError = "error"
+const (
+	ActivityStepWaitting = "Waitting"
+	ActivityStepBuilding = "Building"
+	ActivityStepSuccess  = "Success"
+	ActivityStepFail     = "Fail"
 
-const ActivityStageRunning = "running"
-const ActivityStageWaitting = "waitting"
-const ActivityStageError = "error"
-const ActivityStageFinished = "finished"
+	ActivityStageWaitting = "Waitting"
+	ActivityStageBuilding = "Building"
+	ActivityStageSuccess  = "Success"
+	ActivityStageFail     = "Fail"
+
+	ActivityWaitting = "Waitting"
+	ActivityBuilding = "Building"
+	ActivitySuccess  = "Success"
+	ActivityFail     = "Fail"
+)
 
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
@@ -38,13 +43,8 @@ func NewSchema() *client.Schemas {
 
 type Pipeline struct {
 	client.Resource
-	Name            string     `json:"name,omitempty"`
-	Repository      string     `json:"repository,omitempty"`
-	Branch          string     `json:"branch,omitempty"`
-	Version         string     `json:"version,omitempty"`
-	Status          string     `json:"status,omitempty"`
-	PipelineContent string     `json:"pipeline_content,omitempty"`
-	Activities      []Activity `json:"activities,omitempty"`
+	pipeline.Pipeline
+	Activities []Activity `json:"activities,omitempty"`
 }
 
 type Activity struct {
@@ -67,11 +67,12 @@ type ActivityStage struct {
 }
 
 type ActivityStep struct {
-	Name    string `json:"name,omitstage"`
-	Image   string `json:"image"`
-	Command string `json:"command"`
-	Message string `json:"message"`
-	Status  string `json:"status"`
+	Name    string `json:"name,omitempty"`
+	Image   string `json:"image,omitempty"`
+	Command string `json:"command,omitempty"`
+	Message string `json:"message,omitempty"`
+	Status  string `json:"status,omitempty"`
+	StartTS int64  `json:"start_ts,omitempty"`
 }
 
 func pipelineSchema(pipeline *client.Schema) {
@@ -103,7 +104,81 @@ func acitvitySchema(activity *client.Schema) {
 	}
 }
 
-func toPipelineResource(apiContext *api.ApiContext) *Pipeline {
+// func toPipelineResource(apiContext *api.ApiContext) *Pipeline {
+// 	r := Pipeline{
+// 		Resource: client.Resource{
+// 			Id:      "example",
+// 			Type:    "pipeline",
+// 			Actions: map[string]string{},
+// 			Links:   map[string]string{
+// 			//"activities": apiContext.UrlBuilder.ReferenceLink(nil),
+// 			},
+// 		},
+// 		Pipeline:   *pipeline.ToDemoPipeline(),
+// 		Activities: []Activity{*toActivityResource(apiContext)},
+// 	}
+// 	return &r
+// }
+
+// func toActivityResource(apiContext *api.ApiContext) *Activity {
+// 	pipeline := toPipelineResourceWithoutActivities(apiContext)
+// 	r := Activity{
+// 		Resource: client.Resource{
+// 			Id:      "example#1",
+// 			Type:    "activity",
+// 			Actions: map[string]string{},
+// 			Links: map[string]string{
+// 				"pipeline": apiContext.UrlBuilder.ReferenceLink(pipeline.Resource),
+// 			},
+// 		},
+// 		Id:     "example#1",
+// 		Status: "Finished",
+// 		ActivityStages: []ActivityStage{
+// 			ActivityStage{
+// 				Name:         "stage zeor",
+// 				NeedApproval: false,
+// 				AcitvitySteps: []ActivityStep{
+// 					ActivityStep{
+// 						Name:    "build step",
+// 						Image:   "test/build:v0.1",
+// 						Command: "echo 'i am turkey'",
+// 						Message: "build success",
+// 						Status:  ActivityStepSuccess,
+// 						StartTS: time.Now().Unix()*1000 - 30*1000,
+// 					},
+// 				},
+// 				Status:  ActivityStageSuccess,
+// 				StartTS: time.Now().Unix()*1000 - 30*1000,
+// 			},
+// 		},
+// 		FromPipeline: pipeline,
+// 	}
+// 	return &r
+// }
+
+// func toPipelineResourceWithoutActivities(apiContext *api.ApiContext) *Pipeline {
+// 	r := Pipeline{
+// 		Resource: client.Resource{
+// 			Id:      "example",
+// 			Type:    "pipeline",
+// 			Actions: map[string]string{},
+// 			Links:   map[string]string{},
+// 		},
+// 		Pipeline: *pipeline.ToDemoPipeline(),
+// 		//Activities:      []Activity{*toActivityResource(apiContext)},
+// 	}
+// 	return &r
+// }
+
+func toPipelineCollections(pipelines []*pipeline.Pipeline) []interface{} {
+	var r []interface{}
+	for _, p := range pipelines {
+		r = append(r, toPipelineResourceWithoutActivities(p))
+	}
+	return r
+}
+
+func toPipelineResourceWithoutActivities(pipeline *pipeline.Pipeline) *Pipeline {
 	r := Pipeline{
 		Resource: client.Resource{
 			Id:      "example",
@@ -113,65 +188,8 @@ func toPipelineResource(apiContext *api.ApiContext) *Pipeline {
 			//"activities": apiContext.UrlBuilder.ReferenceLink(nil),
 			},
 		},
-		Name:            "example",
-		Status:          "active",
-		Repository:      "github.com/orangedeng/ui",
-		Branch:          "master",
-		PipelineContent: pipelineFileExample,
-		Activities:      []Activity{*toActivityResource(apiContext)},
-	}
-	return &r
-}
-
-func toActivityResource(apiContext *api.ApiContext) *Activity {
-	pipeline := toPipelineResourceWithoutActivities(apiContext)
-	r := Activity{
-		Resource: client.Resource{
-			Id:      "example#1",
-			Type:    "activity",
-			Actions: map[string]string{},
-			Links: map[string]string{
-				"pipeline": apiContext.UrlBuilder.ReferenceLink(pipeline.Resource),
-			},
-		},
-		Id:     "example#1",
-		Status: "Finished",
-		ActivityStages: []ActivityStage{
-			ActivityStage{
-				Name:         "stage zeor",
-				NeedApproval: false,
-				AcitvitySteps: []ActivityStep{
-					ActivityStep{
-						Name:    "build step",
-						Image:   "test/build:v0.1",
-						Command: "echo 'i am turkey'",
-						Message: "build success",
-						Status:  ActivityStepFinished,
-					},
-				},
-				Status:  ActivityStageFinished,
-				StartTS: time.Now().Unix() - 30,
-			},
-		},
-		FromPipeline: pipeline,
-	}
-	return &r
-}
-
-func toPipelineResourceWithoutActivities(apiContext *api.ApiContext) *Pipeline {
-	r := Pipeline{
-		Resource: client.Resource{
-			Id:      "example",
-			Type:    "pipeline",
-			Actions: map[string]string{},
-			Links:   map[string]string{},
-		},
-		Name:            "example",
-		Status:          "active",
-		Repository:      "github.com/orangedeng.ui",
-		Branch:          "master",
-		PipelineContent: pipelineFileExample,
-		//Activities:      []Activity{*toActivityResource(apiContext)},
+		Pipeline: *pipeline,
+		//Activities: []Activity{*toActivityResource(apiContext)},
 	}
 	return &r
 }

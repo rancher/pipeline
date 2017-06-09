@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver"
 	"github.com/urfave/cli"
 )
@@ -28,19 +29,20 @@ func main() {
 			Usage:  "token of jenkins admin",
 			EnvVar: "JENKINS_TOKEN",
 		},
+		cli.StringFlag{
+			Name:   "template_base_path",
+			Usage:  "token of jenkins admin",
+			EnvVar: "TEMPLATES_BASE_PATH",
+			Value:  "./templates",
+		},
 	}
 	app.Run(os.Args)
 }
 
 func checkAndRun(c *cli.Context) (rtnerr error) {
-	if err := c.GlobalSet("jenkins_user", c.String("jenkins_user")); err != nil {
-		logrus.Fatal(err)
-	}
-	if err := c.GlobalSet("jenkins_user", c.String("jenkins_user")); err != nil {
-		logrus.Fatal(err)
-	}
+	pipelineContext := pipeline.BuildPipelineContext(c)
 	errChan := make(chan bool)
-	go restfulserver.ListenAndServe(errChan)
+	go restfulserver.ListenAndServe(pipelineContext, errChan)
 	<-errChan
 	logrus.Info("Going down")
 	return nil

@@ -98,7 +98,9 @@ func CreateJob(jobname string) error {
 func BuildJob(jobname string, params map[string]string) error {
 	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
 	buildURI, _ := JenkinsConfig.Get(JenkinsJobBuildURI)
+	buildURI = fmt.Sprintf(buildURI, jobname)
 	buildWithParamsURI, _ := JenkinsConfig.Get(JenkinsJobBuildWithParamsURI)
+	buildWithParamsURI = fmt.Sprintf(buildWithParamsURI, jobname)
 	user, _ := JenkinsConfig.Get(JenkinsUser)
 	token, _ := JenkinsConfig.Get(JenkinsToken)
 	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)

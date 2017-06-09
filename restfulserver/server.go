@@ -5,9 +5,11 @@ import "github.com/rancher/go-rancher/api"
 import "github.com/rancher/go-rancher/client"
 import "github.com/rancher/pipeline/jenkins"
 import "strings"
+import "github.com/rancher/pipeline/pipeline"
 
 //Server rest api server
 type Server struct {
+	PipelineContext *pipeline.PipelineContext
 }
 
 //ListPipelines query List of pipelines
@@ -20,16 +22,14 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 	println(req.Host)
 	println(req.URL)
 	apiContext.Write(&client.GenericCollection{
-		Data: []interface{}{
-			toPipelineResource(apiContext),
-		},
+		Data: toPipelineCollections(s.PipelineContext.ListPipelines()),
 	})
 	return nil
 }
 
 func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	apiContext.Write(toPipelineResource(apiContext))
+	apiContext.Write(nil)
 	return nil
 }
 
@@ -37,7 +37,7 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	apiContext := api.GetApiContext(req)
 	apiContext.Write(&client.GenericCollection{
 		Data: []interface{}{
-			toActivityResource(apiContext),
+		//toActivityResource(apiContext),
 		},
 	})
 	return nil
@@ -55,6 +55,8 @@ func (s *Server) CreatePipelineWithXML(rw http.ResponseWriter, req *http.Request
 	return nil
 }
 
-func NewServer() *Server {
-	return &Server{}
+func NewServer(pipelineContext *pipeline.PipelineContext) *Server {
+	return &Server{
+		PipelineContext: pipelineContext,
+	}
 }

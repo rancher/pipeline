@@ -6,14 +6,15 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/handlers"
+	"github.com/rancher/pipeline/pipeline"
 )
 
 type testHandler struct {
 }
 
 //ListenAndServe do http rest serve
-func ListenAndServe(errChan chan bool) {
-	server := NewServer()
+func ListenAndServe(pipelineContext *pipeline.PipelineContext, errChan chan bool) {
+	server := NewServer(pipelineContext)
 	router := http.Handler(NewRouter(server))
 	router = handlers.LoggingHandler(os.Stdout, router)
 	router = handlers.ProxyHeaders(router)
