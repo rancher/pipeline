@@ -27,6 +27,21 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
+## Pipeline git struct
+Rancher CI service will use git server(Gogs) to storage Pipeline File. Git repository structure will be like following:
+
+```
+-- templates
+  |-- <Pipeline name>
+  |   |-- 0
+  |   |   |-- pipeline.yml
+  |   |-- 1
+  |   |   |-- pipeline.yml
+...
+```
+pipeline.yml file describes the process of CI and CD. A pipeline includes several stages and steps. The first stage and first step will be the build stage and the build step.
+User can have their test, deploy and deliver stages and steps after build step.
+
 ## Pipeline file example
 ```yaml
 ---
