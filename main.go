@@ -33,7 +33,13 @@ func main() {
 			Name:   "template_base_path",
 			Usage:  "token of jenkins admin",
 			EnvVar: "TEMPLATES_BASE_PATH",
-			Value:  "./templates",
+			Value:  "/templates",
+		},
+		cli.StringFlag{
+			Name:   "jenkins_config_template",
+			Usage:  "Jenkins configuration template file folder",
+			EnvVar: "JENKINS_CONFIG_TEMPLATE",
+			Value:  "/jenkins",
 		},
 	}
 	app.Run(os.Args)
