@@ -18,6 +18,7 @@ const (
 )
 
 var ErrTemplatePathNotVaild = errors.New("TemplateBasePath is not a vaild directory path")
+var ErrPipelineNotFound = errors.New("Pipeline Not found")
 
 type PipelineContext struct {
 	templateBase string

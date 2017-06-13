@@ -1,6 +1,8 @@
 package restfulserver
 
 import (
+	"net/http"
+
 	"github.com/rancher/go-rancher/client"
 	"github.com/rancher/pipeline/pipeline"
 )
@@ -49,13 +51,13 @@ type Pipeline struct {
 
 type Activity struct {
 	client.Resource
-	Id             string          `json:"id,omitempty"`
-	FromPipeline   *Pipeline       `json:"from_pipeline,omitempty"`
-	Status         string          `json:"status,omitempty"`
-	Result         string          `json:"result,omitempty"`
-	StartTS        int64           `json:"start_ts,omitempty"`
-	StopTS         int64           `json:"stop_ts,omitempty"`
-	ActivityStages []ActivityStage `json:"activity_stages,omitempty"`
+	Id             string             `json:"id,omitempty"`
+	FromPipeline   *pipeline.Pipeline `json:"from_pipeline,omitempty"`
+	Status         string             `json:"status,omitempty"`
+	Result         string             `json:"result,omitempty"`
+	StartTS        int64              `json:"start_ts,omitempty"`
+	StopTS         int64              `json:"stop_ts,omitempty"`
+	ActivityStages []ActivityStage    `json:"activity_stages,omitempty"`
 }
 
 type ActivityStage struct {
@@ -94,7 +96,13 @@ func pipelineSchema(pipeline *client.Schema) {
 	pipeline.ResourceFields["branch"] = pipelineBranch
 
 	//todo others
+	pipeline.ResourceActions = map[string]client.Action{
+		"run": client.Action{
+			Output: "activity",
+		},
+	}
 
+	pipeline.CollectionMethods = []string{http.MethodGet, http.MethodPost}
 }
 
 func acitvitySchema(activity *client.Schema) {
@@ -181,7 +189,7 @@ func toPipelineCollections(pipelines []*pipeline.Pipeline) []interface{} {
 func toPipelineResourceWithoutActivities(pipeline *pipeline.Pipeline) *Pipeline {
 	r := Pipeline{
 		Resource: client.Resource{
-			Id:      "example",
+			Id:      pipeline.Name,
 			Type:    "pipeline",
 			Actions: map[string]string{},
 			Links:   map[string]string{

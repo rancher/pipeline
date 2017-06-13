@@ -4,8 +4,9 @@ import "net/http"
 import "github.com/rancher/go-rancher/api"
 import "github.com/rancher/go-rancher/client"
 import "github.com/rancher/pipeline/jenkins"
-import "strings"
+
 import "github.com/rancher/pipeline/pipeline"
+import "github.com/gorilla/mux"
 
 //Server rest api server
 type Server struct {
@@ -15,12 +16,6 @@ type Server struct {
 //ListPipelines query List of pipelines
 func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	headers := req.Header
-	for header, content := range headers {
-		println(header, ":[", strings.Join(content, ","), "]")
-	}
-	println(req.Host)
-	println(req.URL)
 	apiContext.Write(&client.GenericCollection{
 		Data: toPipelineCollections(s.PipelineContext.ListPipelines()),
 	})
@@ -29,7 +24,12 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 
 func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	apiContext.Write(nil)
+	name := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineByName(name)
+	if r == nil {
+		return pipeline.ErrPipelineNotFound
+	}
+	apiContext.Write(toPipelineResourceWithoutActivities(r))
 	return nil
 }
 
