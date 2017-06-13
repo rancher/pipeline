@@ -1,11 +1,12 @@
 package pipeline
 
 import (
-	"errors"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
+
+	"github.com/pkg/errors"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -40,8 +41,7 @@ func BuildPipelineContext(context *cli.Context) *PipelineContext {
 	r.templateBase = context.GlobalString("template_base_path")
 	f, err := os.Stat(r.templateBase)
 	if err != nil {
-		logrus.Error(err)
-		return nil
+		logrus.Fatal(err)
 	}
 	if !f.IsDir() {
 		logrus.Fatal(ErrTemplatePathNotVaild)
@@ -86,6 +86,10 @@ func (p *PipelineContext) ListPipelines() []*Pipeline {
 }
 
 func getLatestVersionPipelineFile(pipelinePath string) *Pipeline {
+	if _, er := os.Stat(pipelinePath); er == os.ErrNotExist {
+		logrus.Error(errors.Wrapf(er, "pipeline <%s> not found", pipelinePath))
+		return nil
+	}
 	fi, _ := os.OpenFile(pipelinePath, os.O_RDONLY, 0755)
 	defer fi.Close()
 	versions, _ := fi.Readdir(0)
@@ -98,4 +102,12 @@ func getLatestVersionPipelineFile(pipelinePath string) *Pipeline {
 		}
 	}
 	return toPipeline(path.Join(pipelinePath, strconv.Itoa(max)))
+}
+
+func (p *PipelineContext) RunPipeline(pipeline string) (bool, error) {
+	return p.RunPipelineWithVersion(pipeline, Latest)
+}
+
+func (p *PipelineContext) RunPipelineWithVersion(pipeline, version string) (bool, error) {
+	return true, nil
 }

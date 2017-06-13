@@ -3,6 +3,7 @@ package restfulserver
 import (
 	"net/http"
 
+	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
 	"github.com/rancher/pipeline/pipeline"
 )
@@ -35,7 +36,7 @@ const (
 
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
-	schemas.AddType("error", client.ApiError{})
+	schemas.AddType("error", Error{})
 	schemas.AddType("apiVersion", client.Resource{})
 	schemas.AddType("schema", client.Schema{})
 	pipelineSchema(schemas.AddType("pipeline", Pipeline{}))
@@ -47,6 +48,19 @@ type Pipeline struct {
 	client.Resource
 	pipeline.Pipeline
 	Activities []Activity `json:"activities,omitempty"`
+}
+
+type Empty struct {
+	client.Resource
+}
+
+type Error struct {
+	client.Resource
+	Status   int    `json:"status"`
+	Code     string `json:"code"`
+	Msg      string `json:"message"`
+	Detail   string `json:"detail"`
+	BaseType string `json:"baseType"`
 }
 
 type Activity struct {
@@ -112,81 +126,15 @@ func acitvitySchema(activity *client.Schema) {
 	}
 }
 
-// func toPipelineResource(apiContext *api.ApiContext) *Pipeline {
-// 	r := Pipeline{
-// 		Resource: client.Resource{
-// 			Id:      "example",
-// 			Type:    "pipeline",
-// 			Actions: map[string]string{},
-// 			Links:   map[string]string{
-// 			//"activities": apiContext.UrlBuilder.ReferenceLink(nil),
-// 			},
-// 		},
-// 		Pipeline:   *pipeline.ToDemoPipeline(),
-// 		Activities: []Activity{*toActivityResource(apiContext)},
-// 	}
-// 	return &r
-// }
-
-// func toActivityResource(apiContext *api.ApiContext) *Activity {
-// 	pipeline := toPipelineResourceWithoutActivities(apiContext)
-// 	r := Activity{
-// 		Resource: client.Resource{
-// 			Id:      "example#1",
-// 			Type:    "activity",
-// 			Actions: map[string]string{},
-// 			Links: map[string]string{
-// 				"pipeline": apiContext.UrlBuilder.ReferenceLink(pipeline.Resource),
-// 			},
-// 		},
-// 		Id:     "example#1",
-// 		Status: "Finished",
-// 		ActivityStages: []ActivityStage{
-// 			ActivityStage{
-// 				Name:         "stage zeor",
-// 				NeedApproval: false,
-// 				AcitvitySteps: []ActivityStep{
-// 					ActivityStep{
-// 						Name:    "build step",
-// 						Image:   "test/build:v0.1",
-// 						Command: "echo 'i am turkey'",
-// 						Message: "build success",
-// 						Status:  ActivityStepSuccess,
-// 						StartTS: time.Now().Unix()*1000 - 30*1000,
-// 					},
-// 				},
-// 				Status:  ActivityStageSuccess,
-// 				StartTS: time.Now().Unix()*1000 - 30*1000,
-// 			},
-// 		},
-// 		FromPipeline: pipeline,
-// 	}
-// 	return &r
-// }
-
-// func toPipelineResourceWithoutActivities(apiContext *api.ApiContext) *Pipeline {
-// 	r := Pipeline{
-// 		Resource: client.Resource{
-// 			Id:      "example",
-// 			Type:    "pipeline",
-// 			Actions: map[string]string{},
-// 			Links:   map[string]string{},
-// 		},
-// 		Pipeline: *pipeline.ToDemoPipeline(),
-// 		//Activities:      []Activity{*toActivityResource(apiContext)},
-// 	}
-// 	return &r
-// }
-
-func toPipelineCollections(pipelines []*pipeline.Pipeline) []interface{} {
+func toPipelineCollections(apiContext *api.ApiContext, pipelines []*pipeline.Pipeline) []interface{} {
 	var r []interface{}
 	for _, p := range pipelines {
-		r = append(r, toPipelineResourceWithoutActivities(p))
+		r = append(r, toPipelineResourceWithoutActivities(apiContext, p))
 	}
 	return r
 }
 
-func toPipelineResourceWithoutActivities(pipeline *pipeline.Pipeline) *Pipeline {
+func toPipelineResourceWithoutActivities(apiContext *api.ApiContext, pipeline *pipeline.Pipeline) *Pipeline {
 	r := Pipeline{
 		Resource: client.Resource{
 			Id:      pipeline.Name,
@@ -199,5 +147,6 @@ func toPipelineResourceWithoutActivities(pipeline *pipeline.Pipeline) *Pipeline 
 		Pipeline: *pipeline,
 		//Activities: []Activity{*toActivityResource(apiContext)},
 	}
+	r.Actions["run"] = apiContext.UrlBuilder.ReferenceLink(r.Resource) + "?action=run"
 	return &r
 }

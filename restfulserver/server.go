@@ -3,10 +3,11 @@ package restfulserver
 import "net/http"
 import "github.com/rancher/go-rancher/api"
 import "github.com/rancher/go-rancher/client"
-import "github.com/rancher/pipeline/jenkins"
 
 import "github.com/rancher/pipeline/pipeline"
 import "github.com/gorilla/mux"
+import "github.com/pkg/errors"
+import "github.com/sluu99/uuid"
 
 //Server rest api server
 type Server struct {
@@ -17,7 +18,7 @@ type Server struct {
 func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	apiContext.Write(&client.GenericCollection{
-		Data: toPipelineCollections(s.PipelineContext.ListPipelines()),
+		Data: toPipelineCollections(apiContext, s.PipelineContext.ListPipelines()),
 	})
 	return nil
 }
@@ -27,14 +28,28 @@ func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	name := mux.Vars(req)["id"]
 	r := s.PipelineContext.GetPipelineByName(name)
 	if r == nil {
-		return pipeline.ErrPipelineNotFound
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", name)
+		rw.WriteHeader(http.StatusNotFound)
+		apiContext.Write(&Error{
+			Resource: client.Resource{
+				Id:      uuid.Rand().Hex(),
+				Type:    "error",
+				Links:   map[string]string{},
+				Actions: map[string]string{},
+			},
+			Status: http.StatusNotFound,
+			Msg:    err.Error(),
+			Code:   err.Error(),
+		})
+		return err
 	}
-	apiContext.Write(toPipelineResourceWithoutActivities(r))
+	apiContext.Write(toPipelineResourceWithoutActivities(apiContext, r))
 	return nil
 }
 
 func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
+	//Todo
 	apiContext.Write(&client.GenericCollection{
 		Data: []interface{}{
 		//toActivityResource(apiContext),
@@ -43,15 +58,24 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	return nil
 }
 
-func (s *Server) CreatePipelineWithXML(rw http.ResponseWriter, req *http.Request) error {
+func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	if err := jenkins.GetCSRF(); err != nil {
-		return err
-	}
-	if err := jenkins.CreateJob("test1"); err != nil {
-		return err
-	}
-	apiContext.Write("ok")
+	//Todo
+	apiContext.Write(&Empty{})
+	return nil
+}
+
+func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	//Todo
+	apiContext.Write(&Empty{})
+	return nil
+}
+
+func (s *Server) SavePipeline(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	//Todo
+	apiContext.Write(&Empty{})
 	return nil
 }
 
