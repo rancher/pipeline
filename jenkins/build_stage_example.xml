@@ -11,12 +11,12 @@
         <configVersion>2</configVersion>
         <userRemoteConfigs>
             <hudson.plugins.git.UserRemoteConfig>
-                <url>https://github.com/orangedeng/ui</url>
+                <url>{{.Repository}}</url>
             </hudson.plugins.git.UserRemoteConfig>
         </userRemoteConfigs>
         <branches>
             <hudson.plugins.git.BranchSpec>
-                <name>*/master</name>
+                <name>{{.Branch}}</name>
             </hudson.plugins.git.BranchSpec>
         </branches>
         <doGenerateSubmoduleConfigurations>false</doGenerateSubmoduleConfigurations>
@@ -29,13 +29,10 @@
     <blockBuildWhenUpstreamBuilding>false</blockBuildWhenUpstreamBuilding>
     <triggers/>
     <concurrentBuild>false</concurrentBuild>
-    <customWorkspace>/data/jenkins/workspace/pipeline1</customWorkspace>
+    <customWorkspace>{{.Workspace}}</customWorkspace>
     <builders>
         <hudson.tasks.Shell>
-            <command>echo 'hello world!'</command>
-        </hudson.tasks.Shell>
-        <hudson.tasks.Shell>
-            <command>echo 'secoud hello'</command>
+            <command>{{.Command}}</command>
         </hudson.tasks.Shell>
     </builders>
     <publishers/>

@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
-	"github.com/rancher/pipeline/interceptor"
 )
 
 //HandleError handle error from operation
@@ -28,8 +27,6 @@ func NewRouter(s *Server) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	f := HandleError
 
-	// for intercepter
-	router.Methods(http.MethodPost).Path("/").HandlerFunc(interceptor.HandlerInterceptor)
 	// API framework routes
 	router.Methods(http.MethodGet).Path("/").Handler(api.VersionsHandler(schemas, "v1"))
 	router.Methods(http.MethodGet).Path("/v1/schemas").Handler(api.SchemasHandler(schemas))

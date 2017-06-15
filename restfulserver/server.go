@@ -67,7 +67,25 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 
 func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	//Todo
+	name := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineByName(name)
+	if r == nil {
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", name)
+		rw.WriteHeader(http.StatusNotFound)
+		apiContext.Write(&Error{
+			Resource: client.Resource{
+				Id:      uuid.Rand().Hex(),
+				Type:    "error",
+				Links:   map[string]string{},
+				Actions: map[string]string{},
+			},
+			Status: http.StatusNotFound,
+			Msg:    err.Error(),
+			Code:   err.Error(),
+		})
+		return err
+	}
+	s.PipelineContext.RunPipeline(name)
 	apiContext.Write(&Empty{})
 	return nil
 }

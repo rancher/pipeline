@@ -23,6 +23,7 @@ var ErrPipelineNotFound = errors.New("Pipeline Not found")
 
 type PipelineContext struct {
 	templateBase string
+	provider     PipelineProvider
 }
 
 func (p *PipelineContext) GetPipelineByName(pipeline string) *Pipeline {
@@ -31,14 +32,16 @@ func (p *PipelineContext) GetPipelineByName(pipeline string) *Pipeline {
 
 func (p *PipelineContext) GetPipelineByNameAndVersion(pipeline, version string) *Pipeline {
 	if version != Latest {
-		return toPipeline(path.Join(p.templateBase, pipeline, version))
+		return toPipeline(path.Join(p.templateBase, pipeline), version)
 	}
 	return getLatestVersionPipelineFile(path.Join(p.templateBase, pipeline))
 }
 
-func BuildPipelineContext(context *cli.Context) *PipelineContext {
-	r := PipelineContext{}
-	r.templateBase = context.GlobalString("template_base_path")
+func BuildPipelineContext(context *cli.Context, provider PipelineProvider) *PipelineContext {
+	r := PipelineContext{
+		templateBase: context.GlobalString("template_base_path"),
+		provider:     provider,
+	}
 	f, err := os.Stat(r.templateBase)
 	if err != nil {
 		logrus.Fatal(err)
@@ -49,8 +52,8 @@ func BuildPipelineContext(context *cli.Context) *PipelineContext {
 	return &r
 }
 
-func toPipeline(pipelinePath string) *Pipeline {
-	targetPath := path.Join(pipelinePath, PipelineFileName)
+func toPipeline(pipelineBasePath, version string) *Pipeline {
+	targetPath := path.Join(pipelineBasePath, version, PipelineFileName)
 	if _, err := os.Stat(targetPath); err == os.ErrNotExist {
 		return nil
 	}
@@ -66,6 +69,7 @@ func toPipeline(pipelinePath string) *Pipeline {
 		return nil
 	}
 	r.File = string(data)
+	r.VersionSequence = version
 	return &r
 }
 
@@ -101,7 +105,7 @@ func getLatestVersionPipelineFile(pipelinePath string) *Pipeline {
 			}
 		}
 	}
-	return toPipeline(path.Join(pipelinePath, strconv.Itoa(max)))
+	return toPipeline(pipelinePath, strconv.Itoa(max))
 }
 
 func (p *PipelineContext) RunPipeline(pipeline string) (bool, error) {
@@ -109,5 +113,10 @@ func (p *PipelineContext) RunPipeline(pipeline string) (bool, error) {
 }
 
 func (p *PipelineContext) RunPipelineWithVersion(pipeline, version string) (bool, error) {
+	pp := p.GetPipelineByNameAndVersion(pipeline, version)
+	if pp == nil {
+		return false, ErrPipelineNotFound
+	}
+	pp.RunPipeline(p.provider)
 	return true, nil
 }

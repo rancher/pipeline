@@ -47,6 +47,7 @@ func NewSchema() *client.Schemas {
 type Pipeline struct {
 	client.Resource
 	pipeline.Pipeline
+	Status     []string   `json:"status,omitempty"`
 	Activities []Activity `json:"activities,omitempty"`
 }
 
