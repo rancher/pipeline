@@ -47,17 +47,6 @@ func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
-func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-	//Todo
-	apiContext.Write(&client.GenericCollection{
-		Data: []interface{}{
-		//toActivityResource(apiContext),
-		},
-	})
-	return nil
-}
-
 func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	//Todo

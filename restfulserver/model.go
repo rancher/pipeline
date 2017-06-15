@@ -65,13 +65,13 @@ type Error struct {
 
 type Activity struct {
 	client.Resource
-	Id             string             `json:"id,omitempty"`
-	FromPipeline   *pipeline.Pipeline `json:"from_pipeline,omitempty"`
-	Status         string             `json:"status,omitempty"`
-	Result         string             `json:"result,omitempty"`
-	StartTS        int64              `json:"start_ts,omitempty"`
-	StopTS         int64              `json:"stop_ts,omitempty"`
-	ActivityStages []ActivityStage    `json:"activity_stages,omitempty"`
+	Id             string            `json:"id,omitempty"`
+	FromPipeline   pipeline.Pipeline `json:"from_pipeline,omitempty"`
+	Status         string            `json:"status,omitempty"`
+	Result         string            `json:"result,omitempty"`
+	StartTS        int64             `json:"start_ts,omitempty"`
+	StopTS         int64             `json:"stop_ts,omitempty"`
+	ActivityStages []ActivityStage   `json:"activity_stages,omitempty"`
 }
 
 type ActivityStage struct {
@@ -149,4 +149,13 @@ func toPipelineResourceWithoutActivities(apiContext *api.ApiContext, pipeline *p
 	}
 	r.Actions["run"] = apiContext.UrlBuilder.ReferenceLink(r.Resource) + "?action=run"
 	return &r
+}
+
+func initActivityResource(a *Activity) {
+	a.Resource = client.Resource{
+		Id:      a.Id,
+		Type:    "activity",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
 }
