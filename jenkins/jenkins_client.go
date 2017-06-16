@@ -26,7 +26,6 @@ func InitJenkins(context *cli.Context) {
 	user = context.String("jenkins_user")
 	token = context.String("jenkins_token")
 	jenkinsTemlpateFolder := context.String("jenkins_config_template")
-	//jenkinsWorkspace := context.String("workspace")
 	if fi, err := os.Stat(jenkinsTemlpateFolder); err != nil {
 		logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
 	} else {
