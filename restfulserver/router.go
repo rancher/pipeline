@@ -7,7 +7,6 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
-	"github.com/rancher/pipeline/interceptor"
 )
 
 //HandleError handle error from operation
@@ -28,8 +27,6 @@ func NewRouter(s *Server) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	f := HandleError
 
-	// for intercepter
-	router.Methods(http.MethodPost).Path("/").HandlerFunc(interceptor.HandlerInterceptor)
 	// API framework routes
 	router.Methods(http.MethodGet).Path("/").Handler(api.VersionsHandler(schemas, "v1"))
 	router.Methods(http.MethodGet).Path("/v1/schemas").Handler(api.SchemasHandler(schemas))
@@ -39,15 +36,19 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodGet).Path("/v1/pipelines").Handler(f(schemas, s.ListPipelines))
 	router.Methods(http.MethodPost).Path("/v1/pipelines").Handler(f(schemas, s.CreatePipeline))
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}").Handler(f(schemas, s.ListPipeline))
-
+	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/activitys").Handler(f(schemas, s.ListActivitiesOfPipeline))
+	//activities
+	router.Methods(http.MethodGet).Path("/v1/activities/{id}").Handler(f(schemas, s.GetActivity))
+	router.Methods(http.MethodPost).Path("/v1/activities/").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodGet).Path("/v1/activities/").Handler(f(schemas, s.ListActivities))
+	router.Methods(http.MethodPost).Path("/v1/testsaveactivity/").Handler(f(schemas, s.TestSaveActivity))
 
 	pipelineActions := map[string]http.Handler{
 		"run":  f(schemas, s.RunPipeline),
 		"save": f(schemas, s.SavePipeline),
 	}
 	for name, actions := range pipelineActions {
-		router.Methods(http.MethodPost).Path("/v1/pipelines/{id}/").Queries("action", name).Handler(actions)
+		router.Methods(http.MethodPost).Path("/v1/pipelines/{id}").Queries("action", name).Handler(actions)
 	}
 	return router
 }

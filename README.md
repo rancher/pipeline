@@ -48,26 +48,47 @@ User can have their test, deploy and deliver stages and steps after build step.
 name: test1
 repository: http://github.com/orangedeng/ui.git
 branch: master
-target_image: rancher/ui:v0.1
+target-image: rancher/ui:v0.1
 stages:
-  - name: stage zero
-    need_approve: false
+  - name: build
+    need-approve: false
     steps:
-    - name: step zero
+    - name: build
       image: test/build:v0.1
+      type: task
       command: make
       parameters:
       - "env=dev"
-  - name: stage test
-    need_approve: false
+  - name: test
+    need-approve: false
     steps:
     - name: source code check
       image: test/test:v0.1
       command: echo 'i am test'
-    - name: server run test
+      type: task
+    - name: run server test
       image: test/run-bin:v0.1
       command: /startup.sh
+      type: task
     - name: API test 
       image: test/api-test:v0.1
       command: /startup.sh && /api_test.sh
+      type: task
+  - name: deploy to test environment
+    need-approve: true
+    steps:
+    - name: deploy a mysql
+      type: catalog
+      environment: 1a5
+      docker-compose: |
+        ...
+        ...
+      rancher-compose: |
+        ...
+        ...
+    - name: deploy app
+      type: deploy
+      deploy-environment: 1a5
+      deploy-name: app1
+      count: 2
 ```
