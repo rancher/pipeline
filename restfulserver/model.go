@@ -105,3 +105,12 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 	a.Links["pipeline"] = apiContext.UrlBuilder.ReferenceByIdLink("pipeline", a.PipelineName+":"+a.PipelineVersion)
 	return a
 }
+
+func initActivityResource(a *Activity) {
+	a.Resource = client.Resource{
+		Id:      a.Id,
+		Type:    "activity",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
+}

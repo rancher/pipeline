@@ -26,7 +26,11 @@ func InitJenkins(context *cli.Context) {
 	user = context.String("jenkins_user")
 	token = context.String("jenkins_token")
 	jenkinsTemlpateFolder := context.String("jenkins_config_template")
+<<<<<<< HEAD
 	//jenkinsWorkspace := context.String("workspace")
+=======
+	jenkinsWorkspace := context.String("workspace")
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 	if fi, err := os.Stat(jenkinsTemlpateFolder); err != nil {
 		logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
 	} else {
@@ -34,6 +38,7 @@ func InitJenkins(context *cli.Context) {
 			logrus.Fatal(ErrJenkinsTemplateNotVaild)
 		}
 	}
+<<<<<<< HEAD
 	// if fi, err := os.Stat(jenkinsWorkspace); err != nil {
 	// 	logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
 	// } else {
@@ -42,6 +47,16 @@ func InitJenkins(context *cli.Context) {
 	// 	}
 	// }
 	//JenkinsConfig.Set(JenkinsBaseWorkspacePath, jenkinsWorkspace)
+=======
+	if fi, err := os.Stat(jenkinsWorkspace); err != nil {
+		logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
+	} else {
+		if !fi.IsDir() {
+			logrus.Fatal(ErrJenkinsTemplateNotVaild)
+		}
+	}
+	JenkinsConfig.Set(JenkinsBaseWorkspacePath, jenkinsWorkspace)
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 	JenkinsConfig.Set(JenkinsTemlpateFolder, jenkinsTemlpateFolder)
 	JenkinsConfig.Set(JenkinsServerAddress, jenkinsServerAddress)
 	JenkinsConfig.Set(JenkinsUser, user)

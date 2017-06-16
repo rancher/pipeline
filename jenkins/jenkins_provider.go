@@ -4,7 +4,6 @@ import (
 	"text/template"
 
 	"bytes"
-
 	"path"
 
 	"github.com/Sirupsen/logrus"
