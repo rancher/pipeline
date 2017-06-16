@@ -8,16 +8,6 @@ import (
 	"github.com/rancher/pipeline/pipeline"
 )
 
-const pipelineFileExample = `---
-stage_zero:
-    name: stage zero
-	need_approve: false
-	steps:
-	  - name: build step
-	    image: test/build:v0.1
-		command: echo 'i am turkey'
-`
-
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
 	schemas.AddType("error", Error{})
@@ -106,7 +96,7 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 	return a
 }
 
-func initActivityResource(a *Activity) {
+func initActivityResource(a *pipeline.Activity) {
 	a.Resource = client.Resource{
 		Id:      a.Id,
 		Type:    "activity",
