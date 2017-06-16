@@ -17,37 +17,15 @@ stage_zero:
 	    image: test/build:v0.1
 		command: echo 'i am turkey'
 `
-const (
-	ActivityStepWaitting = "Waitting"
-	ActivityStepBuilding = "Building"
-	ActivityStepSuccess  = "Success"
-	ActivityStepFail     = "Fail"
-
-	ActivityStageWaitting = "Waitting"
-	ActivityStageBuilding = "Building"
-	ActivityStageSuccess  = "Success"
-	ActivityStageFail     = "Fail"
-
-	ActivityWaitting = "Waitting"
-	ActivityBuilding = "Building"
-	ActivitySuccess  = "Success"
-	ActivityFail     = "Fail"
-)
 
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
 	schemas.AddType("error", Error{})
 	schemas.AddType("apiVersion", client.Resource{})
 	schemas.AddType("schema", client.Schema{})
-	pipelineSchema(schemas.AddType("pipeline", Pipeline{}))
-	acitvitySchema(schemas.AddType("activity", Activity{}))
+	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))
+	acitvitySchema(schemas.AddType("activity", pipeline.Activity{}))
 	return schemas
-}
-
-type Pipeline struct {
-	client.Resource
-	pipeline.Pipeline
-	Activities []Activity `json:"activities,omitempty"`
 }
 
 type Empty struct {
@@ -61,34 +39,6 @@ type Error struct {
 	Msg      string `json:"message"`
 	Detail   string `json:"detail"`
 	BaseType string `json:"baseType"`
-}
-
-type Activity struct {
-	client.Resource
-	Id             string            `json:"id,omitempty"`
-	FromPipeline   pipeline.Pipeline `json:"from_pipeline,omitempty"`
-	Status         string            `json:"status,omitempty"`
-	Result         string            `json:"result,omitempty"`
-	StartTS        int64             `json:"start_ts,omitempty"`
-	StopTS         int64             `json:"stop_ts,omitempty"`
-	ActivityStages []ActivityStage   `json:"activity_stages,omitempty"`
-}
-
-type ActivityStage struct {
-	Name          string         `json:"name,omitstage"`
-	NeedApproval  bool           `json:"need_approval,omitempty"`
-	AcitvitySteps []ActivityStep `json:"activity_steps,omitempty"`
-	StartTS       int64          `json:"start_ts,omitempty"`
-	Status        string         `json:"status,omitempty"`
-}
-
-type ActivityStep struct {
-	Name    string `json:"name,omitempty"`
-	Image   string `json:"image,omitempty"`
-	Command string `json:"command,omitempty"`
-	Message string `json:"message,omitempty"`
-	Status  string `json:"status,omitempty"`
-	StartTS int64  `json:"start_ts,omitempty"`
 }
 
 func pipelineSchema(pipeline *client.Schema) {
@@ -117,38 +67,43 @@ func pipelineSchema(pipeline *client.Schema) {
 	}
 
 	pipeline.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+	pipeline.IncludeableLinks = []string{"activitys"}
 }
 
 func acitvitySchema(activity *client.Schema) {
-	activity.ResourceFields["from_pipeline"] = client.Field{
-		Type:     "struct",
-		Nullable: true,
-	}
+	activity.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+	activity.IncludeableLinks = []string{"pipeline"}
 }
 
 func toPipelineCollections(apiContext *api.ApiContext, pipelines []*pipeline.Pipeline) []interface{} {
 	var r []interface{}
 	for _, p := range pipelines {
-		r = append(r, toPipelineResourceWithoutActivities(apiContext, p))
+		r = append(r, toPipelineResource(apiContext, p))
 	}
 	return r
 }
 
-func toPipelineResourceWithoutActivities(apiContext *api.ApiContext, pipeline *pipeline.Pipeline) *Pipeline {
-	r := Pipeline{
-		Resource: client.Resource{
-			Id:      pipeline.Name,
-			Type:    "pipeline",
-			Actions: map[string]string{},
-			Links:   map[string]string{
-			//"activities": apiContext.UrlBuilder.ReferenceLink(nil),
-			},
-		},
-		Pipeline: *pipeline,
-		//Activities: []Activity{*toActivityResource(apiContext)},
+func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline) *pipeline.Pipeline {
+	pipeline.Resource = client.Resource{
+		Id:      pipeline.Name,
+		Type:    "pipeline",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
 	}
-	r.Actions["run"] = apiContext.UrlBuilder.ReferenceLink(r.Resource) + "?action=run"
-	return &r
+	pipeline.Actions["run"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=run"
+	pipeline.Links["activitys"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activitys")
+	return pipeline
+}
+
+func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipeline.Activity {
+	a.Resource = client.Resource{
+		Id:      a.Id,
+		Type:    "activity",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
+	a.Links["pipeline"] = apiContext.UrlBuilder.ReferenceByIdLink("pipeline", a.PipelineName+":"+a.PipelineVersion)
+	return a
 }
 
 func initActivityResource(a *Activity) {

@@ -1,7 +1,7 @@
 package jenkins
 
 import (
-	"fmt"
+	"errors"
 	"sync"
 )
 
@@ -16,8 +16,13 @@ const JenkinsCrumbHeader = "JenkinsCrumbHeader"
 const JenkinsCrumb = "JenkinsCrumb"
 const JenkinsJobBuildURI = "JenkinsJobBuildURI"
 const JenkinsJobBuildWithParamsURI = "JenkinsJobBuildWithParamsURI"
+const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
 
-var ErrConfigItemNotFound = fmt.Errorf("Jenkins configuration not fount")
+//const JenkinsBaseWorkspacePath = "JenkinsBaseWorkspacePath"
+const BuildJobStageConfigFile = "build_stage_example.xml"
+
+var ErrConfigItemNotFound = errors.New("Jenkins configuration not fount")
+var ErrJenkinsTemplateNotVaild = errors.New("Jenkins template folder path is not vaild")
 var jenkinsConfLock = &sync.RWMutex{}
 
 func (j jenkinsConfig) Set(key, value string) {
