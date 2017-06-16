@@ -2,14 +2,17 @@ package jenkins
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"os"
+
 	"github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
+	"github.com/urfave/cli"
 )
 
 var (
@@ -17,7 +20,44 @@ var (
 	ErrBuildJobFail  = errors.New("Build Job fail")
 )
 
-func InitJenkins(jenkinsServerAddress, user, token string) {
+func InitJenkins(context *cli.Context) {
+	var jenkinsServerAddress, user, token string
+	jenkinsServerAddress = context.String("jenkins_address")
+	user = context.String("jenkins_user")
+	token = context.String("jenkins_token")
+	jenkinsTemlpateFolder := context.String("jenkins_config_template")
+<<<<<<< HEAD
+	//jenkinsWorkspace := context.String("workspace")
+=======
+	jenkinsWorkspace := context.String("workspace")
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
+	if fi, err := os.Stat(jenkinsTemlpateFolder); err != nil {
+		logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
+	} else {
+		if !fi.IsDir() {
+			logrus.Fatal(ErrJenkinsTemplateNotVaild)
+		}
+	}
+<<<<<<< HEAD
+	// if fi, err := os.Stat(jenkinsWorkspace); err != nil {
+	// 	logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
+	// } else {
+	// 	if !fi.IsDir() {
+	// 		logrus.Fatal(ErrJenkinsTemplateNotVaild)
+	// 	}
+	// }
+	//JenkinsConfig.Set(JenkinsBaseWorkspacePath, jenkinsWorkspace)
+=======
+	if fi, err := os.Stat(jenkinsWorkspace); err != nil {
+		logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
+	} else {
+		if !fi.IsDir() {
+			logrus.Fatal(ErrJenkinsTemplateNotVaild)
+		}
+	}
+	JenkinsConfig.Set(JenkinsBaseWorkspacePath, jenkinsWorkspace)
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
+	JenkinsConfig.Set(JenkinsTemlpateFolder, jenkinsTemlpateFolder)
 	JenkinsConfig.Set(JenkinsServerAddress, jenkinsServerAddress)
 	JenkinsConfig.Set(JenkinsUser, user)
 	JenkinsConfig.Set(JenkinsToken, token)
@@ -55,7 +95,7 @@ func GetCSRF() error {
 	return nil
 }
 
-func CreateJob(jobname string) error {
+func CreateJob(jobname string, content []byte) error {
 	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
 	createJobURI, _ := JenkinsConfig.Get(CreateJobURI)
 	user, _ := JenkinsConfig.Get(JenkinsUser)
@@ -72,11 +112,8 @@ func CreateJob(jobname string) error {
 	qry := createJobURL.Query()
 	qry.Add("name", jobname)
 	createJobURL.RawQuery = qry.Encode()
-
-	//body part
-	body, _ := ioutil.ReadFile("jenkins/example_job.xml")
 	//send request part
-	req, _ := http.NewRequest(http.MethodPost, createJobURL.String(), bytes.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPost, createJobURL.String(), bytes.NewReader(content))
 	req.Header.Add(CrumbHeader, Crumb)
 	req.Header.Set("Content-Type", "application/xml")
 	req.SetBasicAuth(user, token)
@@ -95,7 +132,7 @@ func CreateJob(jobname string) error {
 	return nil
 }
 
-func BuildJob(jobname string, params map[string]string) error {
+func BuildJob(jobname string, params map[string]string) (string, error) {
 	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
 	buildURI, _ := JenkinsConfig.Get(JenkinsJobBuildURI)
 	buildURI = fmt.Sprintf(buildURI, jobname)
@@ -107,7 +144,7 @@ func BuildJob(jobname string, params map[string]string) error {
 	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
 
 	withParams := false
-	if len(params) == 0 {
+	if len(params) > 0 {
 		withParams = true
 	}
 	var targetURL *url.URL
@@ -119,7 +156,7 @@ func BuildJob(jobname string, params map[string]string) error {
 	}
 	if err != nil {
 		logrus.Error(err)
-		return err
+		return "", err
 	}
 	req, _ := http.NewRequest(http.MethodPost, targetURL.String(), nil)
 
@@ -129,12 +166,12 @@ func BuildJob(jobname string, params map[string]string) error {
 	resp, err := client.Do(req)
 	if err != nil {
 		logrus.Error(err)
-		return err
+		return "", err
 	}
 	if resp.StatusCode != 201 {
 		logrus.Error(ErrBuildJobFail)
-		return ErrBuildJobFail
+		return "", ErrBuildJobFail
 	}
 	logrus.Infof("job queue is %s", resp.Header.Get("location"))
-	return nil
+	return "", nil
 }

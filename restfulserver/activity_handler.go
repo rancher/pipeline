@@ -34,9 +34,15 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	var activities []interface{}
 	for _, gobj := range goCollection.Data {
 		b := []byte(gobj.ResourceData["data"].(string))
+<<<<<<< HEAD
+		a := &pipeline.Activity{}
+		json.Unmarshal(b, a)
+		toActivityResource(apiContext, a)
+=======
 		a := &Activity{}
 		json.Unmarshal(b, a)
 		initActivityResource(a)
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 		activities = append(activities, a)
 	}
 	apiContext.Write(&client.GenericCollection{
@@ -51,7 +57,11 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	requestBytes, err := ioutil.ReadAll(req.Body)
+<<<<<<< HEAD
+	activity := pipeline.Activity{}
+=======
 	activity := Activity{}
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 
 	if err := json.Unmarshal(requestBytes, &activity); err != nil {
 		return err
@@ -71,7 +81,11 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 }
 
 //create activity data using GenericObject
+<<<<<<< HEAD
+func CreateActivity(activity pipeline.Activity, apiClient *client.RancherClient) (*client.GenericObject, error) {
+=======
 func CreateActivity(activity Activity, apiClient *client.RancherClient) (*client.GenericObject, error) {
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 	b, err := json.Marshal(activity)
 	if err != nil {
 		return &client.GenericObject{}, err
@@ -105,14 +119,22 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
+<<<<<<< HEAD
+	toActivityResource(apiContext, &actiObj)
+=======
 	initActivityResource(&actiObj)
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 	//logrus.Infof("final object:%v", actiObj)
 	apiContext.WriteResource(&actiObj)
 	return nil
 }
 
 //Get Activity From GenericObjects By Id
+<<<<<<< HEAD
+func GetActivity(id string, apiClient *client.RancherClient) (pipeline.Activity, error) {
+=======
 func GetActivity(id string, apiClient *client.RancherClient) (Activity, error) {
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 	filters := make(map[string]interface{})
 	filters["key"] = id
 	filters["kind"] = "activity"
@@ -121,6 +143,15 @@ func GetActivity(id string, apiClient *client.RancherClient) (Activity, error) {
 	})
 
 	if err != nil {
+<<<<<<< HEAD
+		return pipeline.Activity{}, fmt.Errorf("Error %v filtering genericObjects by key", err)
+	}
+	if len(goCollection.Data) == 0 {
+		return pipeline.Activity{}, fmt.Errorf("Requested activity not found")
+	}
+	data := goCollection.Data[0]
+	activity := pipeline.Activity{}
+=======
 		return Activity{}, fmt.Errorf("Error %v filtering genericObjects by key", err)
 	}
 	if len(goCollection.Data) == 0 {
@@ -128,6 +159,7 @@ func GetActivity(id string, apiClient *client.RancherClient) (Activity, error) {
 	}
 	data := goCollection.Data[0]
 	activity := Activity{}
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 	json.Unmarshal([]byte(data.ResourceData["data"].(string)), &activity)
 	logrus.Infof("getactivity:%v", activity)
 	logrus.Infof("getresource:%v", activity.Resource)
@@ -138,10 +170,17 @@ func GetActivity(id string, apiClient *client.RancherClient) (Activity, error) {
 //test saveActivity
 func (s *Server) TestSaveActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
+<<<<<<< HEAD
+	activity := pipeline.Activity{
+		Id: "121",
+		//FromPipeline:   pipeline.Pipeline{},
+		//Result:         "no result",
+=======
 	activity := Activity{
 		Id:             "121",
 		FromPipeline:   pipeline.Pipeline{},
 		Result:         "no result",
+>>>>>>> f485aa62db7b555c5e296a71cdd80e6015766639
 		Status:         "good",
 		StartTS:        123,
 		StopTS:         948,

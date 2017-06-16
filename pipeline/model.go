@@ -1,67 +1,149 @@
 package pipeline
 
 import (
+	"time"
+
 	"github.com/Sirupsen/logrus"
-	"gopkg.in/yaml.v2"
+	"github.com/pkg/errors"
+	"github.com/rancher/go-rancher/client"
 )
 
-var data = `---
-name: test1
-repository: http://github.com/orangedeng/ui.git
-branch: master
-target_image: rancher/ui:v0.1
-stages:
-  - name: stage zero
-    need_approve: false
-    steps:
-    - name: step zero
-      image: test/build:v0.1
-      command: make
-      parameters:
-      - "env=dev"
-  - name: stage test
-    need_approve: false
-    steps:
-    - name: source code check
-      image: test/test:v0.1
-      command: echo 'i am test'
-    - name: server run test
-      image: test/run-bin:v0.1
-      command: /startup.sh
-    - name: API test 
-      image: test/api-test:v0.1
-      command: /startup.sh && /api_test.sh
-`
+const StepTypeTask = "task"
+const StepTypeCatalog = "catalog"
+const StepTypeDeploy = "deploy"
+const (
+	ActivityStepWaitting = "Waitting"
+	ActivityStepBuilding = "Building"
+	ActivityStepSuccess  = "Success"
+	ActivityStepFail     = "Fail"
+
+	ActivityStageWaitting = "Waitting"
+	ActivityStageBuilding = "Building"
+	ActivityStageSuccess  = "Success"
+	ActivityStageFail     = "Fail"
+
+	ActivityWaitting = "Waitting"
+	ActivityBuilding = "Building"
+	ActivitySuccess  = "Success"
+	ActivityFail     = "Fail"
+)
 
 type Pipeline struct {
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-	//	Version        string   `json:"version,omitempty" yaml:"version,omitempty"`
-	Repository  string   `json:"repository,omitempty" yaml:"repository,omitempty"`
-	Branch      string   `json:"branch,omitempty" yaml:"branch,omitempty"`
-	TargetImage string   `json:"target_image,omitempty" yaml:"target_image,omitempty"`
-	File        string   `json:"file"`
-	Stages      []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
+	client.Resource
+	Name            string   `json:"name,omitempty" yaml:"name,omitempty"`
+	VersionSequence string   `json:"-" yaml:"-"`
+	Repository      string   `json:"repository,omitempty" yaml:"repository,omitempty"`
+	Branch          string   `json:"branch,omitempty" yaml:"branch,omitempty"`
+	TargetImage     string   `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
+	File            string   `json:"file"`
+	Stages          []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
 
 type Stage struct {
 	Name        string  `json:"name,omitempty" yaml:"name,omitempty"`
-	NeedApprove bool    `json:"need_approve,omitempty" yaml:"need_approve,omitempty"`
+	NeedApprove bool    `json:"needApprove,omitempty" yaml:"need-approve,omitempty"`
 	Steps       []*Step `json:"steps,omitempty" yaml:"steps,omitempty"`
 }
 
 type Step struct {
-	Name       string   `json:"name,omitempty" yaml:"name,omitempty"`
-	Image      string   `json:"image,omitempty" yaml:"image,omitempty"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	//---task step
 	Command    string   `json:"command,omitempty" yaml:"command,omitempty"`
+	Image      string   `json:"image,omitempty" yaml:"image,omitempty"`
 	Parameters []string `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	//---catalog step
+	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"docker-compose,omitempty"`
+	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancher-compose,omitempty"`
+	Environment    string `json:"environment,omitempty" yaml:"environment,omitempty"`
+	//---deploy step
+	DeployName        string `json:"deployName,omitempty" yaml:"deploy-name,omitempty"`
+	DeployEnvironment string `json:"deployEnvironment,omitempty" yaml:"deploy-environment,omitempty"`
+	Count             int    `json:"count,omitempty" yaml:"count,omitempty"`
 }
 
-func ToDemoPipeline() *Pipeline {
-	r := Pipeline{}
-	if err := yaml.Unmarshal([]byte(data), &r); err != nil {
-		logrus.Error(err)
-		return nil
+type BuildStep struct {
+	Repository string `json:"-" yaml:"-"`
+	Branch     string `json:"-" yaml:"-"`
+}
+
+type PipelineProvider interface {
+	Init(*Pipeline) error
+	RunBuild(*Stage) error
+	RunStage(*Stage) error
+}
+
+type Activity struct {
+	client.Resource
+	Id              string          `json:"id,omitempty"`
+	PipelineName    string          `json:"pipelineName,omitempty"`
+	PipelineVersion string          `json:"pipelineVersion,omitempty"`
+	Status          string          `json:"status,omitempty"`
+	StartTS         int64           `json:"start_ts,omitempty"`
+	StopTS          int64           `json:"stop_ts,omitempty"`
+	ActivityStages  []ActivityStage `json:"activity_stages,omitempty"`
+}
+
+type ActivityStage struct {
+	Name          string         `json:"name,omitempty"`
+	NeedApproval  bool           `json:"need_approval,omitempty"`
+	ActivitySteps []ActivityStep `json:"activity_steps,omitempty"`
+	StartTS       int64          `json:"start_ts,omitempty"`
+	Status        string         `json:"status,omitempty"`
+	RawOutput     string         `json:"rawOutput,omitempty"`
+}
+
+type ActivityStep struct {
+	Name    string `json:"name,omitempty"`
+	Message string `json:"message,omitempty"`
+	Status  string `json:"status,omitempty"`
+	StartTS int64  `json:"start_ts,omitempty"`
+}
+
+func (p *Pipeline) RunPipeline(provider PipelineProvider) {
+	provider.Init(p)
+	if len(p.Stages) > 0 {
+		logrus.Info("building")
+		if err := provider.RunBuild(p.Stages[0]); err != nil {
+			logrus.Error(errors.Wrap(err, "build stage fail"))
+			return
+		}
 	}
-	r.File = data
+	logrus.Info("running other test")
+	for i := 1; i < len(p.Stages); i++ {
+		if err := provider.RunStage(p.Stages[i]); err != nil {
+			logrus.Error(errors.Wrapf(err, "stage <%s> fail", p.Stages[i].Name))
+			return
+		}
+	}
+}
+
+func ToDemoActivity() *Activity {
+	startTS := (time.Now().Unix() - 30) * 1000
+	stopTS := time.Now().Unix()
+	r := Activity{
+		Id:              "test",
+		PipelineName:    "test1",
+		PipelineVersion: "0",
+		Status:          ActivitySuccess,
+		StartTS:         startTS,
+		StopTS:          stopTS,
+		ActivityStages: []ActivityStage{
+			ActivityStage{
+				Name:         "build",
+				NeedApproval: false,
+				StartTS:      startTS,
+				Status:       ActivityStageSuccess,
+				RawOutput:    "",
+				ActivitySteps: []ActivityStep{
+					ActivityStep{
+						Name:    "build",
+						Message: "",
+						Status:  ActivityStageSuccess,
+					},
+				},
+			},
+		},
+	}
 	return &r
 }
