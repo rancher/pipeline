@@ -37,11 +37,25 @@ func TestReadLatestPipelineFile(t *testing.T) {
 	os.RemoveAll(path)
 }
 
+func TestReadPipelineFile(t *testing.T) {
+	S.SavePipelineFile("testpipeline", "content0")
+	S.SavePipelineFile("testpipeline", "content1")
+
+	content, err := S.ReadPipelineFile("testpipeline", "0")
+	CheckFatal(t, err)
+
+	path := filepath.Join(BasePipelinePath, "testpipeline")
+	if content != "content0" {
+		t.Fatalf("expected \"content0\" but get \"%v\"!", content)
+	}
+	os.RemoveAll(path)
+}
+
 func TestSaveLogFile(t *testing.T) {
 	S.SavePipelineFile("testp", "plcontent")
-	err := S.SaveLogFile("testp", "stageA", "stepB", "I'm logs")
+	err := S.SaveLogFile("testp", "0", "stageA", "stepB", "I'm logs")
 	CheckFatal(t, err)
-	b, _ := ioutil.ReadFile(filepath.Join(BasePipelinePath, "testp", "logs", "stageA_stepB.log"))
+	b, _ := ioutil.ReadFile(filepath.Join(BasePipelinePath, "testp", "logs", "0", "stageA_stepB.log"))
 	if string(b) != "I'm logs" {
 		t.Fatalf("expected \"I'm logs\" but get \"%v\"!", string(b))
 	}
@@ -50,8 +64,8 @@ func TestSaveLogFile(t *testing.T) {
 
 func TestReadLogFile(t *testing.T) {
 	S.SavePipelineFile("testp", "plcontent")
-	S.SaveLogFile("testp", "stageC", "stepD", "I'm logs")
-	content, err := S.ReadLogFile("testp", "stageC", "stepD")
+	S.SaveLogFile("testp", "0", "stageC", "stepD", "I'm logs")
+	content, err := S.ReadLogFile("testp", "0", "stageC", "stepD")
 	CheckFatal(t, err)
 	if content != "I'm logs" {
 		t.Fatalf("expected \"I'm logs\" but get \"%v\"!", content)

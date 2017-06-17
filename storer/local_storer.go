@@ -71,10 +71,13 @@ func (l *LocalStorer) ReadLatestPipelineFile(pipelinePath string) (string, error
 }
 
 //SaveLogFile saves step log file in "stagename_stepname.log" under pipeline_folder/logs
-func (l *LocalStorer) SaveLogFile(pipelinePath string, stageName string, stepName string, content string) error {
-	logPath := filepath.Join(BasePipelinePath, pipelinePath, "logs")
+func (l *LocalStorer) SaveLogFile(pipelinePath string, version string, stageName string, stepName string, content string) error {
+	if pipelinePath == "" || version == "" || stageName == "" || stepName == "" {
+		return errors.New("invalid empty param")
+	}
+	logPath := filepath.Join(BasePipelinePath, pipelinePath, "logs", version)
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		err := os.Mkdir(logPath, 0755)
+		err := os.MkdirAll(logPath, 0755)
 		if err != nil {
 			return err
 		}
@@ -88,9 +91,12 @@ func (l *LocalStorer) SaveLogFile(pipelinePath string, stageName string, stepNam
 }
 
 //ReadLogFile reads log file from pipeline path
-func (l *LocalStorer) ReadLogFile(pipelinePath string, stageName string, stepName string) (string, error) {
+func (l *LocalStorer) ReadLogFile(pipelinePath string, version string, stageName string, stepName string) (string, error) {
+	if pipelinePath == "" || version == "" || stageName == "" || stepName == "" {
+		return "", errors.New("invalid empty param")
+	}
 	fName := stageName + "_" + stepName + ".log"
-	fPath := filepath.Join(BasePipelinePath, pipelinePath, "logs", fName)
+	fPath := filepath.Join(BasePipelinePath, pipelinePath, "logs", version, fName)
 	b, err := ioutil.ReadFile(fPath)
 	if err != nil {
 		return "", err

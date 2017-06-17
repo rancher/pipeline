@@ -34,15 +34,15 @@ func (g *GitStorer) ReadLatestPipelineFile(pipelinePath string) (string, error) 
 }
 
 //SaveLogFile saves step log file in "stagename_stepname.log" under pipeline_folder/logs
-func (g *GitStorer) SaveLogFile(pipelinePath string, stageName string, stepName string, content string) error {
-	return g.LocalStorer.SaveLogFile(pipelinePath, stageName, stepName, content)
+func (g *GitStorer) SaveLogFile(pipelinePath string, version string, stageName string, stepName string, content string) error {
+	return g.LocalStorer.SaveLogFile(pipelinePath, version, stageName, stepName, content)
 	//TODO
 	//git operations
 }
 
 //ReadLogFile reads log file from pipeline path
-func (g *GitStorer) ReadLogFile(pipelinePath string, stageName string, stepName string) (string, error) {
-	return g.LocalStorer.ReadLogFile(pipelinePath, stageName, stepName)
+func (g *GitStorer) ReadLogFile(pipelinePath string, version string, stageName string, stepName string) (string, error) {
+	return g.LocalStorer.ReadLogFile(pipelinePath, version, stageName, stepName)
 	//TODO
 	//git operations
 }
