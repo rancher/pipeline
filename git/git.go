@@ -13,6 +13,29 @@ func Clone(path, url, branch string) error {
 	return runcmd("git", "clone", "-b", branch, "--single-branch", url, path)
 }
 
+func Init(path string, url string) error {
+	return runcmd("git", "init", path)
+}
+
+func Push(path, repo, refspec string) error {
+	return runcmd("git", "-C", path, "push", repo, refspec)
+}
+
+//add,commit and push changes.
+func LazyPush(path, repo, refspec string) error {
+	err := runcmd("git", "-C", path, "add", ".")
+	if err != nil {
+		return err
+	}
+
+	err = runcmd("git", "-C", path, "commit", "-m", "updating")
+	if err != nil {
+		return err
+	}
+	//-f is added for test purpose, remove later.
+	err = runcmd("git", "-C", path, "push", repo, refspec, "-f")
+	return err
+}
 func Update(path, branch string) error {
 	if err := runcmd("git", "-C", path, "fetch"); err != nil {
 		return err
