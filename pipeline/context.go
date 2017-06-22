@@ -1,12 +1,14 @@
 package pipeline
 
 import (
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path"
 	"strconv"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/pipeline/storer"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
@@ -24,6 +26,7 @@ var ErrPipelineNotFound = errors.New("Pipeline Not found")
 type PipelineContext struct {
 	templateBase string
 	provider     PipelineProvider
+	storer       storer.Storer
 }
 
 func (p *PipelineContext) GetPipelineByName(pipeline string) *Pipeline {
@@ -41,6 +44,7 @@ func BuildPipelineContext(context *cli.Context, provider PipelineProvider) *Pipe
 	r := PipelineContext{
 		templateBase: context.GlobalString("template_base_path"),
 		provider:     provider,
+		storer:       storer.InitLocalStorer(context.GlobalString("template_base_path")),
 	}
 	f, err := os.Stat(r.templateBase)
 	if err != nil {
@@ -50,6 +54,14 @@ func BuildPipelineContext(context *cli.Context, provider PipelineProvider) *Pipe
 		logrus.Fatal(ErrTemplatePathNotVaild)
 	}
 	return &r
+}
+
+func (p *PipelineContext) SavePipeline(pipeline Pipeline) error {
+	b, err := json.Marshal(pipeline)
+	if err != nil {
+		return err
+	}
+	return p.storer.SavePipelineFile(pipeline.Name, string(b))
 }
 
 func toPipeline(pipelineBasePath, version string) *Pipeline {

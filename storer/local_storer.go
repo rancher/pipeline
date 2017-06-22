@@ -13,14 +13,19 @@ const (
 )
 
 type LocalStorer struct {
+	BasePipelinePath string
 }
 
-func init() {
-	if _, err := os.Stat(BasePipelinePath); os.IsNotExist(err) {
-		err := os.MkdirAll(BasePipelinePath, 0755)
+func InitLocalStorer(basePipelinePath string) *LocalStorer {
+	if _, err := os.Stat(basePipelinePath); os.IsNotExist(err) {
+		err := os.MkdirAll(basePipelinePath, 0755)
 		if err != nil {
 			panic(err)
 		}
+	}
+
+	return &LocalStorer{
+		BasePipelinePath: basePipelinePath,
 	}
 }
 
@@ -30,7 +35,7 @@ func (l *LocalStorer) GetName() string {
 
 //SavePipelineFile save pipeline file with the content to a new version folder in the path
 func (l *LocalStorer) SavePipelineFile(pipelinePath string, content string) error {
-	path := filepath.Join(BasePipelinePath, pipelinePath)
+	path := filepath.Join(l.BasePipelinePath, pipelinePath)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err := os.Mkdir(path, 0755)
 		if err != nil {
@@ -53,7 +58,7 @@ func (l *LocalStorer) SavePipelineFile(pipelinePath string, content string) erro
 
 //ReadPipelineFile read pipeline file in the path with specific version
 func (l *LocalStorer) ReadPipelineFile(pipelinePath string, version string) (string, error) {
-	path := filepath.Join(BasePipelinePath, pipelinePath, version, "pipeline.yaml")
+	path := filepath.Join(l.BasePipelinePath, pipelinePath, version, "pipeline.yaml")
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
 		return "", err
@@ -75,7 +80,7 @@ func (l *LocalStorer) SaveLogFile(pipelinePath string, version string, stageName
 	if pipelinePath == "" || version == "" || stageName == "" || stepName == "" {
 		return errors.New("invalid empty param")
 	}
-	logPath := filepath.Join(BasePipelinePath, pipelinePath, "logs", version)
+	logPath := filepath.Join(l.BasePipelinePath, pipelinePath, "logs", version)
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
 		err := os.MkdirAll(logPath, 0755)
 		if err != nil {
@@ -96,7 +101,7 @@ func (l *LocalStorer) ReadLogFile(pipelinePath string, version string, stageName
 		return "", errors.New("invalid empty param")
 	}
 	fName := stageName + "_" + stepName + ".log"
-	fPath := filepath.Join(BasePipelinePath, pipelinePath, "logs", version, fName)
+	fPath := filepath.Join(l.BasePipelinePath, pipelinePath, "logs", version, fName)
 	b, err := ioutil.ReadFile(fPath)
 	if err != nil {
 		return "", err
@@ -107,7 +112,7 @@ func (l *LocalStorer) ReadLogFile(pipelinePath string, version string, stageName
 
 //GetLatestVersion gets latest pipeline file version in the pipeline path, return -1 if non valid version exists
 func (l *LocalStorer) GetLatestVersion(pipelinePath string) int {
-	path := filepath.Join(BasePipelinePath, pipelinePath)
+	path := filepath.Join(l.BasePipelinePath, pipelinePath)
 	latestVersion := -1
 	files, err := ioutil.ReadDir(path)
 	if err != nil {

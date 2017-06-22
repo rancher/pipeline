@@ -9,7 +9,9 @@ import (
 	"testing"
 )
 
-var S Storer = &LocalStorer{} //InitializeGitStorer("", "master")
+var S Storer = InitLocalStorer("/var/tmp/pipelines")
+
+//var S Storer = InitGitStorer("/var/tmp/pipelines", "", "master")
 
 func TestSavePipelineFile(t *testing.T) {
 	path := filepath.Join(BasePipelinePath, "testpipeline")

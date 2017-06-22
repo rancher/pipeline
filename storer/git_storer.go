@@ -21,15 +21,17 @@ func (g *GitStorer) GetName() string {
 	return GitStorerName
 }
 
-func InitializeGitStorer(repo string, branch string) *GitStorer {
-	return &GitStorer{
+func InitGitStorer(basePipelinePath, repo, branch string) *GitStorer {
+	r := &GitStorer{
 		RepoURL: repo,
 		Branch:  branch,
 	}
+	r.LocalStorer = *InitLocalStorer(basePipelinePath)
+	return r
 }
 
 func (g *GitStorer) getRepo(pipelinePath string) error {
-	path := filepath.Join(BasePipelinePath, pipelinePath)
+	path := filepath.Join(g.BasePipelinePath, pipelinePath)
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		err := os.Mkdir(path, 0755)
 		if err != nil {
@@ -54,7 +56,7 @@ func (g *GitStorer) SavePipelineFile(pipelinePath string, content string) error 
 		return err
 	}
 
-	path := filepath.Join(BasePipelinePath, pipelinePath)
+	path := filepath.Join(g.BasePipelinePath, pipelinePath)
 	err = git.LazyPush(path, g.RepoURL, g.Branch)
 
 	return err
@@ -77,7 +79,7 @@ func (g *GitStorer) SaveLogFile(pipelinePath string, version string, stageName s
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(BasePipelinePath, pipelinePath)
+	path := filepath.Join(g.BasePipelinePath, pipelinePath)
 	err = git.LazyPush(path, g.RepoURL, g.Branch)
 
 	return err
