@@ -1,14 +1,19 @@
 package restfulserver
 
 import (
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"strings"
+
+	yaml "gopkg.in/yaml.v2"
 
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
 	"github.com/rancher/pipeline/pipeline"
+	"github.com/rancher/pipeline/storer"
 	"github.com/sluu99/uuid"
 )
 
@@ -58,8 +63,18 @@ func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 
 func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	//Todo
-	apiContext.Write(&Empty{})
+	data, err := ioutil.ReadAll(req.Body)
+	pipeline := pipeline.Pipeline{}
+
+	if err := json.Unmarshal(data, &pipeline); err != nil {
+		return err
+	}
+	err = s.PipelineContext.SavePipeline(pipeline)
+	if err != nil {
+		return err
+	}
+
+	apiContext.Write(toPipelineResource(apiContext, &pipeline))
 	return nil
 }
 
@@ -90,6 +105,18 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 
 func (s *Server) SavePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
+	requestBytes, err := ioutil.ReadAll(req.Body)
+	ppl := pipeline.Pipeline{}
+
+	if err := json.Unmarshal(requestBytes, &ppl); err != nil {
+		return err
+	}
+	st := &storer.LocalStorer{}
+	yamlBytes, err := yaml.Marshal(ppl)
+	if err != nil {
+		return err
+	}
+	st.SavePipelineFile(ppl.Name, string(yamlBytes))
 	//Todo
 	apiContext.Write(&Empty{})
 	return nil
