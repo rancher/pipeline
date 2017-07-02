@@ -243,7 +243,11 @@ func (p *PipelineContext) RunPipeline(id string) (bool, error) {
 	if pp == nil {
 		return false, ErrPipelineNotFound
 	}
-	pp.RunPipeline(p.provider)
+
+	err := p.provider.RunPipeline(pp)
+	if err != nil {
+		return false, err
+	}
 	return true, nil
 }
 
@@ -252,6 +256,6 @@ func (p *PipelineContext) RunPipelineWithVersion(pipeline, version string) (bool
 	if pp == nil {
 		return false, ErrPipelineNotFound
 	}
-	pp.RunPipeline(p.provider)
+	p.provider.RunPipeline(pp)
 	return true, nil
 }

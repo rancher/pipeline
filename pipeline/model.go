@@ -3,8 +3,6 @@ package pipeline
 import (
 	"time"
 
-	"github.com/Sirupsen/logrus"
-	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/client"
 )
 
@@ -69,7 +67,8 @@ type BuildStep struct {
 
 type PipelineProvider interface {
 	Init(*Pipeline) error
-	RunBuild(*Stage) error
+	RunPipeline(*Pipeline) error
+	RunBuild(*Stage, string) error
 	RunStage(*Stage) error
 }
 
@@ -86,6 +85,7 @@ type Activity struct {
 }
 
 type ActivityStage struct {
+	ActivityId    string         `json:"activity_id,omitempty"`
 	Name          string         `json:"name,omitempty"`
 	NeedApproval  bool           `json:"need_approval,omitempty"`
 	ActivitySteps []ActivityStep `json:"activity_steps,omitempty"`
@@ -99,24 +99,6 @@ type ActivityStep struct {
 	Message string `json:"message,omitempty"`
 	Status  string `json:"status,omitempty"`
 	StartTS int64  `json:"start_ts,omitempty"`
-}
-
-func (p *Pipeline) RunPipeline(provider PipelineProvider) {
-	provider.Init(p)
-	if len(p.Stages) > 0 {
-		logrus.Info("building")
-		if err := provider.RunBuild(p.Stages[0]); err != nil {
-			logrus.Error(errors.Wrap(err, "build stage fail"))
-			return
-		}
-	}
-	logrus.Info("running other test")
-	for i := 1; i < len(p.Stages); i++ {
-		if err := provider.RunStage(p.Stages[i]); err != nil {
-			logrus.Error(errors.Wrapf(err, "stage <%s> fail", p.Stages[i].Name))
-			return
-		}
-	}
 }
 
 func ToDemoActivity() *Activity {
