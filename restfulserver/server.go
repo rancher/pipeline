@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-	"strings"
 
 	yaml "gopkg.in/yaml.v2"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
@@ -33,16 +33,10 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 
 func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	name := mux.Vars(req)["id"]
-	nameAndVersion := strings.Split(name, ":")
-	var r *pipeline.Pipeline
-	if len(nameAndVersion) == 2 {
-		r = s.PipelineContext.GetPipelineByNameAndVersion(nameAndVersion[0], nameAndVersion[1])
-	} else {
-		r = s.PipelineContext.GetPipelineByName(name)
-	}
+	id := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineById(id)
 	if r == nil {
-		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", name)
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
 		rw.WriteHeader(http.StatusNotFound)
 		apiContext.Write(&Error{
 			Resource: client.Resource{
@@ -65,11 +59,12 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
 	pipeline := pipeline.Pipeline{}
-
+	logrus.Infof("start create pipeline,get data:%v", string(data))
 	if err := json.Unmarshal(data, &pipeline); err != nil {
 		return err
 	}
-	err = s.PipelineContext.SavePipeline(pipeline)
+	logrus.Infof("pipeline is %v", pipeline)
+	err = s.PipelineContext.CreatePipeline(pipeline)
 	if err != nil {
 		return err
 	}
@@ -78,12 +73,41 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	return nil
 }
 
+func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	data, err := ioutil.ReadAll(req.Body)
+	pipeline := pipeline.Pipeline{}
+	logrus.Infof("start create pipeline,get data:%v", string(data))
+	if err := json.Unmarshal(data, &pipeline); err != nil {
+		return err
+	}
+	logrus.Infof("pipeline is %v", pipeline)
+	err = s.PipelineContext.UpdatePipeline(pipeline)
+	if err != nil {
+		return err
+	}
+
+	apiContext.Write(toPipelineResource(apiContext, &pipeline))
+	return nil
+}
+
+func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error {
+	//apiContext := api.GetApiContext(req)
+	id := mux.Vars(req)["id"]
+	err := s.PipelineContext.DeletePipeline(id)
+	if err != nil {
+		return err
+	}
+	//apiContext.Write(toPipelineResource(apiContext, r))
+	return nil
+}
+
 func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	name := mux.Vars(req)["id"]
-	r := s.PipelineContext.GetPipelineByName(name)
+	id := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineById(id)
 	if r == nil {
-		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", name)
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
 		rw.WriteHeader(http.StatusNotFound)
 		apiContext.Write(&Error{
 			Resource: client.Resource{
@@ -98,7 +122,7 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 		})
 		return err
 	}
-	s.PipelineContext.RunPipeline(name)
+	s.PipelineContext.RunPipeline(id)
 	apiContext.Write(&Empty{})
 	return nil
 }

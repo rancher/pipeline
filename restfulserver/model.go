@@ -38,7 +38,6 @@ func pipelineSchema(pipeline *client.Schema) {
 	pipelineName.Required = true
 	pipelineName.Unique = true
 	pipeline.ResourceFields["name"] = pipelineName
-
 	pipelineRepository := pipeline.ResourceFields["repository"]
 	pipelineRepository.Create = true
 	pipelineRepository.Required = true
@@ -75,7 +74,7 @@ func toPipelineCollections(apiContext *api.ApiContext, pipelines []*pipeline.Pip
 
 func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline) *pipeline.Pipeline {
 	pipeline.Resource = client.Resource{
-		Id:      pipeline.Name,
+		Id:      pipeline.Id,
 		Type:    "pipeline",
 		Actions: map[string]string{},
 		Links:   map[string]string{},

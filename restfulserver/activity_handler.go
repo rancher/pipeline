@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
+	"github.com/sluu99/uuid"
 )
 
 //List All Activities
@@ -47,7 +48,7 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 
 }
 
-//SaveActivity Handler
+//CreateActivity Handler
 func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	requestBytes, err := ioutil.ReadAll(req.Body)
@@ -57,21 +58,42 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 
-	apiClient, err := util.GetRancherClient()
+	_, err = CreateActivity(activity)
 	if err != nil {
 		return err
 	}
-	actiObj, err := CreateActivity(activity, apiClient)
+	toActivityResource(apiContext, &activity)
+	apiContext.Write(&activity)
+	return nil
+
+}
+
+func (s *Server) UpdateActivity(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	requestBytes, err := ioutil.ReadAll(req.Body)
+	activity := pipeline.Activity{}
+
+	if err := json.Unmarshal(requestBytes, &activity); err != nil {
+		return err
+	}
+
+	err = UpdateActivity(activity)
 	if err != nil {
 		return err
 	}
-	apiContext.Write(actiObj)
+	toActivityResource(apiContext, &activity)
+	apiContext.Write(&activity)
 	return nil
 
 }
 
 //create activity data using GenericObject
-func CreateActivity(activity pipeline.Activity, apiClient *client.RancherClient) (*client.GenericObject, error) {
+func CreateActivity(activity pipeline.Activity) (*client.GenericObject, error) {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return &client.GenericObject{}, err
+	}
+	activity.Id = uuid.Rand().Hex()
 	b, err := json.Marshal(activity)
 	if err != nil {
 		return &client.GenericObject{}, err
@@ -79,6 +101,7 @@ func CreateActivity(activity pipeline.Activity, apiClient *client.RancherClient)
 	resourceData := map[string]interface{}{
 		"data": string(b),
 	}
+
 	obj, err := apiClient.GenericObject.Create(&client.GenericObject{
 		Name:         activity.Id,
 		Key:          activity.Id,
@@ -92,16 +115,46 @@ func CreateActivity(activity pipeline.Activity, apiClient *client.RancherClient)
 	return obj, nil
 }
 
-//Get Activity Handler
-func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
+func UpdateActivity(activity pipeline.Activity) error {
+	b, err := json.Marshal(activity)
+	if err != nil {
+		return err
+	}
+	resourceData := map[string]interface{}{
+		"data": string(b),
+	}
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return err
 	}
+	existing, err := apiClient.GenericObject.ById(activity.Id)
+	logrus.Infof("existing pipeline:%v", existing)
+	if err != nil {
+		logrus.Errorf("find existing activity got error")
+		return err
+	}
+	if existing != nil {
+		existing, err = apiClient.GenericObject.Update(existing, &client.GenericObject{
+			Name:         activity.Id,
+			Key:          activity.Id,
+			ResourceData: resourceData,
+			Kind:         "activity",
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		return errors.New("cannot get existing activity to update")
+	}
+	return nil
+}
+
+//Get Activity Handler
+func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
 
 	id := mux.Vars(req)["id"]
-	actiObj, err := GetActivity(id, apiClient)
+	actiObj, err := GetActivity(id)
 	if err != nil {
 		return err
 	}
@@ -112,14 +165,17 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 }
 
 //Get Activity From GenericObjects By Id
-func GetActivity(id string, apiClient *client.RancherClient) (pipeline.Activity, error) {
+func GetActivity(id string) (pipeline.Activity, error) {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return pipeline.Activity{}, err
+	}
 	filters := make(map[string]interface{})
 	filters["key"] = id
 	filters["kind"] = "activity"
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
 	})
-
 	if err != nil {
 		return pipeline.Activity{}, fmt.Errorf("Error %v filtering genericObjects by key", err)
 	}
@@ -148,14 +204,8 @@ func (s *Server) TestSaveActivity(rw http.ResponseWriter, req *http.Request) err
 		ActivityStages: nil,
 	}
 	logrus.Infof("testing save activity:%v", activity)
-	apiClient, err := util.GetRancherClient()
-	if err != nil {
-		return err
-	}
-	if apiClient == nil {
-		return errors.New("cannot create apiClient")
-	}
-	actiObj, err := CreateActivity(activity, apiClient)
+
+	actiObj, err := CreateActivity(activity)
 	if err != nil {
 		return err
 	}
