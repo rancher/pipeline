@@ -230,6 +230,27 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 	return nil
 }
 
+// GetStepLog gets running logs of a particular step
+func (s *Server) GetStepLog(activityId string, stageOrdinal int, stepOrdinal int) (string, error) {
+	activity, err := GetActivity(activityId, s.PipelineContext)
+	if err != nil {
+		return "", err
+	}
+	stageSize := len(activity.ActivityStages)
+
+	if stageOrdinal >= stageSize {
+		return "", errors.New("stage out of size")
+	}
+	stage := activity.ActivityStages[stageOrdinal]
+
+	stepSize := len(stage.ActivitySteps)
+	if stepOrdinal >= stepSize {
+		return "", errors.New("step out of size")
+	}
+	step := stage.ActivitySteps[stepOrdinal]
+	return step.Message, nil
+}
+
 func NewServer(pipelineContext *pipeline.PipelineContext) *Server {
 	return &Server{
 		PipelineContext: pipelineContext,
