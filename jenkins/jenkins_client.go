@@ -2,6 +2,7 @@ package jenkins
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,8 +17,10 @@ import (
 )
 
 var (
-	ErrCreateJobFail = errors.New("Create Job fail")
-	ErrBuildJobFail  = errors.New("Build Job fail")
+	ErrCreateJobFail    = errors.New("Create Job fail")
+	ErrBuildJobFail     = errors.New("Build Job fail")
+	ErrGetBuildInfoFail = errors.New("Get Build Info fail")
+	ErrGetJobInfoFail   = errors.New("Get Job Info fail")
 )
 
 func InitJenkins(context *cli.Context) {
@@ -150,4 +153,131 @@ func BuildJob(jobname string, params map[string]string) (string, error) {
 	}
 	logrus.Infof("job queue is %s", resp.Header.Get("location"))
 	return "", nil
+}
+
+func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	buildInfoURI, _ := JenkinsConfig.Get(JenkinsBuildInfoURI)
+	buildInfoURI = fmt.Sprintf(buildInfoURI, jobname)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	var targetURL *url.URL
+	var err error
+	targetURL, err = url.Parse(sah + buildInfoURI)
+	logrus.Infof("targetURL is :%v", targetURL)
+	if err != nil {
+		logrus.Error(err)
+		return nil, err
+	}
+	req, _ := http.NewRequest(http.MethodPost, targetURL.String(), nil)
+
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return nil, err
+	}
+	logrus.Infof("response code is :%v", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		logrus.Error(ErrGetBuildInfoFail)
+		return nil, ErrGetBuildInfoFail
+	}
+	buildInfo := &JenkinsBuildInfo{}
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	err = json.Unmarshal(respBytes, buildInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Infof("build info is %v", buildInfo)
+	return buildInfo, nil
+
+}
+
+func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	jobInfoURI, _ := JenkinsConfig.Get(JenkinsJobInfoURI)
+	jobInfoURI = fmt.Sprintf(jobInfoURI, jobname)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	var targetURL *url.URL
+	var err error
+	targetURL, err = url.Parse(sah + jobInfoURI)
+	logrus.Infof("targetURL is :%v", targetURL)
+	if err != nil {
+		logrus.Error(err)
+		return nil, err
+	}
+	req, _ := http.NewRequest(http.MethodGet, targetURL.String(), nil)
+
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return nil, err
+	}
+	logrus.Infof("response code is :%v", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		logrus.Error(ErrGetJobInfoFail)
+		return nil, ErrGetJobInfoFail
+	}
+	jobInfo := &JenkinsJobInfo{}
+	respBytes, err := ioutil.ReadAll(resp.Body)
+	err = json.Unmarshal(respBytes, jobInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	logrus.Infof("build info is %v", jobInfo)
+	return jobInfo, nil
+
+}
+
+func GetBuildRawOutput(jobname string) (string, error) {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	buildRawOutputURI, _ := JenkinsConfig.Get(JenkinsBuildLogURI)
+	buildRawOutputURI = fmt.Sprintf(buildRawOutputURI, jobname)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	var targetURL *url.URL
+	var err error
+	targetURL, err = url.Parse(sah + buildRawOutputURI)
+	logrus.Infof("targetURL is :%v", targetURL)
+	if err != nil {
+		logrus.Error(err)
+		return "", err
+	}
+	req, _ := http.NewRequest(http.MethodGet, targetURL.String(), nil)
+
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return "", err
+	}
+	logrus.Infof("response code is :%v", resp.StatusCode)
+	if resp.StatusCode != 200 {
+		logrus.Error(ErrGetJobInfoFail)
+		return "", ErrGetJobInfoFail
+	}
+	respBytes, err := ioutil.ReadAll(resp.Body)
+
+	logrus.Infof("build info is %v", string(respBytes))
+	return string(respBytes), nil
+
 }

@@ -2,7 +2,6 @@ package restfulserver
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -10,16 +9,17 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
-	"github.com/rancher/go-rancher/v2"
+	v1client "github.com/rancher/go-rancher/client"
+	client "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
-	"github.com/sluu99/uuid"
 )
 
 //List All Activities
 func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	apiClient, err := util.GetRancherClient()
+	logrus.Infof("req2:%v", req.URL.Path)
 	if err != nil {
 		return err
 	}
@@ -37,12 +37,32 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
+		//When get a unfinish Activity ,try to sync from provider and update its status
+		if a.Status == "Waitting" || a.Status == "Building" {
+			err = s.PipelineContext.SyncActivity(a)
+			if err != nil {
+				logrus.Error(err)
+				//skip nonsync one
+				continue
+			}
+			err = UpdateActivity(*a)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+		}
 		toActivityResource(apiContext, a)
 		activities = append(activities, a)
 	}
-	apiContext.Write(&client.GenericCollection{
+	logrus.Info("are you kiding?")
+	logrus.Infof("activity resource is :%v", &client.GenericCollection{
 		Data: activities,
 	})
+	//v2client here generates error?
+	apiContext.Write(&v1client.GenericCollection{
+		Data: activities,
+	})
+	logrus.Infof("req3:%v", req.URL.Path)
 
 	return nil
 
@@ -93,7 +113,7 @@ func CreateActivity(activity pipeline.Activity) (*client.GenericObject, error) {
 	if err != nil {
 		return &client.GenericObject{}, err
 	}
-	activity.Id = uuid.Rand().Hex()
+	//activity.Id = uuid.Rand().Hex()
 	b, err := json.Marshal(activity)
 	if err != nil {
 		return &client.GenericObject{}, err
@@ -127,24 +147,31 @@ func UpdateActivity(activity pipeline.Activity) error {
 	if err != nil {
 		return err
 	}
-	existing, err := apiClient.GenericObject.ById(activity.Id)
-	logrus.Infof("existing pipeline:%v", existing)
+
+	filters := make(map[string]interface{})
+	filters["key"] = activity.Id
+	filters["kind"] = "activity"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
 	if err != nil {
-		logrus.Errorf("find existing activity got error")
-		return err
+		logrus.Errorf("Error %v filtering genericObjects by key", err)
+		return nil
 	}
-	if existing != nil {
-		existing, err = apiClient.GenericObject.Update(existing, &client.GenericObject{
-			Name:         activity.Id,
-			Key:          activity.Id,
-			ResourceData: resourceData,
-			Kind:         "activity",
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		return errors.New("cannot get existing activity to update")
+	if len(goCollection.Data) == 0 {
+		logrus.Errorf("Error %v filtering genericObjects by key", err)
+		return nil
+	}
+	existing := goCollection.Data[0]
+	logrus.Infof("existing pipeline:%v", existing)
+	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
+		Name:         activity.Id,
+		Key:          activity.Id,
+		ResourceData: resourceData,
+		Kind:         "activity",
+	})
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -154,7 +181,7 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
 	id := mux.Vars(req)["id"]
-	actiObj, err := GetActivity(id)
+	actiObj, err := GetActivity(id, s.PipelineContext)
 	if err != nil {
 		return err
 	}
@@ -165,7 +192,7 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 }
 
 //Get Activity From GenericObjects By Id
-func GetActivity(id string) (pipeline.Activity, error) {
+func GetActivity(id string, pContext *pipeline.PipelineContext) (pipeline.Activity, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return pipeline.Activity{}, err
@@ -188,27 +215,18 @@ func GetActivity(id string) (pipeline.Activity, error) {
 	logrus.Infof("getactivity:%v", activity)
 	logrus.Infof("getresource:%v", activity.Resource)
 
+	//When get a unfinish Activity ,try to sync from provider and update its status
+	if activity.Status == "Waitting" || activity.Status == "Building" {
+		err = pContext.SyncActivity(&activity)
+		if err != nil {
+			logrus.Error(err)
+			return pipeline.Activity{}, err
+		}
+		err = UpdateActivity(activity)
+		if err != nil {
+			logrus.Error(err)
+			return pipeline.Activity{}, err
+		}
+	}
 	return activity, nil
-}
-
-//test saveActivity
-func (s *Server) TestSaveActivity(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-	activity := pipeline.Activity{
-		Id: "121",
-		//FromPipeline:   pipeline.Pipeline{},
-		//Result:         "no result",
-		Status:         "good",
-		StartTS:        123,
-		StopTS:         948,
-		ActivityStages: nil,
-	}
-	logrus.Infof("testing save activity:%v", activity)
-
-	actiObj, err := CreateActivity(activity)
-	if err != nil {
-		return err
-	}
-	apiContext.Write(actiObj)
-	return nil
 }

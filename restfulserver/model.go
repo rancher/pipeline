@@ -52,6 +52,11 @@ func pipelineSchema(pipeline *client.Schema) {
 	pipeline.ResourceActions = map[string]client.Action{
 		"run": client.Action{
 			Output: "activity",
+		}, "update": client.Action{
+			Output: "pipeline",
+		},
+		"remove": client.Action{
+			Output: "pipeline",
 		},
 	}
 
@@ -80,6 +85,9 @@ func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline)
 		Links:   map[string]string{},
 	}
 	pipeline.Actions["run"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=run"
+	pipeline.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=update"
+	pipeline.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=remove"
+
 	pipeline.Links["activitys"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activitys")
 	return pipeline
 }

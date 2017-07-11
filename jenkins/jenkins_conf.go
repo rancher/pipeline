@@ -15,6 +15,9 @@ const GetCrumbURI = "GetCrumbURI"
 const JenkinsCrumbHeader = "JenkinsCrumbHeader"
 const JenkinsCrumb = "JenkinsCrumb"
 const JenkinsJobBuildURI = "JenkinsJobBuildURI"
+const JenkinsJobInfoURI = "JenkinsJobInfoURI"
+const JenkinsBuildInfoURI = "JenkinsBuildInfoURI"
+const JenkinsBuildLogURI = "JenkinsBuildLogURI"
 const JenkinsJobBuildWithParamsURI = "JenkinsJobBuildWithParamsURI"
 const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
 
@@ -45,4 +48,7 @@ var JenkinsConfig = jenkinsConfig{
 	GetCrumbURI:                  "/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)",
 	JenkinsJobBuildURI:           "/job/%s/build",
 	JenkinsJobBuildWithParamsURI: "/job/%s/buildWithParameters",
+	JenkinsJobInfoURI:            "/job/%s/api/json",
+	JenkinsBuildInfoURI:          "/job/%s/lastBuild/api/json",
+	JenkinsBuildLogURI:           "/job/%s/lastBuild/consoleText",
 }

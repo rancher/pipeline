@@ -20,10 +20,7 @@ func TestModel(t *testing.T) {
 		BlockBuildWhenDownstreamBuilding: false,
 		BlockBuildWhenUpstreamBuilding:   false,
 		CustomWorkspace:                  "$JENKINS_HOME/workspace/test",
-		Builders: []JenkinsBuilder{
-			JenkinsBuilder{Command: "echo build1"},
-			JenkinsBuilder{Command: "echo build2"},
-		},
+		Builders:                         JenkinsBuilder{[]JenkinsTaskShell{JenkinsTaskShell{Command: "echo build1"}, JenkinsTaskShell{Command: "echo build2"}}},
 	}
 	output, err := xml.MarshalIndent(v, "  ", "    ")
 	if err != nil {

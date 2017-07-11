@@ -17,7 +17,10 @@ func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) e
 			// apiContext.Write(err)
 			//apiContext.WriteErr(err)
 			logrus.Error(err)
+			logrus.Infof("req1:%v", req.URL.Path)
+			logrus.Infof("handle here")
 		}
+		logrus.Infof("handle there")
 	}))
 }
 
@@ -39,15 +42,16 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/activitys").Handler(f(schemas, s.ListActivitiesOfPipeline))
 	router.Methods(http.MethodDelete).Path("/v1/pipelines/{id}").Handler(f(schemas, s.DeletePipeline))
 	//activities
-
-	router.Methods(http.MethodGet).Path("/v1/activities/{id}").Handler(f(schemas, s.GetActivity))
-	router.Methods(http.MethodPost).Path("/v1/activities/{id}").Handler(f(schemas, s.UpdateActivity))
-	router.Methods(http.MethodPost).Path("/v1/activity/").Handler(f(schemas, s.CreateActivity))
-	router.Methods(http.MethodGet).Path("/v1/activities/").Handler(f(schemas, s.ListActivities))
+	router.Methods(http.MethodGet).Path("/v1/activitys").Handler(f(schemas, s.ListActivities))
+	router.Methods(http.MethodGet).Path("/v1/activities").Handler(f(schemas, s.ListActivities))
+	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
+	router.Methods(http.MethodGet).Path("/v1/activitys/{id}").Handler(f(schemas, s.GetActivity))
+	router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.UpdateActivity))
 
 	pipelineActions := map[string]http.Handler{
 		"run":    f(schemas, s.RunPipeline),
 		"update": f(schemas, s.UpdatePipeline),
+		"remove": f(schemas, s.DeletePipeline),
 	}
 	for name, actions := range pipelineActions {
 		router.Methods(http.MethodPost).Path("/v1/pipelines/{id}").Queries("action", name).Handler(actions)

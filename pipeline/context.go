@@ -120,35 +120,9 @@ func (p *PipelineContext) UpdatePipeline(pipeline Pipeline) error {
 	if err != nil {
 		return err
 	}
-	existing, err := apiClient.GenericObject.ById(pipeline.Id)
-	logrus.Infof("existing pipeline:%v", existing)
-	if err != nil {
-		logrus.Errorf("find existing pipeline got error")
-		return err
-	}
-	if existing != nil {
-		existing, err = apiClient.GenericObject.Update(existing, &client.GenericObject{
-			Name:         pipeline.Name,
-			Key:          pipeline.Id,
-			ResourceData: resourceData,
-			Kind:         "pipeline",
-		})
-		if err != nil {
-			return err
-		}
-	} else {
-		return errors.New("cannot get existing pipeline to update")
-	}
-	return nil
-}
 
-func (p *PipelineContext) DeletePipeline(id string) error {
-	apiClient, err := util.GetRancherClient()
-	if err != nil {
-		return err
-	}
 	filters := make(map[string]interface{})
-	filters["key"] = id
+	filters["key"] = pipeline.Id
 	filters["kind"] = "pipeline"
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
@@ -158,16 +132,50 @@ func (p *PipelineContext) DeletePipeline(id string) error {
 		return err
 	}
 	if len(goCollection.Data) == 0 {
-		return errors.New("cannot find pipeline to delete")
+		logrus.Errorf("Error %v filtering genericObjects by key", err)
+		return err
 	}
 	existing := goCollection.Data[0]
-
-	err = apiClient.GenericObject.Delete(&existing)
+	logrus.Infof("existing pipeline:%v", existing)
+	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
+		Name:         pipeline.Name,
+		Key:          pipeline.Id,
+		ResourceData: resourceData,
+		Kind:         "pipeline",
+	})
 	if err != nil {
 		return err
 	}
-
 	return nil
+}
+
+func (p *PipelineContext) DeletePipeline(id string) (*Pipeline, error) {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return &Pipeline{}, err
+	}
+	filters := make(map[string]interface{})
+	filters["key"] = id
+	filters["kind"] = "pipeline"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		logrus.Errorf("Error %v filtering genericObjects by key", err)
+		return &Pipeline{}, err
+	}
+	if len(goCollection.Data) == 0 {
+		return &Pipeline{}, errors.New("cannot find pipeline to delete")
+	}
+	existing := goCollection.Data[0]
+	ppl := Pipeline{}
+	json.Unmarshal([]byte(existing.ResourceData["data"].(string)), &ppl)
+	err = apiClient.GenericObject.Delete(&existing)
+	if err != nil {
+		return &Pipeline{}, err
+	}
+
+	return &ppl, nil
 }
 
 func toPipeline(pipelineBasePath, version string) *Pipeline {
@@ -238,17 +246,17 @@ func getLatestVersionPipelineFile(pipelinePath string) *Pipeline {
 	return toPipeline(pipelinePath, strconv.Itoa(max))
 }
 
-func (p *PipelineContext) RunPipeline(id string) (bool, error) {
+func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
 	pp := p.GetPipelineById(id)
 	if pp == nil {
-		return false, ErrPipelineNotFound
+		return &Activity{}, ErrPipelineNotFound
 	}
 
-	err := p.provider.RunPipeline(pp)
+	activity, err := p.provider.RunPipeline(pp)
 	if err != nil {
-		return false, err
+		return &Activity{}, err
 	}
-	return true, nil
+	return activity, nil
 }
 
 func (p *PipelineContext) RunPipelineWithVersion(pipeline, version string) (bool, error) {
@@ -258,4 +266,16 @@ func (p *PipelineContext) RunPipelineWithVersion(pipeline, version string) (bool
 	}
 	p.provider.RunPipeline(pp)
 	return true, nil
+}
+
+//get updated activity from provider
+func (p *PipelineContext) SyncActivity(activity *Activity) error {
+	//its done, no need to sync
+	//return nil
+
+	if activity.Status == ActivityFail || activity.Status == ActivitySuccess {
+		return nil
+	}
+	return p.provider.SyncActivity(activity)
+
 }

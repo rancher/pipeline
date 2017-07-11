@@ -12,8 +12,10 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
+	v2client "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/storer"
+	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
 )
 
@@ -26,6 +28,13 @@ type Server struct {
 func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	apiContext.Write(&client.GenericCollection{
+		Data: toPipelineCollections(apiContext, s.PipelineContext.ListPipelines()),
+	})
+	pCollections := s.PipelineContext.ListPipelines()
+	for _, p := range pCollections {
+		s.updateLastActivity(p)
+	}
+	logrus.Infof("pipelins resource is:%v", &client.GenericCollection{
 		Data: toPipelineCollections(apiContext, s.PipelineContext.ListPipelines()),
 	})
 	return nil
@@ -51,8 +60,23 @@ func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 		})
 		return err
 	}
+	s.updateLastActivity(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
+}
+
+//update last activity info in the pipeline
+func (s *Server) updateLastActivity(p *pipeline.Pipeline) {
+	if p.LastRunId == "" {
+		return
+	}
+	activity, err := GetActivity(p.LastRunId, s.PipelineContext)
+	if err != nil {
+		logrus.Error("fail to get last run of pipeline %v", p.Name)
+		return
+	}
+	p.LastRunStatus = activity.Status
+	p.CommitInfo = activity.CommitInfo
 }
 
 func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
@@ -92,13 +116,13 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 }
 
 func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error {
-	//apiContext := api.GetApiContext(req)
+	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	err := s.PipelineContext.DeletePipeline(id)
+	r, err := s.PipelineContext.DeletePipeline(id)
 	if err != nil {
 		return err
 	}
-	//apiContext.Write(toPipelineResource(apiContext, r))
+	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 }
 
@@ -122,8 +146,15 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 		})
 		return err
 	}
-	s.PipelineContext.RunPipeline(id)
-	apiContext.Write(&Empty{})
+	activity, err := s.PipelineContext.RunPipeline(id)
+	if err != nil {
+		return err
+	}
+	r.RunCount = activity.RunSequence
+	r.LastRunId = activity.Id
+	r.LastRunStatus = activity.Status
+	s.PipelineContext.UpdatePipeline(*r)
+	apiContext.Write(toActivityResource(apiContext, activity))
 	return nil
 }
 
@@ -148,11 +179,54 @@ func (s *Server) SavePipeline(rw http.ResponseWriter, req *http.Request) error {
 
 func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
-	apiContext.Write(&client.GenericCollection{
-		Data: []interface{}{
-			toActivityResource(apiContext, pipeline.ToDemoActivity()),
-		},
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	pId := mux.Vars(req)["id"]
+	filters := make(map[string]interface{})
+	filters["kind"] = "activity"
+	goCollection, err := apiClient.GenericObject.List(&v2client.ListOpts{
+		Filters: filters,
 	})
+
+	if err != nil {
+		return err
+	}
+	var activities []interface{}
+	for _, gobj := range goCollection.Data {
+		b := []byte(gobj.ResourceData["data"].(string))
+		a := &pipeline.Activity{}
+		json.Unmarshal(b, a)
+		if a.Pipeline.Id != pId {
+			continue
+		}
+		//When get a unfinish Activity ,try to sync from provider and update its status
+		if a.Status == "Waitting" || a.Status == "Building" {
+			err = s.PipelineContext.SyncActivity(a)
+			if err != nil {
+				logrus.Error(err)
+				//skip nonsync one
+				continue
+			}
+			err = UpdateActivity(*a)
+			if err != nil {
+				logrus.Error(err)
+				continue
+			}
+		}
+		toActivityResource(apiContext, a)
+		activities = append(activities, a)
+	}
+	logrus.Info("are you kiding?")
+	logrus.Infof("activity resource is :%v", &client.GenericCollection{
+		Data: activities,
+	})
+	//v2client here generates error?
+	apiContext.Write(&client.GenericCollection{
+		Data: activities,
+	})
+
 	return nil
 }
 
