@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/jenkins"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver"
@@ -37,24 +38,31 @@ func main() {
 			Value:  "http://jenkins:8080",
 		},
 		cli.StringFlag{
-			Name:   "template_base_path",
-			Usage:  "token of jenkins admin",
-			EnvVar: "TEMPLATES_BASE_PATH",
-			Value:  "/data/rancher-ci/templates",
+			Name:   "cattle_url",
+			Usage:  "rancher server api address",
+			EnvVar: "CATTLE_URL",
+			Value:  "",
 		},
 		cli.StringFlag{
-			Name:   "jenkins_config_template",
-			Usage:  "Jenkins configuration template file folder",
-			EnvVar: "JENKINS_CONFIG_TEMPLATE",
-			Value:  "/data/rancher-ci/jenkins",
+			Name:   "cattle_access_key",
+			Usage:  "cattle access key",
+			EnvVar: "CATTLE_ACCESS_KEY",
+			Value:  "",
+		},
+		cli.StringFlag{
+			Name:   "cattle_secret_key",
+			Usage:  "cattle secret key",
+			EnvVar: "CATTLE_SECRET_KEY",
+			Value:  "",
 		},
 	}
 	app.Run(os.Args)
 }
 
 func checkAndRun(c *cli.Context) (rtnerr error) {
-	jenkins.InitJenkins(c)
-	pipelineContext := pipeline.BuildPipelineContext(c, &jenkins.JenkinsProvider{})
+	config.Parse(c)
+	jenkins.InitJenkins()
+	pipelineContext := pipeline.BuildPipelineContext(&jenkins.JenkinsProvider{})
 	errChan := make(chan bool)
 	go restfulserver.ListenAndServe(pipelineContext, errChan)
 	<-errChan

@@ -9,8 +9,7 @@ import (
 )
 
 func GetRancherClient() (*client.RancherClient, error) {
-	apiConfig := config.GetConfig()
-
+	apiConfig := config.Config
 	apiUrl := apiConfig.CattleUrl //http://ip:port/v2
 	accessKey := apiConfig.CattleAccessKey
 	secretKey := apiConfig.CattleSecretKey

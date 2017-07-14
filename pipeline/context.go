@@ -9,12 +9,10 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/v2"
-	"github.com/rancher/pipeline/storer"
 	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/urfave/cli"
 	"gopkg.in/yaml.v2"
 )
 
@@ -27,20 +25,7 @@ var ErrTemplatePathNotVaild = errors.New("TemplateBasePath is not a vaild direct
 var ErrPipelineNotFound = errors.New("Pipeline Not found")
 
 type PipelineContext struct {
-	templateBase string
-	provider     PipelineProvider
-	storer       storer.Storer
-}
-
-func (p *PipelineContext) GetPipelineByName(pipeline string) *Pipeline {
-	return p.GetPipelineByNameAndVersion(pipeline, Latest)
-}
-
-func (p *PipelineContext) GetPipelineByNameAndVersion(pipeline, version string) *Pipeline {
-	if version != Latest {
-		return toPipeline(path.Join(p.templateBase, pipeline), version)
-	}
-	return getLatestVersionPipelineFile(path.Join(p.templateBase, pipeline))
+	provider PipelineProvider
 }
 
 func (p *PipelineContext) GetPipelineById(id string) *Pipeline {
@@ -69,19 +54,11 @@ func (p *PipelineContext) GetPipelineById(id string) *Pipeline {
 	return &ppl
 }
 
-func BuildPipelineContext(context *cli.Context, provider PipelineProvider) *PipelineContext {
+func BuildPipelineContext(provider PipelineProvider) *PipelineContext {
 	r := PipelineContext{
-		templateBase: context.GlobalString("template_base_path"),
-		provider:     provider,
-		storer:       storer.InitLocalStorer(context.GlobalString("template_base_path")),
+		provider: provider,
 	}
-	f, err := os.Stat(r.templateBase)
-	if err != nil {
-		logrus.Fatal(err)
-	}
-	if !f.IsDir() {
-		logrus.Fatal(ErrTemplatePathNotVaild)
-	}
+
 	return &r
 }
 
@@ -257,15 +234,6 @@ func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
 		return &Activity{}, err
 	}
 	return activity, nil
-}
-
-func (p *PipelineContext) RunPipelineWithVersion(pipeline, version string) (bool, error) {
-	pp := p.GetPipelineByNameAndVersion(pipeline, version)
-	if pp == nil {
-		return false, ErrPipelineNotFound
-	}
-	p.provider.RunPipeline(pp)
-	return true, nil
 }
 
 //get updated activity from provider

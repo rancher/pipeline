@@ -9,11 +9,9 @@ import (
 	"net/url"
 	"strings"
 
-	"os"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli"
+	"github.com/rancher/pipeline/config"
 )
 
 var (
@@ -23,20 +21,22 @@ var (
 	ErrGetJobInfoFail   = errors.New("Get Job Info fail")
 )
 
-func InitJenkins(context *cli.Context) {
+func InitJenkins() {
 	var jenkinsServerAddress, user, token string
-	jenkinsServerAddress = context.String("jenkins_address")
-	user = context.String("jenkins_user")
-	token = context.String("jenkins_token")
-	jenkinsTemlpateFolder := context.String("jenkins_config_template")
-	if fi, err := os.Stat(jenkinsTemlpateFolder); err != nil {
-		logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
-	} else {
-		if !fi.IsDir() {
-			logrus.Fatal(ErrJenkinsTemplateNotVaild)
+	jenkinsServerAddress = config.Config.JenkinsAddress //context.String("jenkins_address")
+	user = config.Config.JenkinsUser                    //context.String("jenkins_user")
+	token = config.Config.JenkinsToken                  //context.String("jenkins_token")
+	/*
+		jenkinsTemlpateFolder := context.String("jenkins_config_template")
+		if fi, err := os.Stat(jenkinsTemlpateFolder); err != nil {
+			logrus.Fatal(errors.Wrapf(err, "jenkins template folder read error"))
+		} else {
+			if !fi.IsDir() {
+				logrus.Fatal(ErrJenkinsTemplateNotVaild)
+			}
 		}
-	}
-	JenkinsConfig.Set(JenkinsTemlpateFolder, jenkinsTemlpateFolder)
+		JenkinsConfig.Set(JenkinsTemlpateFolder, jenkinsTemlpateFolder)
+	*/
 	JenkinsConfig.Set(JenkinsServerAddress, jenkinsServerAddress)
 	JenkinsConfig.Set(JenkinsUser, user)
 	JenkinsConfig.Set(JenkinsToken, token)
