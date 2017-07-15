@@ -38,19 +38,20 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
 		//When get a unfinish Activity ,try to sync from provider and update its status
-		if a.Status == "Waitting" || a.Status == "Building" {
-			err = s.PipelineContext.SyncActivity(a)
-			if err != nil {
-				logrus.Error(err)
-				//skip nonsync one
-				continue
-			}
-			err = UpdateActivity(*a)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-		}
+		/*
+			if a.Status == "Waitting" || a.Status == "Building" {
+				err = s.PipelineContext.SyncActivity(a)
+				if err != nil {
+					logrus.Error(err)
+					//skip nonsync one
+					continue
+				}
+				err = UpdateActivity(*a)
+				if err != nil {
+					logrus.Error(err)
+					continue
+				}
+			}*/
 		toActivityResource(apiContext, a)
 		activities = append(activities, a)
 	}
@@ -176,6 +177,31 @@ func UpdateActivity(activity pipeline.Activity) error {
 	return nil
 }
 
+func ListActivities(pContext *pipeline.PipelineContext) ([]*pipeline.Activity, error) {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return nil, err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = "activity"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	var activities []*pipeline.Activity
+	for _, gobj := range goCollection.Data {
+		b := []byte(gobj.ResourceData["data"].(string))
+		a := &pipeline.Activity{}
+		json.Unmarshal(b, a)
+		activities = append(activities, a)
+	}
+
+	return activities, nil
+}
+
 //Get Activity Handler
 func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
@@ -212,21 +238,20 @@ func GetActivity(id string, pContext *pipeline.PipelineContext) (pipeline.Activi
 	data := goCollection.Data[0]
 	activity := pipeline.Activity{}
 	json.Unmarshal([]byte(data.ResourceData["data"].(string)), &activity)
-	logrus.Infof("getactivity:%v", activity)
-	logrus.Infof("getresource:%v", activity.Resource)
 
 	//When get a unfinish Activity ,try to sync from provider and update its status
-	if activity.Status == "Waitting" || activity.Status == "Building" {
-		err = pContext.SyncActivity(&activity)
-		if err != nil {
-			logrus.Error(err)
-			return pipeline.Activity{}, err
-		}
-		err = UpdateActivity(activity)
-		if err != nil {
-			logrus.Error(err)
-			return pipeline.Activity{}, err
-		}
-	}
+	/*
+		if activity.Status == "Waitting" || activity.Status == "Building" {
+			err = pContext.SyncActivity(&activity)
+			if err != nil {
+				logrus.Error(err)
+				return pipeline.Activity{}, err
+			}
+			err = UpdateActivity(activity)
+			if err != nil {
+				logrus.Error(err)
+				return pipeline.Activity{}, err
+			}
+		}*/
 	return activity, nil
 }

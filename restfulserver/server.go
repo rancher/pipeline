@@ -34,9 +34,6 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 	for _, p := range pCollections {
 		s.updateLastActivity(p)
 	}
-	logrus.Infof("pipelins resource is:%v", &client.GenericCollection{
-		Data: toPipelineCollections(apiContext, s.PipelineContext.ListPipelines()),
-	})
 	return nil
 }
 
@@ -87,7 +84,6 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, &pipeline); err != nil {
 		return err
 	}
-	logrus.Infof("pipeline is %v", pipeline)
 	err = s.PipelineContext.CreatePipeline(pipeline)
 	if err != nil {
 		return err
@@ -101,11 +97,9 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
 	pipeline := pipeline.Pipeline{}
-	logrus.Infof("start create pipeline,get data:%v", string(data))
 	if err := json.Unmarshal(data, &pipeline); err != nil {
 		return err
 	}
-	logrus.Infof("pipeline is %v", pipeline)
 	err = s.PipelineContext.UpdatePipeline(pipeline)
 	if err != nil {
 		return err
@@ -154,6 +148,7 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	r.LastRunId = activity.Id
 	r.LastRunStatus = activity.Status
 	s.PipelineContext.UpdatePipeline(*r)
+	MyAgent.ReWatch <- true
 	apiContext.Write(toActivityResource(apiContext, activity))
 	return nil
 }
@@ -202,26 +197,24 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 			continue
 		}
 		//When get a unfinish Activity ,try to sync from provider and update its status
-		if a.Status == "Waitting" || a.Status == "Building" {
-			err = s.PipelineContext.SyncActivity(a)
-			if err != nil {
-				logrus.Error(err)
-				//skip nonsync one
-				continue
-			}
-			err = UpdateActivity(*a)
-			if err != nil {
-				logrus.Error(err)
-				continue
-			}
-		}
+		/*
+			if a.Status == "Waitting" || a.Status == "Building" {
+				err = s.PipelineContext.SyncActivity(a)
+				if err != nil {
+					logrus.Error(err)
+					//skip nonsync one
+					continue
+				}
+				err = UpdateActivity(*a)
+				if err != nil {
+					logrus.Error(err)
+					continue
+				}
+			}*/
 		toActivityResource(apiContext, a)
 		activities = append(activities, a)
 	}
-	logrus.Info("are you kiding?")
-	logrus.Infof("activity resource is :%v", &client.GenericCollection{
-		Data: activities,
-	})
+
 	//v2client here generates error?
 	apiContext.Write(&client.GenericCollection{
 		Data: activities,

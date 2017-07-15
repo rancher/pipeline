@@ -65,6 +65,10 @@ func checkAndRun(c *cli.Context) (rtnerr error) {
 	pipelineContext := pipeline.BuildPipelineContext(&jenkins.JenkinsProvider{})
 	errChan := make(chan bool)
 	go restfulserver.ListenAndServe(pipelineContext, errChan)
+
+	server := restfulserver.NewServer(pipelineContext)
+
+	restfulserver.InitAgent(server)
 	<-errChan
 	logrus.Info("Going down")
 	return nil

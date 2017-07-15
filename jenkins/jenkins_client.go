@@ -194,7 +194,6 @@ func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
 		return nil, err
 	}
 
-	logrus.Infof("build info is %v", buildInfo)
 	return buildInfo, nil
 
 }
@@ -238,7 +237,6 @@ func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
 		return nil, err
 	}
 
-	logrus.Infof("build info is %v", jobInfo)
 	return jobInfo, nil
 
 }
@@ -277,7 +275,6 @@ func GetBuildRawOutput(jobname string) (string, error) {
 	}
 	respBytes, err := ioutil.ReadAll(resp.Body)
 
-	logrus.Infof("build info is %v", string(respBytes))
 	return string(respBytes), nil
 
 }

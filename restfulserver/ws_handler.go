@@ -5,13 +5,14 @@
 package restfulserver
 
 import (
-	"log"
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
+	"github.com/sluu99/uuid"
 )
 
 const (
@@ -19,13 +20,15 @@ const (
 	writeWait = 10 * time.Second
 
 	// Time allowed to read the next pong message from the client.
-	pongWait = 60 * time.Second
+	pongWait = 20 * time.Second
 
 	// Send pings to client with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
 
 	// Poll step log for changes with this period.
 	pollPeriod = 2 * time.Second
+
+	syncPeriod = 20 * time.Second
 )
 
 var (
@@ -35,27 +38,23 @@ var (
 	}
 )
 
-func echo(w http.ResponseWriter, r *http.Request) error {
-	c, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print("upgrade:", err)
-		return err
+type WSMsg struct {
+	Id           string      `json:"id"`
+	Name         string      `json:"name"`
+	ResourceId   string      `json:"resourceId"`
+	ResourceType string      `json:"resourceType"`
+	Data         interface{} `json:"data"`
+	Time         time.Time   `json:"time"`
+}
+
+func PingMsg() []byte {
+	msg := WSMsg{
+		Id:   uuid.Rand().Hex(),
+		Name: "ping",
+		Time: time.Now(),
 	}
-	defer c.Close()
-	for {
-		mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Println("read:", err)
-			break
-		}
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
-	}
-	return nil
+	b, _ := json.Marshal(msg)
+	return b
 }
 
 func getActivityLog(activityId string, stepOrdinal int) ([]byte, error) {
@@ -64,7 +63,7 @@ func getActivityLog(activityId string, stepOrdinal int) ([]byte, error) {
 	return []byte(log), nil
 }
 
-func stepLogreader(ws *websocket.Conn) {
+func stepLogReader(ws *websocket.Conn) {
 	logrus.Infof("start ws reader")
 	defer ws.Close()
 	ws.SetReadLimit(512)
@@ -87,26 +86,41 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 		pollTicker.Stop()
 		ws.Close()
 	}()
+	activity, err := GetActivity(activityId, s.PipelineContext)
+	if err != nil {
+		return
+	}
+	prevLog := ""
 	for {
 		select {
 		case <-pollTicker.C:
 			var b []byte
 			var err error
 
-			stepLog, err := s.GetStepLog(activityId, stageOrdinal, stepOrdinal)
-			b = []byte(stepLog)
+			stepLog, err := s.PipelineContext.Provider.GetStepLog(&activity, stageOrdinal, stepOrdinal)
 			if err != nil {
+				logrus.Errorf("error get steplog,%v", err)
 				return
 			}
-			if b != nil {
+			if stepLog != "" && prevLog != stepLog {
+				logrus.Infof("writing step log:%v", stepLog)
 				ws.SetWriteDeadline(time.Now().Add(writeWait))
+				response := WSMsg{
+					Id:           uuid.Rand().Hex(),
+					Name:         "resource.change",
+					ResourceType: "log",
+					Time:         time.Now(),
+					Data:         stepLog,
+				}
+				b, err = json.Marshal(response)
 				if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
 					return
 				}
+				prevLog = stepLog
 			}
 		case <-pingTicker.C:
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
+			if err := ws.WriteMessage(websocket.PingMessage, PingMsg()); err != nil {
 				return
 			}
 		}
@@ -135,6 +149,6 @@ func (s *Server) ServeStepLog(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	go s.stepLogWriter(ws, activityId, stageOrdinal, stepOrdinal)
-	stepLogreader(ws)
+	stepLogReader(ws)
 	return nil
 }

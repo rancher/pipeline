@@ -25,7 +25,7 @@ var ErrTemplatePathNotVaild = errors.New("TemplateBasePath is not a vaild direct
 var ErrPipelineNotFound = errors.New("Pipeline Not found")
 
 type PipelineContext struct {
-	provider PipelineProvider
+	Provider PipelineProvider
 }
 
 func (p *PipelineContext) GetPipelineById(id string) *Pipeline {
@@ -56,7 +56,7 @@ func (p *PipelineContext) GetPipelineById(id string) *Pipeline {
 
 func BuildPipelineContext(provider PipelineProvider) *PipelineContext {
 	r := PipelineContext{
-		provider: provider,
+		Provider: provider,
 	}
 
 	return &r
@@ -229,7 +229,7 @@ func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
 		return &Activity{}, ErrPipelineNotFound
 	}
 
-	activity, err := p.provider.RunPipeline(pp)
+	activity, err := p.Provider.RunPipeline(pp)
 	if err != nil {
 		return &Activity{}, err
 	}
@@ -244,6 +244,6 @@ func (p *PipelineContext) SyncActivity(activity *Activity) error {
 	if activity.Status == ActivityFail || activity.Status == ActivitySuccess {
 		return nil
 	}
-	return p.provider.SyncActivity(activity)
-
+	_, err := p.Provider.SyncActivity(activity)
+	return err
 }

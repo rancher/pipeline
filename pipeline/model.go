@@ -80,7 +80,8 @@ type PipelineProvider interface {
 	RunPipeline(*Pipeline) (*Activity, error)
 	RunBuild(*Stage, string) error
 	RunStage(*Activity, int) error
-	SyncActivity(*Activity) error
+	SyncActivity(*Activity) (bool, error)
+	GetStepLog(*Activity, int, int) (string, error)
 }
 
 type Activity struct {
