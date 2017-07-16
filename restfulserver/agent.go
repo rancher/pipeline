@@ -91,7 +91,7 @@ func (a *Agent) SyncWatchList() {
 						continue
 					}
 					updated, _ := a.Server.PipelineContext.Provider.SyncActivity(activity)
-					logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
+					//logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
 					/*
 						if activity.Id == "1def6e31-345d-48ee-b443-6f633f35a636" {
 							updated = true

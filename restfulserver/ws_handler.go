@@ -23,12 +23,12 @@ const (
 	pongWait = 20 * time.Second
 
 	// Send pings to client with this period. Must be less than pongWait.
-	pingPeriod = (pongWait * 9) / 10
+	pingPeriod = 5 * time.Second
 
 	// Poll step log for changes with this period.
 	pollPeriod = 2 * time.Second
 
-	syncPeriod = 20 * time.Second
+	syncPeriod = 10 * time.Second
 )
 
 var (
@@ -120,7 +120,12 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 			}
 		case <-pingTicker.C:
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := ws.WriteMessage(websocket.PingMessage, PingMsg()); err != nil {
+			if err := ws.WriteMessage(websocket.PingMessage, []byte("")); err != nil {
+				logrus.Errorf("error writing ping,%v", err)
+				return
+			}
+			if err := ws.WriteMessage(websocket.TextMessage, PingMsg()); err != nil {
+				logrus.Errorf("error writing ping,%v", err)
 				return
 			}
 		}

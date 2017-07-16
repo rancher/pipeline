@@ -84,8 +84,14 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
 				return
 			}
 		case <-pingTicker.C:
+			logrus.Infof("trying to ping")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
-			if err := c.conn.WriteControl(websocket.PingMessage, PingMsg(), time.Now().Add(time.Second)); err != nil {
+			if err := c.conn.WriteMessage(websocket.PingMessage, []byte("")); err != nil {
+				logrus.Errorf("error writing ping,%v", err)
+				return
+			}
+			if err := c.conn.WriteMessage(websocket.TextMessage, PingMsg()); err != nil {
+				logrus.Errorf("error writing ping,%v", err)
 				return
 			}
 		}
