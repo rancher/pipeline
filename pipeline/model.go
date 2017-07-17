@@ -39,6 +39,7 @@ type Pipeline struct {
 	Branch          string   `json:"branch,omitempty" yaml:"branch,omitempty"`
 	TargetImage     string   `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
 	File            string   `json:"file"`
+	Trigger         Trigger  `json:"trigger,omitempty" yaml:"trigger,omitempty"`
 	Stages          []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
 
@@ -70,6 +71,13 @@ type Step struct {
 	Count             int    `json:"count,omitempty" yaml:"count,omitempty"`
 }
 
+type Trigger struct {
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+
+	// cron trigger
+	Spec string `json:"spec" yaml:"spec,omitempty"`
+}
+
 type BuildStep struct {
 	Repository string `json:"-" yaml:"-"`
 	Branch     string `json:"-" yaml:"-"`
@@ -86,27 +94,27 @@ type PipelineProvider interface {
 
 type Activity struct {
 	client.Resource
-	Id              string          `json:"id,omitempty"`
-	Pipeline        Pipeline        `json:"pipeline,omitempty"`
-	PipelineName    string          `json:"pipelineName,omitempty"`
-	PipelineVersion string          `json:"pipelineVersion,omitempty"`
-	RunSequence     int             `json:"runSequence,omitempty"`
-	CommitInfo      string          `json:"commitInfo,omitempty"`
-	Status          string          `json:"status,omitempty"`
-	StartTS         int64           `json:"start_ts,omitempty"`
-	StopTS          int64           `json:"stop_ts,omitempty"`
-	ActivityStages  []ActivityStage `json:"activity_stages,omitempty"`
+	Id              string           `json:"id,omitempty"`
+	Pipeline        Pipeline         `json:"pipeline,omitempty"`
+	PipelineName    string           `json:"pipelineName,omitempty"`
+	PipelineVersion string           `json:"pipelineVersion,omitempty"`
+	RunSequence     int              `json:"runSequence,omitempty"`
+	CommitInfo      string           `json:"commitInfo,omitempty"`
+	Status          string           `json:"status,omitempty"`
+	StartTS         int64            `json:"start_ts,omitempty"`
+	StopTS          int64            `json:"stop_ts,omitempty"`
+	ActivityStages  []*ActivityStage `json:"activity_stages,omitempty"`
 }
 
 type ActivityStage struct {
-	ActivityId    string         `json:"activity_id,omitempty"`
-	Name          string         `json:"name,omitempty"`
-	NeedApproval  bool           `json:"need_approval,omitempty"`
-	ActivitySteps []ActivityStep `json:"activity_steps,omitempty"`
-	StartTS       int64          `json:"start_ts,omitempty"`
-	Duration      int64          `json:"duration,omitempty"`
-	Status        string         `json:"status,omitempty"`
-	RawOutput     string         `json:"rawOutput,omitempty"`
+	ActivityId    string          `json:"activity_id,omitempty"`
+	Name          string          `json:"name,omitempty"`
+	NeedApproval  bool            `json:"need_approval,omitempty"`
+	ActivitySteps []*ActivityStep `json:"activity_steps,omitempty"`
+	StartTS       int64           `json:"start_ts,omitempty"`
+	Duration      int64           `json:"duration,omitempty"`
+	Status        string          `json:"status,omitempty"`
+	RawOutput     string          `json:"rawOutput,omitempty"`
 }
 
 type ActivityStep struct {
@@ -126,15 +134,15 @@ func ToDemoActivity() *Activity {
 		Status:          ActivitySuccess,
 		StartTS:         startTS,
 		StopTS:          stopTS,
-		ActivityStages: []ActivityStage{
-			ActivityStage{
+		ActivityStages: []*ActivityStage{
+			&ActivityStage{
 				Name:         "build",
 				NeedApproval: false,
 				StartTS:      startTS,
 				Status:       ActivityStageSuccess,
 				RawOutput:    "",
-				ActivitySteps: []ActivityStep{
-					ActivityStep{
+				ActivitySteps: []*ActivityStep{
+					&ActivityStep{
 						Name:    "build",
 						Message: "",
 						Status:  ActivityStageSuccess,

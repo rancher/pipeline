@@ -137,6 +137,8 @@ func CreateActivity(activity pipeline.Activity) (*client.GenericObject, error) {
 }
 
 func UpdateActivity(activity pipeline.Activity) error {
+	logrus.Infof("updating activity %v.", activity.Id)
+	logrus.Infof("activity stages:%v", activity.ActivityStages)
 	b, err := json.Marshal(activity)
 	if err != nil {
 		return err

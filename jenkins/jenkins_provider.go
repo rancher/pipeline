@@ -46,8 +46,9 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 		StartTS:     time.Now().UnixNano() / int64(time.Millisecond),
 	}
 	for _, stage := range p.Stages {
-		activity.ActivityStages = append(activity.ActivityStages, *ToActivityStage(stage))
+		activity.ActivityStages = append(activity.ActivityStages, ToActivityStage(stage))
 	}
+	logrus.Infof("creating activity:%v", activity)
 	_, err := restfulserver.CreateActivity(activity)
 	if err != nil {
 		return &pipeline.Activity{}, err
@@ -217,17 +218,18 @@ func commandBuilder(step *pipeline.Step) string {
 
 //SyncActivity gets latest activity info, return true if status if changed
 func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error) {
-	logrus.Info("start syncActivity")
 	p := activity.Pipeline
-	activityStages := []pipeline.ActivityStage{}
 	var updated bool
+
+	logrus.Infof("syncing activity:%v", activity.Id)
+	logrus.Infof("activity is:%v", activity)
 	for i, actiStage := range activity.ActivityStages {
 		jobName := p.Name + "_" + actiStage.Name + "_" + activity.Id
 		beforeStatus := actiStage.Status
 		jobInfo, err := GetJobInfo(jobName)
-		logrus.Infof("got job info:%v,err:%v", jobInfo, err)
 		if err != nil {
 			//cannot get jobinfo
+			logrus.Infof("got job info:%v,err:%v", jobInfo, err)
 			return false, err
 		}
 
@@ -262,18 +264,19 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 				activity.Status = pipeline.ActivitySuccess
 			}
 		}
+		logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
 		if err == nil {
 			rawOutput, err := GetBuildRawOutput(jobName)
 			logrus.Infof("got rawOutput:%v,err:%v", rawOutput, err)
-			actiStage.RawOutput = rawOutput
-			parseSteps(activity, &actiStage, rawOutput)
+			//actiStage.RawOutput = rawOutput
+			stepStatusUpdated := parseSteps(activity, actiStage, rawOutput)
+			updated = updated || stepStatusUpdated
 		}
 		if beforeStatus != actiStage.Status {
-			updated = true
+			logrus.Infof("sync activity %v,updated !", activity.Id)
 		}
-		activityStages = append(activityStages, actiStage)
+		logrus.Infof("after sync,beforestatus and after:%v,%v", beforeStatus, actiStage.Status)
 	}
-	activity.ActivityStages = activityStages
 
 	return updated, nil
 }
@@ -321,9 +324,11 @@ func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
 	}
 }
 
-func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, rawOutput string) {
+//parse jenkins rawoutput to steps,return true if status updated
+func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, rawOutput string) bool {
 	token := "\\n\\[.*?\\].*?\\.sh"
 	lastStatus := pipeline.ActivityStepBuilding
+	var updated bool = false
 	if strings.HasSuffix(rawOutput, "\nFinished: SUCCESS\n") {
 		lastStatus = pipeline.ActivityStepSuccess
 	} else if strings.HasSuffix(rawOutput, "\nFinished: FAILURE\n") {
@@ -335,11 +340,11 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 		// SCM
 		//actiStage.ActivitySteps[0].Message = outputs[0]
 		actiStage.ActivitySteps[0].Status = lastStatus
-		return
+		return updated
 	}
 	for i, step := range actiStage.ActivitySteps {
 		finishStepNum := len(outputs) - 1
-
+		prevStatus := step.Status
 		logrus.Info("getting step %v", i)
 		if i < finishStepNum-1 {
 			//passed steps
@@ -353,10 +358,15 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			//not run steps
 			step.Status = pipeline.ActivityStepWaitting
 		}
+		if prevStatus != step.Status {
+			updated = true
+		}
 		actiStage.ActivitySteps[i] = step
 		logrus.Infof("now step is %v.", step)
 	}
 	logrus.Infof("now actistage is %v.", actiStage)
+
+	return updated
 
 }
 
@@ -365,10 +375,10 @@ func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
 		Name:          stage.Name,
 		NeedApproval:  stage.NeedApprove,
 		Status:        "Waiting",
-		ActivitySteps: []pipeline.ActivityStep{},
+		ActivitySteps: []*pipeline.ActivityStep{},
 	}
 	for _, step := range stage.Steps {
-		actiStep := pipeline.ActivityStep{
+		actiStep := &pipeline.ActivityStep{
 			Name:   step.Name,
 			Status: pipeline.ActivityStepWaitting,
 		}

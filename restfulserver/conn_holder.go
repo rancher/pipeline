@@ -64,16 +64,19 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
 			logrus.Infof("get message from c.send,%v", string(message))
 			var b []byte
 			var err error
-			activities, err := ListActivities(c.agent.Server.PipelineContext)
-			for _, activity := range activities {
-				toActivityResource(apiContext, activity)
+			activityId := string(message)
+			activity, err := GetActivity(activityId, c.agent.Server.PipelineContext)
+			if err != nil {
+				logrus.Errorf("get activity error,%v", err)
+				return
 			}
+			toActivityResource(apiContext, &activity)
 			response := WSMsg{
 				Id:           uuid.Rand().Hex(),
 				Name:         "resource.change",
 				ResourceType: "activity",
 				Time:         time.Now(),
-				Data:         activities,
+				Data:         activity,
 			}
 			b, err = json.Marshal(response)
 			if err != nil {

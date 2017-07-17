@@ -83,6 +83,7 @@ func (a *Agent) SyncWatchList() {
 		if err != nil {
 			logrus.Errorf("error get watchlist,%v", err)
 		}
+	watchingLabel:
 		for {
 			select {
 			case <-ticker.C:
@@ -91,7 +92,7 @@ func (a *Agent) SyncWatchList() {
 						continue
 					}
 					updated, _ := a.Server.PipelineContext.Provider.SyncActivity(activity)
-					//logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
+					logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
 					/*
 						if activity.Id == "1def6e31-345d-48ee-b443-6f633f35a636" {
 							updated = true
@@ -99,6 +100,7 @@ func (a *Agent) SyncWatchList() {
 					*/
 					if updated {
 						//status changed,then update in rancher server
+
 						err = UpdateActivity(*activity)
 						if err != nil {
 							logrus.Errorf("fail update activity,%v", err)
@@ -109,8 +111,9 @@ func (a *Agent) SyncWatchList() {
 					}
 				}
 			case <-a.ReWatch:
+				logrus.Infof("rewatch signal")
 				//reget the watchlist
-				break
+				break watchingLabel
 			}
 		}
 	}
