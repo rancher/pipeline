@@ -69,6 +69,24 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 
 }
 
+func (s *Server) CleanActivities(rw http.ResponseWriter, req *http.Request) error {
+	apiClient, err := util.GetRancherClient()
+	filters := make(map[string]interface{})
+	filters["kind"] = "activity"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+
+	if err != nil {
+		return err
+	}
+	for _, gobj := range goCollection.Data {
+		apiClient.GenericObject.Delete(&gobj)
+	}
+	return nil
+
+}
+
 //CreateActivity Handler
 func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)

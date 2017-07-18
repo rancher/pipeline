@@ -47,6 +47,7 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodGet).Path("/v1/activitys/{id}").Handler(f(schemas, s.GetActivity))
 	router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.UpdateActivity))
+	router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
 
 	//test websocket
 	router.Methods(http.MethodGet).Path("/v1/ws/log").Handler(f(schemas, s.ServeStepLog))

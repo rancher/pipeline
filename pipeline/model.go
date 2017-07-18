@@ -39,7 +39,7 @@ type Pipeline struct {
 	Branch          string   `json:"branch,omitempty" yaml:"branch,omitempty"`
 	TargetImage     string   `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
 	File            string   `json:"file"`
-	Trigger         Trigger  `json:"trigger,omitempty" yaml:"trigger,omitempty"`
+	Trigger         *Trigger `json:"trigger,omitempty" yaml:"trigger,omitempty"`
 	Stages          []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
 

@@ -79,9 +79,9 @@ func (s *Server) updateLastActivity(p *pipeline.Pipeline) {
 func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
-	pipeline := pipeline.Pipeline{}
+	pipeline := &pipeline.Pipeline{}
 	logrus.Infof("start create pipeline,get data:%v", string(data))
-	if err := json.Unmarshal(data, &pipeline); err != nil {
+	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
 	err = s.PipelineContext.CreatePipeline(pipeline)
@@ -89,15 +89,16 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 
-	apiContext.Write(toPipelineResource(apiContext, &pipeline))
+	MyAgent.onPipelineChange(pipeline)
+	apiContext.Write(toPipelineResource(apiContext, pipeline))
 	return nil
 }
 
 func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
-	pipeline := pipeline.Pipeline{}
-	if err := json.Unmarshal(data, &pipeline); err != nil {
+	pipeline := &pipeline.Pipeline{}
+	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
 	err = s.PipelineContext.UpdatePipeline(pipeline)
@@ -105,7 +106,8 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 
-	apiContext.Write(toPipelineResource(apiContext, &pipeline))
+	MyAgent.onPipelineChange(pipeline)
+	apiContext.Write(toPipelineResource(apiContext, pipeline))
 	return nil
 }
 
@@ -147,7 +149,7 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	r.RunCount = activity.RunSequence
 	r.LastRunId = activity.Id
 	r.LastRunStatus = activity.Status
-	s.PipelineContext.UpdatePipeline(*r)
+	s.PipelineContext.UpdatePipeline(r)
 	MyAgent.ReWatch <- true
 	apiContext.Write(toActivityResource(apiContext, activity))
 	return nil

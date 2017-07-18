@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/pipeline/pipeline"
+	"github.com/rancher/pipeline/scheduler"
 )
 
 //component to comunicate between server and ci provider
@@ -20,7 +21,16 @@ type Agent struct {
 
 	broadcast chan []byte
 
-	ReWatch chan bool
+	activityWatchlist map[string]*pipeline.Activity
+
+	watchActivityC chan *pipeline.Activity
+	ReWatch        chan bool
+
+	//scheduler
+
+	cronRunners           map[string]*scheduler.CronRunner
+	registerCronRunnerC   chan *scheduler.CronRunner
+	unregisterCronRunnerC chan string
 }
 
 var MyAgent *Agent
@@ -28,16 +38,20 @@ var MyAgent *Agent
 func InitAgent(s *Server) {
 	logrus.Infof("init agent")
 	MyAgent = &Agent{
-		Server:      s,
-		connHolders: make(map[*ConnHolder]bool),
-		register:    make(chan *ConnHolder),
-		unregister:  make(chan *ConnHolder),
-		broadcast:   make(chan []byte),
-		ReWatch:     make(chan bool),
+		Server:                s,
+		connHolders:           make(map[*ConnHolder]bool),
+		register:              make(chan *ConnHolder),
+		unregister:            make(chan *ConnHolder),
+		broadcast:             make(chan []byte),
+		ReWatch:               make(chan bool),
+		cronRunners:           make(map[string]*scheduler.CronRunner),
+		registerCronRunnerC:   make(chan *scheduler.CronRunner),
+		unregisterCronRunnerC: make(chan string),
 	}
 	logrus.Infof("inited myagent:%v", MyAgent)
 	go MyAgent.handleWS()
 	go MyAgent.SyncWatchList()
+	go MyAgent.RunScheduler()
 
 }
 
@@ -122,6 +136,7 @@ func (a *Agent) SyncWatchList() {
 func (a *Agent) getWatchList() ([]*pipeline.Activity, error) {
 	logrus.Infof("getting watchlist")
 	activities, err := ListActivities(a.Server.PipelineContext)
+	logrus.Infof("get total activities:%v", len(activities))
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +146,7 @@ func (a *Agent) getWatchList() ([]*pipeline.Activity, error) {
 		if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
 			continue
 		} else {
-			logrus.Infof("add %v to watchlist", activity.Id)
+			//logrus.Infof("add %v to watchlist", activity.Id)
 			watchlist = append(watchlist, activity)
 		}
 	}
@@ -139,7 +154,76 @@ func (a *Agent) getWatchList() ([]*pipeline.Activity, error) {
 	return watchlist, nil
 }
 
-func (a *Agent) GetStepLog(activityId string, stageOrdinal int, stepOrdinal int) (string, error) {
+func (a *Agent) RunScheduler() {
 
-	return "", nil
+	pipelines := a.Server.PipelineContext.ListPipelines()
+	for _, pipeline := range pipelines {
+		if pipeline.Trigger != nil && pipeline.Trigger.Type == "cron" {
+			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.Trigger.Spec)
+			a.registerCronRunner(cr)
+		}
+	}
+	logrus.Infof("run scheduler,init size:%v", len(a.cronRunners))
+	for {
+		select {
+		case cr := <-a.registerCronRunnerC:
+			a.registerCronRunner(cr)
+			return
+		case pId := <-a.unregisterCronRunnerC:
+			a.unregisterCronRunner(pId)
+			return
+		}
+	}
+}
+
+func (a *Agent) onPipelineChange(pipeline *pipeline.Pipeline) {
+	pId := pipeline.Id
+	spec := ""
+	if pipeline.Trigger != nil && pipeline.Trigger.Type == "cron" && pipeline.Trigger.Spec != "" {
+		spec = pipeline.Trigger.Spec
+	}
+	cr := scheduler.NewCronRunner(pId, spec)
+	a.registerCronRunnerC <- cr
+}
+
+//registerCronRunner add or update a cronRunner
+func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
+	pId := cr.PipelineId
+	existing := a.cronRunners[pId]
+	logrus.Infof("registering conrunner,pid:%v,spec:%v", pId, cr.Spec)
+	if existing == nil {
+		err := cr.AddFunc(cr.Spec, func() { logrus.Infof("cron job run,pid:%v", pId); a.Server.PipelineContext.RunPipeline(pId) })
+		if err != nil {
+			logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
+		}
+		cr.Start()
+		a.cronRunners[pId] = cr
+	} else {
+		if existing.Spec == cr.Spec {
+			return
+		} else {
+			//update cron spec
+			existing.Stop()
+			a.cronRunners[pId] = nil
+			if cr.Spec != "" {
+				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
+				if err != nil {
+					logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
+				}
+				cr.Start()
+				a.cronRunners[pId] = cr
+			}
+		}
+
+	}
+
+}
+
+//unregisterCronRunner remove cronrunner for pipeline
+func (a *Agent) unregisterCronRunner(pipelineId string) {
+	existing := a.cronRunners[pipelineId]
+	if existing != nil {
+		existing.Stop()
+	}
+	a.cronRunners[pipelineId] = nil
 }

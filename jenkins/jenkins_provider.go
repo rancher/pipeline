@@ -187,7 +187,7 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 	logrus.Infof("before xml:%v", v)
 	logrus.Infof("v.Triggers:%v", v.Triggers)
 	output, err := xml.MarshalIndent(v, "  ", "    ")
-	logrus.Infof("get xml:%v\n end xml.", string(output))
+	//logrus.Infof("get xml:%v\n end xml.", string(output))
 	if err != nil {
 		fmt.Printf("error: %v\n", err)
 		return nil, err
@@ -222,7 +222,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 	var updated bool
 
 	logrus.Infof("syncing activity:%v", activity.Id)
-	logrus.Infof("activity is:%v", activity)
+	//logrus.Infof("activity is:%v", activity)
 	for i, actiStage := range activity.ActivityStages {
 		jobName := p.Name + "_" + actiStage.Name + "_" + activity.Id
 		beforeStatus := actiStage.Status
@@ -240,7 +240,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 			}
 		*/
 		buildInfo, err := GetBuildInfo(jobName)
-		logrus.Infof("got build info:%v, err:%v", buildInfo, err)
+		//logrus.Infof("got build info:%v, err:%v", buildInfo, err)
 		if err != nil {
 			//cannot get build info
 			//build not started
@@ -264,10 +264,12 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 				activity.Status = pipeline.ActivitySuccess
 			}
 		}
-		logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
+		//logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
 		if err == nil {
 			rawOutput, err := GetBuildRawOutput(jobName)
-			logrus.Infof("got rawOutput:%v,err:%v", rawOutput, err)
+			if err != nil {
+				logrus.Infof("got rawOutput:%v,err:%v", rawOutput, err)
+			}
 			//actiStage.RawOutput = rawOutput
 			stepStatusUpdated := parseSteps(activity, actiStage, rawOutput)
 			updated = updated || stepStatusUpdated

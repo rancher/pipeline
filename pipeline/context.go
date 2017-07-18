@@ -50,7 +50,7 @@ func (p *PipelineContext) GetPipelineById(id string) *Pipeline {
 	data := goCollection.Data[0]
 	ppl := Pipeline{}
 	json.Unmarshal([]byte(data.ResourceData["data"].(string)), &ppl)
-	logrus.Infof("get pipeline:%v", ppl)
+	//logrus.Infof("get pipeline:%v", ppl)
 	return &ppl
 }
 
@@ -62,9 +62,9 @@ func BuildPipelineContext(provider PipelineProvider) *PipelineContext {
 	return &r
 }
 
-func (p *PipelineContext) CreatePipeline(pipeline Pipeline) error {
+func (p *PipelineContext) CreatePipeline(pipeline *Pipeline) error {
 	pipeline.Id = uuid.Rand().Hex()
-	b, err := json.Marshal(pipeline)
+	b, err := json.Marshal(*pipeline)
 	if err != nil {
 		return err
 	}
@@ -85,8 +85,8 @@ func (p *PipelineContext) CreatePipeline(pipeline Pipeline) error {
 
 	return err
 }
-func (p *PipelineContext) UpdatePipeline(pipeline Pipeline) error {
-	b, err := json.Marshal(pipeline)
+func (p *PipelineContext) UpdatePipeline(pipeline *Pipeline) error {
+	b, err := json.Marshal(*pipeline)
 	if err != nil {
 		return err
 	}
