@@ -43,6 +43,8 @@ func InitAgent(s *Server) {
 		register:              make(chan *ConnHolder),
 		unregister:            make(chan *ConnHolder),
 		broadcast:             make(chan []byte),
+		activityWatchlist:     make(map[string]*pipeline.Activity),
+		watchActivityC:        make(chan *pipeline.Activity),
 		ReWatch:               make(chan bool),
 		cronRunners:           make(map[string]*scheduler.CronRunner),
 		registerCronRunnerC:   make(chan *scheduler.CronRunner),
@@ -50,7 +52,7 @@ func InitAgent(s *Server) {
 	}
 	logrus.Infof("inited myagent:%v", MyAgent)
 	go MyAgent.handleWS()
-	go MyAgent.SyncWatchList()
+	go MyAgent.SyncActivityWatchList()
 	go MyAgent.RunScheduler()
 
 }
@@ -131,6 +133,57 @@ func (a *Agent) SyncWatchList() {
 			}
 		}
 	}
+}
+
+func (a *Agent) SyncActivityWatchList() {
+	activities, err := ListActivities(a.Server.PipelineContext)
+	logrus.Infof("get total activities:%v", len(activities))
+	if err != nil {
+		logrus.Errorf("fail to get activities")
+	}
+	for _, activity := range activities {
+		if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
+			continue
+		} else {
+			//logrus.Infof("add %v to watchlist", activity.Id)
+			a.activityWatchlist[activity.Id] = activity
+		}
+	}
+	logrus.Infof("got watchlist,size:%v", len(a.activityWatchlist))
+	ticker := time.NewTicker(syncPeriod)
+	defer func() {
+		ticker.Stop()
+	}()
+	for {
+		select {
+		case <-ticker.C:
+			for _, activity := range a.activityWatchlist {
+				if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
+					continue
+				}
+				updated, _ := a.Server.PipelineContext.Provider.SyncActivity(activity)
+				logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
+				if updated {
+					//status changed,then update in rancher server
+
+					err = UpdateActivity(*activity)
+					if err != nil {
+						logrus.Errorf("fail update activity,%v", err)
+					}
+					if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
+						//done,remove from watchlist
+						delete(a.activityWatchlist, activity.Id)
+					}
+					logrus.Infof("telling all holder to send messages!")
+					a.broadcast <- []byte(activity.Id)
+				}
+			}
+		case acti := <-a.watchActivityC:
+			a.activityWatchlist[acti.Id] = acti
+
+		}
+	}
+
 }
 
 func (a *Agent) getWatchList() ([]*pipeline.Activity, error) {

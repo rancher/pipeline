@@ -37,6 +37,41 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 	return nil
 }
 
+func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
+	event_type := req.Header.Get("X-GitHub-Event")
+	id := mux.Vars(req)["id"]
+	logrus.Infof("webhook trigger,id:%v,event:%v", id, event_type)
+	if event_type == "ping" {
+		rw.Write([]byte("pong"))
+		return nil
+	}
+	if event_type != "push" {
+		logrus.Errorf("not push event")
+		return errors.New("not push event")
+	}
+
+	r := s.PipelineContext.GetPipelineById(id)
+	if r == nil {
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
+		rw.WriteHeader(http.StatusNotFound)
+		rw.Write([]byte("pipeline not found!"))
+		return err
+	}
+	activity, err := s.PipelineContext.RunPipeline(id)
+	if err != nil {
+		rw.Write([]byte("run pipeline error!"))
+		return err
+	}
+	r.RunCount = activity.RunSequence
+	r.LastRunId = activity.Id
+	r.LastRunStatus = activity.Status
+	s.PipelineContext.UpdatePipeline(r)
+	MyAgent.watchActivityC <- activity
+	rw.Write([]byte("run pipeline success!"))
+	logrus.Infof("webhook run success")
+	return nil
+}
+
 func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
@@ -150,7 +185,7 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	r.LastRunId = activity.Id
 	r.LastRunStatus = activity.Status
 	s.PipelineContext.UpdatePipeline(r)
-	MyAgent.ReWatch <- true
+	MyAgent.watchActivityC <- activity
 	apiContext.Write(toActivityResource(apiContext, activity))
 	return nil
 }
