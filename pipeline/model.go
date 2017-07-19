@@ -30,6 +30,7 @@ const (
 type Pipeline struct {
 	client.Resource
 	Name            string   `json:"name,omitempty" yaml:"name,omitempty"`
+	IsActivate      bool     `json:"isActivate,omitempty" yaml:"isActivate,omitempty"`
 	VersionSequence string   `json:"-" yaml:"-"`
 	RunCount        int      `json:"runCount,omitempty" yaml:"runCount,omitempty"`
 	LastRunId       string   `json:"lastRunId,omitempty" yaml:"lastRunId,omitempty"`

@@ -47,6 +47,8 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodGet).Path("/v1/activitys/{id}").Handler(f(schemas, s.GetActivity))
 	router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.UpdateActivity))
+	router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.ActivatePipeline))
+	router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.DeActivatePipeline))
 	router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
 
 	//test websocket
@@ -56,9 +58,11 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/webhook/{id}").Handler(f(schemas, s.Webhook))
 
 	pipelineActions := map[string]http.Handler{
-		"run":    f(schemas, s.RunPipeline),
-		"update": f(schemas, s.UpdatePipeline),
-		"remove": f(schemas, s.DeletePipeline),
+		"run":        f(schemas, s.RunPipeline),
+		"update":     f(schemas, s.UpdatePipeline),
+		"activate":   f(schemas, s.ActivatePipeline),
+		"deactivate": f(schemas, s.DeActivatePipeline),
+		"remove":     f(schemas, s.DeletePipeline),
 	}
 	for name, actions := range pipelineActions {
 		router.Methods(http.MethodPost).Path("/v1/pipelines/{id}").Queries("action", name).Handler(actions)

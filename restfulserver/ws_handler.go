@@ -28,7 +28,7 @@ const (
 	// Poll step log for changes with this period.
 	pollPeriod = 2 * time.Second
 
-	syncPeriod = 10 * time.Second
+	syncPeriod = 5 * time.Second
 )
 
 var (

@@ -57,6 +57,10 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		rw.Write([]byte("pipeline not found!"))
 		return err
 	}
+	if !r.IsActivate {
+		logrus.Errorf("pipeline is not activated!")
+		return errors.New("pipeline is not activated!")
+	}
 	activity, err := s.PipelineContext.RunPipeline(id)
 	if err != nil {
 		rw.Write([]byte("run pipeline error!"))
@@ -153,6 +157,43 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
+	apiContext.Write(toPipelineResource(apiContext, r))
+	return nil
+}
+
+func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	id := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineById(id)
+	if r == nil {
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
+		return err
+	}
+	r.IsActivate = true
+	err = s.PipelineContext.UpdatePipeline(r)
+	if err != nil {
+		return err
+	}
+	MyAgent.onPipelineChange(pipeline)
+	apiContext.Write(toPipelineResource(apiContext, r))
+	return nil
+
+}
+
+func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	id := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineById(id)
+	if r == nil {
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
+		return err
+	}
+	r.IsActivate = false
+	err = s.PipelineContext.UpdatePipeline(r)
+	if err != nil {
+		return err
+	}
+	MyAgent.onPipelineChange(pipeline)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 }

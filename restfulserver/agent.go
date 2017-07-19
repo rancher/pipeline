@@ -232,7 +232,13 @@ func (a *Agent) RunScheduler() {
 func (a *Agent) onPipelineChange(pipeline *pipeline.Pipeline) {
 	pId := pipeline.Id
 	spec := ""
-	if pipeline.Trigger != nil && pipeline.Trigger.Type == "cron" && pipeline.Trigger.Spec != "" {
+	if !pipeline.IsActivate {
+		//deactivate,remove the cron
+		a.unregisterCronRunnerC <- pId
+		return
+	}
+
+	if pipeline.IsActivate && pipeline.Trigger != nil && pipeline.Trigger.Type == "cron" {
 		spec = pipeline.Trigger.Spec
 	}
 	cr := scheduler.NewCronRunner(pId, spec)
@@ -257,7 +263,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 		} else {
 			//update cron spec
 			existing.Stop()
-			a.cronRunners[pId] = nil
+			delete(a.cronRunners, pId)
 			if cr.Spec != "" {
 				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
 				if err != nil {
@@ -278,5 +284,5 @@ func (a *Agent) unregisterCronRunner(pipelineId string) {
 	if existing != nil {
 		existing.Stop()
 	}
-	a.cronRunners[pipelineId] = nil
+	delete(a.cronRunners, pipelineId)
 }
