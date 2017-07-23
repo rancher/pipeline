@@ -108,7 +108,20 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 	return nil
 
 }
-
+func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	id := mux.Vars(req)["id"]
+	r, err := GetActivity(id, s.PipelineContext)
+	if err != nil {
+		return err
+	}
+	err = DeleteActivity(id)
+	if err != nil {
+		return err
+	}
+	apiContext.Write(toActivityResource(apiContext, &r))
+	return nil
+}
 func (s *Server) UpdateActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	requestBytes, err := ioutil.ReadAll(req.Body)
@@ -156,6 +169,34 @@ func CreateActivity(activity pipeline.Activity) (*client.GenericObject, error) {
 	return obj, nil
 }
 
+func DeleteActivity(id string) error {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+
+	filters := make(map[string]interface{})
+	filters["key"] = id
+	filters["kind"] = "activity"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		logrus.Errorf("Error %v filtering genericObjects by key", err)
+		return nil
+	}
+	if len(goCollection.Data) == 0 {
+		logrus.Errorf("Error %v filtering genericObjects by key", err)
+		return nil
+	}
+	existing := goCollection.Data[0]
+	//logrus.Infof("existing pipeline:%v", existing)
+	err = apiClient.GenericObject.Delete(&existing)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func UpdateActivity(activity pipeline.Activity) error {
 	logrus.Infof("updating activity %v.", activity.Id)
 	logrus.Infof("activity stages:%v", activity.ActivityStages)

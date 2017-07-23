@@ -68,5 +68,13 @@ func NewRouter(s *Server) *mux.Router {
 	for name, actions := range pipelineActions {
 		router.Methods(http.MethodPost).Path("/v1/pipelines/{id}").Queries("action", name).Handler(actions)
 	}
+
+	activityActions := map[string]http.Handler{
+		"update": f(schemas, s.UpdateActivity),
+		"remove": f(schemas, s.DeleteActivity),
+	}
+	for name, actions := range activityActions {
+		router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Queries("action", name).Handler(actions)
+	}
 	return router
 }

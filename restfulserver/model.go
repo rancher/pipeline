@@ -109,6 +109,9 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 		Actions: map[string]string{},
 		Links:   map[string]string{},
 	}
+	a.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=update"
+	a.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=remove"
+
 	a.Links["pipeline"] = apiContext.UrlBuilder.ReferenceByIdLink("pipeline", a.PipelineName+":"+a.PipelineVersion)
 	return a
 }
