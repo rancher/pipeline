@@ -42,7 +42,7 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 		Id:          uuid.Rand().Hex(),
 		Pipeline:    *p,
 		RunSequence: p.RunCount + 1,
-		Status:      pipeline.ActivityWaitting,
+		Status:      pipeline.ActivityWaiting,
 		StartTS:     time.Now().UnixNano() / int64(time.Millisecond),
 	}
 	for _, stage := range p.Stages {
@@ -207,7 +207,51 @@ func commandBuilder(step *pipeline.Step) string {
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(step.Image)
 		stringBuilder.WriteString(" ")
-		stringBuilder.WriteString(step.Command)
+		cmdAllBuf := new(bytes.Buffer)
+		cmdAllBuf.WriteString("sh -c \"")
+		cmds := strings.Split(step.Command, "\n")
+		for _, cmd := range cmds {
+			if strings.HasSuffix(cmd, "\\n") {
+				cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
+				continue
+			} else {
+				cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
+				cmdAllBuf.WriteString(";")
+			}
+		}
+		cmdAllBuf.WriteString("\"")
+		stringBuilder.WriteString(cmdAllBuf.String())
+
+	case pipeline.StepTypeBuild:
+
+		if step.SourceType == "sc" {
+			stringBuilder.WriteString("docker build --tag ")
+			stringBuilder.WriteString(step.TargetImage)
+			stringBuilder.WriteString(" .;")
+		} else if step.SourceType == "file" {
+			stringBuilder.WriteString("echo \"")
+			stringBuilder.WriteString(strings.Replace(step.Dockerfile, "\"", "\\\"", -1))
+			stringBuilder.WriteString("\">.Dockerfile;")
+			stringBuilder.WriteString("docker build --tag ")
+			stringBuilder.WriteString(step.TargetImage)
+			stringBuilder.WriteString(" -f .Dockerfile .;")
+		}
+		if step.PushFlag {
+			sep := strings.Index(step.TargetImage, "/")
+			registry := ""
+			if sep != -1 {
+				registry = step.TargetImage[:sep]
+			}
+			stringBuilder.WriteString("docker login --username ")
+			stringBuilder.WriteString(step.RegUserName)
+			stringBuilder.WriteString(" --password ")
+			stringBuilder.WriteString(step.RegPassword)
+			stringBuilder.WriteString(" ")
+			stringBuilder.WriteString(registry)
+			stringBuilder.WriteString(";docker push ")
+			stringBuilder.WriteString(step.TargetImage)
+			stringBuilder.WriteString(";")
+		}
 	case pipeline.StepTypeSCM:
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
@@ -244,7 +288,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 		if err != nil {
 			//cannot get build info
 			//build not started
-			actiStage.Status = pipeline.ActivityStageWaitting
+			actiStage.Status = pipeline.ActivityStageWaiting
 			continue
 		}
 		getCommit(activity, buildInfo)
@@ -315,11 +359,11 @@ func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
 		return
 	}
 
-	logrus.Infof("try to get commitInfo,action:%v", buildInfo.Actions)
+	//logrus.Infof("try to get commitInfo,action:%v", buildInfo.Actions)
 	actions := buildInfo.Actions
 	for _, action := range actions {
 
-		logrus.Infof("lastbuiltrevision:%v", action.LastBuiltRevision.SHA1)
+		//logrus.Infof("lastbuiltrevision:%v", action.LastBuiltRevision.SHA1)
 		if action.LastBuiltRevision.SHA1 != "" {
 			activity.CommitInfo = action.LastBuiltRevision.SHA1
 		}
@@ -337,11 +381,14 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 		lastStatus = pipeline.ActivityStepFail
 	}
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
-	logrus.Infof("split to %v parts,steps number:%v, parse outputs:%v", len(outputs), len(actiStage.ActivitySteps), outputs)
+	//logrus.Infof("split to %v parts,steps number:%v, parse outputs:%v", len(outputs), len(actiStage.ActivitySteps), outputs)
 	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "\nCloning the remote Git repository\n") {
 		// SCM
 		//actiStage.ActivitySteps[0].Message = outputs[0]
-		actiStage.ActivitySteps[0].Status = lastStatus
+		if actiStage.ActivitySteps[0].Status != lastStatus {
+			updated = true
+			actiStage.ActivitySteps[0].Status = lastStatus
+		}
 		return updated
 	}
 	for i, step := range actiStage.ActivitySteps {
@@ -358,7 +405,7 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			step.Status = lastStatus
 		} else {
 			//not run steps
-			step.Status = pipeline.ActivityStepWaitting
+			step.Status = pipeline.ActivityStepWaiting
 		}
 		if prevStatus != step.Status {
 			updated = true
@@ -382,7 +429,7 @@ func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
 	for _, step := range stage.Steps {
 		actiStep := &pipeline.ActivityStep{
 			Name:   step.Name,
-			Status: pipeline.ActivityStepWaitting,
+			Status: pipeline.ActivityStepWaiting,
 		}
 		actiStage.ActivitySteps = append(actiStage.ActivitySteps, actiStep)
 	}

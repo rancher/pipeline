@@ -167,7 +167,7 @@ func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
 	var targetURL *url.URL
 	var err error
 	targetURL, err = url.Parse(sah + buildInfoURI)
-	logrus.Infof("targetURL is :%v", targetURL)
+	//logrus.Infof("targetURL is :%v", targetURL)
 	if err != nil {
 		logrus.Error(err)
 		return nil, err
@@ -182,7 +182,7 @@ func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
 		logrus.Error(err)
 		return nil, err
 	}
-	logrus.Infof("response code is :%v", resp.StatusCode)
+	//logrus.Infof("response code is :%v", resp.StatusCode)
 	if resp.StatusCode != 200 {
 		logrus.Error(ErrGetBuildInfoFail)
 		return nil, ErrGetBuildInfoFail
@@ -210,7 +210,7 @@ func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
 	var targetURL *url.URL
 	var err error
 	targetURL, err = url.Parse(sah + jobInfoURI)
-	logrus.Infof("targetURL is :%v", targetURL)
+	//logrus.Infof("targetURL is :%v", targetURL)
 	if err != nil {
 		logrus.Error(err)
 		return nil, err
@@ -225,7 +225,7 @@ func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
 		logrus.Error(err)
 		return nil, err
 	}
-	logrus.Infof("response code is :%v", resp.StatusCode)
+	//logrus.Infof("response code is :%v", resp.StatusCode)
 	if resp.StatusCode != 200 {
 		logrus.Error(ErrGetJobInfoFail)
 		return nil, ErrGetJobInfoFail
@@ -253,7 +253,7 @@ func GetBuildRawOutput(jobname string) (string, error) {
 	var targetURL *url.URL
 	var err error
 	targetURL, err = url.Parse(sah + buildRawOutputURI)
-	logrus.Infof("targetURL is :%v", targetURL)
+	//logrus.Infof("targetURL is :%v", targetURL)
 	if err != nil {
 		logrus.Error(err)
 		return "", err
@@ -268,7 +268,7 @@ func GetBuildRawOutput(jobname string) (string, error) {
 		logrus.Error(err)
 		return "", err
 	}
-	logrus.Infof("response code is :%v", resp.StatusCode)
+	//logrus.Infof("response code is :%v", resp.StatusCode)
 	if resp.StatusCode != 200 {
 		logrus.Error(ErrGetJobInfoFail)
 		return "", ErrGetJobInfoFail

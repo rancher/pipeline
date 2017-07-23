@@ -170,6 +170,9 @@ func (a *Agent) SyncActivityWatchList() {
 					if err != nil {
 						logrus.Errorf("fail update activity,%v", err)
 					}
+					logrus.Infof("trying to update lastactivity:%v", activity)
+					a.Server.UpdateLastActivity(activity.Pipeline.Id)
+
 					if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
 						//done,remove from watchlist
 						delete(a.activityWatchlist, activity.Id)
@@ -211,8 +214,8 @@ func (a *Agent) RunScheduler() {
 
 	pipelines := a.Server.PipelineContext.ListPipelines()
 	for _, pipeline := range pipelines {
-		if pipeline.Trigger != nil && pipeline.Trigger.Type == "cron" {
-			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.Trigger.Spec)
+		if pipeline.IsActivate && pipeline.TriggerSpec != "" {
+			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.TriggerSpec, pipeline.TriggerTimezone)
 			a.registerCronRunner(cr)
 		}
 	}
@@ -221,28 +224,31 @@ func (a *Agent) RunScheduler() {
 		select {
 		case cr := <-a.registerCronRunnerC:
 			a.registerCronRunner(cr)
-			return
 		case pId := <-a.unregisterCronRunnerC:
+			logrus.Infof("")
 			a.unregisterCronRunner(pId)
-			return
 		}
 	}
 }
 
-func (a *Agent) onPipelineChange(pipeline *pipeline.Pipeline) {
-	pId := pipeline.Id
+func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
+	pId := p.Id
 	spec := ""
-	if !pipeline.IsActivate {
+	timezone := ""
+	if !p.IsActivate {
 		//deactivate,remove the cron
 		a.unregisterCronRunnerC <- pId
-		return
 	}
 
-	if pipeline.IsActivate && pipeline.Trigger != nil && pipeline.Trigger.Type == "cron" {
-		spec = pipeline.Trigger.Spec
+	if p.IsActivate {
+		spec = p.TriggerSpec
+		timezone = p.TriggerTimezone
+		cr := scheduler.NewCronRunner(pId, spec, timezone)
+		a.registerCronRunnerC <- cr
 	}
-	cr := scheduler.NewCronRunner(pId, spec)
-	a.registerCronRunnerC <- cr
+	p.NextRunTime = pipeline.GetNextRunTime(p)
+	a.Server.PipelineContext.UpdatePipeline(p)
+
 }
 
 //registerCronRunner add or update a cronRunner
@@ -251,9 +257,10 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	existing := a.cronRunners[pId]
 	logrus.Infof("registering conrunner,pid:%v,spec:%v", pId, cr.Spec)
 	if existing == nil {
-		err := cr.AddFunc(cr.Spec, func() { logrus.Infof("cron job run,pid:%v", pId); a.Server.PipelineContext.RunPipeline(pId) })
+		err := cr.AddFunc("0 "+cr.Spec, func() { logrus.Infof("cron job run,pid:%v", pId); a.Server.PipelineContext.RunPipeline(pId) })
 		if err != nil {
 			logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
+			return
 		}
 		cr.Start()
 		a.cronRunners[pId] = cr
@@ -265,9 +272,10 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 			existing.Stop()
 			delete(a.cronRunners, pId)
 			if cr.Spec != "" {
-				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
+				err := cr.AddFunc("0 "+cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
 				if err != nil {
 					logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
+					return
 				}
 				cr.Start()
 				a.cronRunners[pId] = cr
@@ -280,6 +288,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 
 //unregisterCronRunner remove cronrunner for pipeline
 func (a *Agent) unregisterCronRunner(pipelineId string) {
+	logrus.Infof("unregistering conrunner,pid:%v", pipelineId)
 	existing := a.cronRunners[pipelineId]
 	if existing != nil {
 		existing.Stop()

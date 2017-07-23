@@ -30,17 +30,20 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 	apiContext.Write(&client.GenericCollection{
 		Data: toPipelineCollections(apiContext, s.PipelineContext.ListPipelines()),
 	})
-	pCollections := s.PipelineContext.ListPipelines()
-	for _, p := range pCollections {
-		s.updateLastActivity(p)
-	}
 	return nil
 }
 
 func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
-	event_type := req.Header.Get("X-GitHub-Event")
-	id := mux.Vars(req)["id"]
-	logrus.Infof("webhook trigger,id:%v,event:%v", id, event_type)
+	var signature string
+	var event_type string
+
+	if signature = req.Header.Get("X-Hub-Signature"); len(signature) == 0 {
+		return errors.New("No signature!")
+	}
+	if event_type = req.Header.Get("X-GitHub-Event"); len(event_type) == 0 {
+		return errors.New("No event!")
+	}
+
 	if event_type == "ping" {
 		rw.Write([]byte("pong"))
 		return nil
@@ -50,6 +53,13 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		return errors.New("not push event")
 	}
 
+	id := mux.Vars(req)["id"]
+	logrus.Infof("webhook trigger,id:%v,event:%v,signature:%v", id, event_type, signature)
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return err
+	}
+
 	r := s.PipelineContext.GetPipelineById(id)
 	if r == nil {
 		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
@@ -57,6 +67,10 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		rw.Write([]byte("pipeline not found!"))
 		return err
 	}
+	if !util.VerifyWebhookSignature([]byte(r.WebHookToken), signature, body) {
+		return errors.New("Invalid signature")
+	}
+	logrus.Infof("token validate pass")
 	if !r.IsActivate {
 		logrus.Errorf("pipeline is not activated!")
 		return errors.New("pipeline is not activated!")
@@ -66,10 +80,6 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		rw.Write([]byte("run pipeline error!"))
 		return err
 	}
-	r.RunCount = activity.RunSequence
-	r.LastRunId = activity.Id
-	r.LastRunStatus = activity.Status
-	s.PipelineContext.UpdatePipeline(r)
 	MyAgent.watchActivityC <- activity
 	rw.Write([]byte("run pipeline success!"))
 	logrus.Infof("webhook run success")
@@ -96,25 +106,58 @@ func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 		})
 		return err
 	}
-	s.updateLastActivity(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 }
 
 //update last activity info in the pipeline
-func (s *Server) updateLastActivity(p *pipeline.Pipeline) {
-	if p.LastRunId == "" {
+func (s *Server) UpdateLastActivity(pId string) {
+	logrus.Infof("begin UpdateLastActivity")
+	p := s.PipelineContext.GetPipelineById(pId)
+	if p == nil || p.LastRunId == "" {
 		return
 	}
-	activity, err := GetActivity(p.LastRunId, s.PipelineContext)
+	activityId := p.LastRunId
+	activity, err := GetActivity(activityId, s.PipelineContext)
 	if err != nil {
-		logrus.Error("fail to get last run of pipeline %v", p.Name)
+		logrus.Errorf("fail update pipeline last run status,%v", err)
 		return
 	}
 	p.LastRunStatus = activity.Status
 	p.CommitInfo = activity.CommitInfo
+	//TODO
+	p.NextRunTime = pipeline.GetNextRunTime(p)
+	err = s.PipelineContext.UpdatePipeline(p)
+	if err != nil {
+		logrus.Errorf("fail update pipeline last run status,%v", err)
+	}
+	logrus.Infof("updated pipeline last activity,%v", p)
 }
 
+/*
+func GetNextRunTime(pipeline *pipeline.Pipeline) int64 {
+	nextRunTime := int64(0)
+	if !pipeline.IsActivate {
+		return nextRunTime
+	}
+	spec := pipeline.TriggerSpec
+	schedule, err := cron.Parse(spec)
+	if err != nil {
+		logrus.Errorf("error parse cron exp,%v,%v", spec, err)
+		return nextRunTime
+	}
+	nextRunTime = schedule.Next(time.Now()).UnixNano() / int64(time.Millisecond)
+	cronRunner := MyAgent.cronRunners[pipeline.Id]
+	if cronRunner == nil {
+		return nextRunTime
+	}
+	entry := cronRunner.Cron.Entries()
+	if len(entry) > 0 {
+		nextRunTime = entry[0].Next.UnixNano() / int64(time.Millisecond)
+	}
+	return nextRunTime
+}
+*/
 func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
@@ -140,6 +183,7 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
+	logrus.Infof("to update pipeline,%v", pipeline)
 	err = s.PipelineContext.UpdatePipeline(pipeline)
 	if err != nil {
 		return err
@@ -170,11 +214,11 @@ func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) err
 		return err
 	}
 	r.IsActivate = true
-	err = s.PipelineContext.UpdatePipeline(r)
+	err := s.PipelineContext.UpdatePipeline(r)
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineChange(pipeline)
+	MyAgent.onPipelineChange(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 
@@ -189,11 +233,11 @@ func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) e
 		return err
 	}
 	r.IsActivate = false
-	err = s.PipelineContext.UpdatePipeline(r)
+	err := s.PipelineContext.UpdatePipeline(r)
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineChange(pipeline)
+	MyAgent.onPipelineChange(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 }
@@ -222,10 +266,6 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	r.RunCount = activity.RunSequence
-	r.LastRunId = activity.Id
-	r.LastRunStatus = activity.Status
-	s.PipelineContext.UpdatePipeline(r)
 	MyAgent.watchActivityC <- activity
 	apiContext.Write(toActivityResource(apiContext, activity))
 	return nil
@@ -274,21 +314,7 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 		if a.Pipeline.Id != pId {
 			continue
 		}
-		//When get a unfinish Activity ,try to sync from provider and update its status
-		/*
-			if a.Status == "Waitting" || a.Status == "Building" {
-				err = s.PipelineContext.SyncActivity(a)
-				if err != nil {
-					logrus.Error(err)
-					//skip nonsync one
-					continue
-				}
-				err = UpdateActivity(*a)
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
-			}*/
+
 		toActivityResource(apiContext, a)
 		activities = append(activities, a)
 	}

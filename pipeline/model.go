@@ -10,18 +10,19 @@ const StepTypeTask = "task"
 const StepTypeCatalog = "catalog"
 const StepTypeDeploy = "deploy"
 const StepTypeSCM = "scm"
+const StepTypeBuild = "build"
 const (
-	ActivityStepWaitting = "Waitting"
+	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
 	ActivityStepSuccess  = "Success"
 	ActivityStepFail     = "Fail"
 
-	ActivityStageWaitting = "Waitting"
+	ActivityStageWaiting  = "Waiting"
 	ActivityStageBuilding = "Building"
 	ActivityStageSuccess  = "Success"
 	ActivityStageFail     = "Fail"
 
-	ActivityWaitting = "Waitting"
+	ActivityWaiting  = "Waiting"
 	ActivityBuilding = "Building"
 	ActivitySuccess  = "Success"
 	ActivityFail     = "Fail"
@@ -29,19 +30,26 @@ const (
 
 type Pipeline struct {
 	client.Resource
-	Name            string   `json:"name,omitempty" yaml:"name,omitempty"`
-	IsActivate      bool     `json:"isActivate,omitempty" yaml:"isActivate,omitempty"`
-	VersionSequence string   `json:"-" yaml:"-"`
-	RunCount        int      `json:"runCount,omitempty" yaml:"runCount,omitempty"`
-	LastRunId       string   `json:"lastRunId,omitempty" yaml:"lastRunId,omitempty"`
-	LastRunStatus   string   `json:"lastRunStatus,omitempty" yaml:"lastRunStatus,omitempty"`
-	CommitInfo      string   `json:"commitInfo,omitempty" yaml:"commitInfo,omitempty"`
-	Repository      string   `json:"repository,omitempty" yaml:"repository,omitempty"`
-	Branch          string   `json:"branch,omitempty" yaml:"branch,omitempty"`
-	TargetImage     string   `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
-	File            string   `json:"file"`
-	Trigger         *Trigger `json:"trigger,omitempty" yaml:"trigger,omitempty"`
-	Stages          []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
+	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
+	IsActivate      bool   `json:"isActivate,omitempty" yaml:"isActivate,omitempty"`
+	VersionSequence string `json:"-" yaml:"-"`
+	RunCount        int    `json:"runCount,omitempty" yaml:"runCount,omitempty"`
+	LastRunId       string `json:"lastRunId,omitempty" yaml:"lastRunId,omitempty"`
+	LastRunStatus   string `json:"lastRunStatus,omitempty" yaml:"lastRunStatus,omitempty"`
+	LastRunTime     int64  `json:"lastRunTime,omitempty" yaml:"lastRunTime,omitempty"`
+	NextRunTime     int64  `json:"nextRunTime,omitempty" yaml:"nextRunTime,omitempty"`
+	CommitInfo      string `json:"commitInfo,omitempty" yaml:"commitInfo,omitempty"`
+	Repository      string `json:"repository,omitempty" yaml:"repository,omitempty"`
+	Branch          string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	TargetImage     string `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
+	File            string `json:"file"`
+	WebHookToken    string `json:"webhookToken,omitempty" yaml:"webhookToken,omitempty"`
+	//trigger
+	TriggerType     string `json:"triggerType,omitempty" yaml:"triggerType,omitempty"`
+	TriggerSpec     string `json:"triggerSpec" yaml:"triggerSpec,omitempty"`
+	TriggerTimezone string `json:"triggerTimezone,omitempty" yaml:"triggerTimezone,omitempty"`
+
+	Stages []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
 
 type Stage struct {
@@ -58,6 +66,13 @@ type Step struct {
 	//---SCM step
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	//---Build step
+	SourceType  string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
+	Dockerfile  string `json:"file,omitempty" yaml:"file,omitempty"`
+	TargetImage string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
+	PushFlag    bool   `json:"push,omitempty" yaml:"push,omitempty"`
+	RegUserName string `json:"username,omitempty" yaml:"username,omitempty"`
+	RegPassword string `json:"password,omitempty" yaml:"password,omitempty"`
 	//---task step
 	Command    string   `json:"command,omitempty" yaml:"command,omitempty"`
 	Image      string   `json:"image,omitempty" yaml:"image,omitempty"`
@@ -76,7 +91,8 @@ type Trigger struct {
 	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 
 	// cron trigger
-	Spec string `json:"spec" yaml:"spec,omitempty"`
+	Spec     string `json:"spec" yaml:"spec,omitempty"`
+	Timezone string `json:"timezone,omitempty" yaml:"timezone,omitempty"`
 }
 
 type BuildStep struct {

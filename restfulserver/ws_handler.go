@@ -28,7 +28,7 @@ const (
 	// Poll step log for changes with this period.
 	pollPeriod = 2 * time.Second
 
-	syncPeriod = 5 * time.Second
+	syncPeriod = 2 * time.Second
 )
 
 var (
@@ -64,7 +64,6 @@ func getActivityLog(activityId string, stepOrdinal int) ([]byte, error) {
 }
 
 func stepLogReader(ws *websocket.Conn) {
-	logrus.Infof("start ws reader")
 	defer ws.Close()
 	ws.SetReadLimit(512)
 	ws.SetReadDeadline(time.Now().Add(pongWait))
@@ -78,7 +77,6 @@ func stepLogReader(ws *websocket.Conn) {
 }
 
 func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdinal int, stepOrdinal int) {
-	logrus.Infof("start ws writer")
 	pingTicker := time.NewTicker(pingPeriod)
 	pollTicker := time.NewTicker(pollPeriod)
 	defer func() {
@@ -133,7 +131,6 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 }
 
 func (s *Server) ServeStepLog(w http.ResponseWriter, r *http.Request) error {
-	logrus.Infof("start ws")
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {

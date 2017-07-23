@@ -27,7 +27,6 @@ type ConnHolder struct {
 }
 
 func (c *ConnHolder) DoRead() {
-	logrus.Infof("start ws reader")
 	defer func() {
 		c.agent.unregister <- c
 		c.conn.Close()
@@ -44,7 +43,6 @@ func (c *ConnHolder) DoRead() {
 }
 
 func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
-	logrus.Infof("start ws writer")
 	pingTicker := time.NewTicker(pingPeriod)
 	pollTicker := time.NewTicker(pollPeriod)
 	defer func() {
@@ -82,12 +80,32 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
 			if err != nil {
 				return
 			}
+			//write websocket for activity status change
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.TextMessage, b); err != nil {
 				return
 			}
+			//write websocket for pipeline status change
+			pipeline := c.agent.Server.PipelineContext.GetPipelineById(activity.Pipeline.Id)
+			if pipeline.LastRunId == activityId {
+				toPipelineResource(apiContext, pipeline)
+				response := WSMsg{
+					Id:           uuid.Rand().Hex(),
+					Name:         "resource.change",
+					ResourceType: "pipeline",
+					Time:         time.Now(),
+					Data:         pipeline,
+				}
+				b, err = json.Marshal(response)
+				if err != nil {
+					return
+				}
+				if err := c.conn.WriteMessage(websocket.TextMessage, b); err != nil {
+					return
+				}
+			}
 		case <-pingTicker.C:
-			logrus.Infof("trying to ping")
+			//logrus.Infof("trying to ping")
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.PingMessage, []byte("")); err != nil {
 				logrus.Errorf("error writing ping,%v", err)
@@ -102,7 +120,6 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
 }
 
 func (s *Server) ServeStatusWS(w http.ResponseWriter, r *http.Request) error {
-	logrus.Infof("start ws")
 	apiContext := api.GetApiContext(r)
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {

@@ -6,10 +6,12 @@ import (
 	"os"
 	"path"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/util"
+	"github.com/robfig/cron"
 	"github.com/sluu99/uuid"
 
 	"github.com/Sirupsen/logrus"
@@ -64,6 +66,7 @@ func BuildPipelineContext(provider PipelineProvider) *PipelineContext {
 
 func (p *PipelineContext) CreatePipeline(pipeline *Pipeline) error {
 	pipeline.Id = uuid.Rand().Hex()
+	pipeline.WebHookToken = uuid.Rand().Hex()
 	b, err := json.Marshal(*pipeline)
 	if err != nil {
 		return err
@@ -113,7 +116,7 @@ func (p *PipelineContext) UpdatePipeline(pipeline *Pipeline) error {
 		return err
 	}
 	existing := goCollection.Data[0]
-	logrus.Infof("existing pipeline:%v", existing)
+	//logrus.Infof("existing pipeline:%v", existing)
 	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
 		Name:         pipeline.Name,
 		Key:          pipeline.Id,
@@ -123,6 +126,7 @@ func (p *PipelineContext) UpdatePipeline(pipeline *Pipeline) error {
 	if err != nil {
 		return err
 	}
+	logrus.Infof("updated pipeline")
 	return nil
 }
 
@@ -233,7 +237,30 @@ func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
 	if err != nil {
 		return &Activity{}, err
 	}
+
+	pp.RunCount = activity.RunSequence
+	pp.LastRunId = activity.Id
+	pp.LastRunStatus = activity.Status
+	pp.LastRunTime = activity.StartTS
+	pp.NextRunTime = GetNextRunTime(pp)
+	p.UpdatePipeline(pp)
 	return activity, nil
+}
+
+func GetNextRunTime(pipeline *Pipeline) int64 {
+	nextRunTime := int64(0)
+	if !pipeline.IsActivate {
+		return nextRunTime
+	}
+	spec := pipeline.TriggerSpec
+	schedule, err := cron.Parse(spec)
+	if err != nil {
+		logrus.Errorf("error parse cron exp,%v,%v", spec, err)
+		return nextRunTime
+	}
+	nextRunTime = schedule.Next(time.Now()).UnixNano() / int64(time.Millisecond)
+
+	return nextRunTime
 }
 
 //get updated activity from provider

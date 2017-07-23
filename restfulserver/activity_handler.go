@@ -37,21 +37,6 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
-		//When get a unfinish Activity ,try to sync from provider and update its status
-		/*
-			if a.Status == "Waitting" || a.Status == "Building" {
-				err = s.PipelineContext.SyncActivity(a)
-				if err != nil {
-					logrus.Error(err)
-					//skip nonsync one
-					continue
-				}
-				err = UpdateActivity(*a)
-				if err != nil {
-					logrus.Error(err)
-					continue
-				}
-			}*/
 		toActivityResource(apiContext, a)
 		activities = append(activities, a)
 	}
@@ -85,6 +70,23 @@ func (s *Server) CleanActivities(rw http.ResponseWriter, req *http.Request) erro
 	}
 	return nil
 
+}
+
+func (s *Server) CleanPipelines(rw http.ResponseWriter, req *http.Request) error {
+	apiClient, err := util.GetRancherClient()
+	filters := make(map[string]interface{})
+	filters["kind"] = "pipeline"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+
+	if err != nil {
+		return err
+	}
+	for _, gobj := range goCollection.Data {
+		apiClient.GenericObject.Delete(&gobj)
+	}
+	return nil
 }
 
 //CreateActivity Handler
@@ -184,7 +186,7 @@ func UpdateActivity(activity pipeline.Activity) error {
 		return nil
 	}
 	existing := goCollection.Data[0]
-	logrus.Infof("existing pipeline:%v", existing)
+	//logrus.Infof("existing pipeline:%v", existing)
 	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
 		Name:         activity.Id,
 		Key:          activity.Id,
@@ -259,19 +261,5 @@ func GetActivity(id string, pContext *pipeline.PipelineContext) (pipeline.Activi
 	activity := pipeline.Activity{}
 	json.Unmarshal([]byte(data.ResourceData["data"].(string)), &activity)
 
-	//When get a unfinish Activity ,try to sync from provider and update its status
-	/*
-		if activity.Status == "Waitting" || activity.Status == "Building" {
-			err = pContext.SyncActivity(&activity)
-			if err != nil {
-				logrus.Error(err)
-				return pipeline.Activity{}, err
-			}
-			err = UpdateActivity(activity)
-			if err != nil {
-				logrus.Error(err)
-				return pipeline.Activity{}, err
-			}
-		}*/
 	return activity, nil
 }
