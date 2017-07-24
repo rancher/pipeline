@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -57,10 +58,11 @@ func VerifyWebhookSignature(secret []byte, signature string, body []byte) bool {
 	return hmac.Equal([]byte(computed.Sum(nil)), actual)
 }
 
-func CreateWebhook(user string, repo string, accesstoken string, webhookUrl string, secret string) error {
+//create webhook,return id of webhook
+func CreateWebhook(user string, repo string, accesstoken string, webhookUrl string, secret string) (int, error) {
 	data := user + ":" + accesstoken
 	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
-	name := "pipeline-" + secret
+	name := "web"
 	active := true
 	hook := github.Hook{
 		Name:   &name,
@@ -74,14 +76,88 @@ func CreateWebhook(user string, repo string, accesstoken string, webhookUrl stri
 	hook.Config["secret"] = secret
 	hook.Config["insecure_ssl"] = "1"
 
+	logrus.Infof("hook to create:%v", hook)
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(hook)
 	hc := http.Client{}
 	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
 	req, err := http.NewRequest("POST", APIURL, b)
 
-	req.Header.Add("Authorization", sEnc)
+	req.Header.Add("Authorization", "Basic "+sEnc)
 
-	_, err = hc.Do(req)
+	resp, err := hc.Do(req)
+	if err != nil {
+		return -1, err
+	}
+	respData, err := ioutil.ReadAll(resp.Body)
+	logrus.Infof("respData:%v", string(respData))
+	err = json.Unmarshal(respData, &hook)
+	if err != nil {
+		return -1, err
+	}
+	return hook.GetID(), err
+}
+
+func ListWebhook(user string, repo string, accesstoken string) ([]*github.Hook, error) {
+	data := user + ":" + accesstoken
+	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
+	hc := http.Client{}
+	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
+	req, err := http.NewRequest("GET", APIURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	var hooks []*github.Hook
+	logrus.Infof("get encrpyt:%v", sEnc)
+	req.Header.Add("Authorization", "Basic "+sEnc)
+	resp, err := hc.Do(req)
+	respData, err := ioutil.ReadAll(resp.Body)
+	logrus.Infof("get response data:%v", string(respData))
+	err = json.Unmarshal(respData, &hooks)
+	if err != nil {
+		return nil, err
+	}
+
+	return hooks, nil
+}
+
+func GetWebhook(user string, repo string, accesstoken string, id string) (*github.Hook, error) {
+	data := user + ":" + accesstoken
+	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
+	hc := http.Client{}
+	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
+	req, err := http.NewRequest("GET", APIURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	var hook *github.Hook
+	logrus.Infof("get encrpyt:%v", sEnc)
+	req.Header.Add("Authorization", "Basic "+sEnc)
+	resp, err := hc.Do(req)
+	respData, err := ioutil.ReadAll(resp.Body)
+	logrus.Infof("get response data:%v", string(respData))
+	err = json.Unmarshal(respData, hook)
+	if err != nil {
+		return nil, err
+	}
+	return hook, nil
+}
+
+func DeleteWebhook(user string, repo string, accesstoken string, id int) error {
+
+	logrus.Infof("deleting webhook:%v,%v,%v,%v", user, repo, accesstoken, id)
+	data := user + ":" + accesstoken
+	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
+	hc := http.Client{}
+	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks/%v", user, repo, id)
+	req, err := http.NewRequest("DELETE", APIURL, nil)
+	if err != nil {
+		return err
+	}
+	logrus.Infof("get encrpyt:%v", sEnc)
+	req.Header.Add("Authorization", "Basic "+sEnc)
+	resp, err := hc.Do(req)
+	respData, err := ioutil.ReadAll(resp.Body)
+	logrus.Infof("after delete,%v,%v", string(respData))
 	return err
 }

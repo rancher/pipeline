@@ -171,7 +171,7 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 
-	MyAgent.onPipelineChange(pipeline)
+	MyAgent.onPipelineChange(pipeline, req)
 	apiContext.Write(toPipelineResource(apiContext, pipeline))
 	return nil
 }
@@ -183,13 +183,12 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
-	logrus.Infof("to update pipeline,%v", pipeline)
 	err = s.PipelineContext.UpdatePipeline(pipeline)
 	if err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(pipeline)
+	MyAgent.onPipelineChange(pipeline, req)
 	apiContext.Write(toPipelineResource(apiContext, pipeline))
 	return nil
 }
@@ -201,6 +200,7 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
+	MyAgent.onPipelineDelete(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 }
@@ -218,7 +218,7 @@ func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) err
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineChange(r)
+	MyAgent.onPipelineActivate(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 
@@ -237,7 +237,7 @@ func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) e
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineChange(r)
+	MyAgent.onPipelineDeActivate(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
 	return nil
 }

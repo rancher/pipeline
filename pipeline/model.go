@@ -43,6 +43,7 @@ type Pipeline struct {
 	Branch          string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	TargetImage     string `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
 	File            string `json:"file"`
+	WebHookId       int    `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 	WebHookToken    string `json:"webhookToken,omitempty" yaml:"webhookToken,omitempty"`
 	//trigger
 	TriggerType     string `json:"triggerType,omitempty" yaml:"triggerType,omitempty"`
@@ -66,6 +67,8 @@ type Step struct {
 	//---SCM step
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	Webhook    bool   `json:"webhook,omitempty" yaml:"webhook,omitempty"`
+	Token      string `json:"token,omitempty" yaml:"token,omitempty"`
 	//---Build step
 	SourceType  string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
 	Dockerfile  string `json:"file,omitempty" yaml:"file,omitempty"`
