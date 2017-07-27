@@ -150,7 +150,11 @@ func (p *PipelineContext) DeletePipeline(id string) (*Pipeline, error) {
 	}
 	existing := goCollection.Data[0]
 	ppl := Pipeline{}
-	json.Unmarshal([]byte(existing.ResourceData["data"].(string)), &ppl)
+	err = json.Unmarshal([]byte(existing.ResourceData["data"].(string)), &ppl)
+	if err != nil {
+		return &ppl, err
+	}
+	//first delete webhook
 	err = apiClient.GenericObject.Delete(&existing)
 	if err != nil {
 		return &Pipeline{}, err

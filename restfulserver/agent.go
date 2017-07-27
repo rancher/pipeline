@@ -1,16 +1,11 @@
 package restfulserver
 
 import (
-	"errors"
-	"fmt"
-	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/scheduler"
-	"github.com/rancher/pipeline/util"
 )
 
 //component to comunicate between server and ci provider
@@ -236,7 +231,7 @@ func (a *Agent) RunScheduler() {
 	}
 }
 
-func (a *Agent) onPipelineChange(p *pipeline.Pipeline, req *http.Request) {
+func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 	logrus.Infof("on pipeline change")
 	pId := p.Id
 	spec := ""
@@ -252,23 +247,6 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline, req *http.Request) {
 		cr := scheduler.NewCronRunner(pId, spec, timezone)
 		a.registerCronRunnerC <- cr
 	}
-	//update webhook
-	logrus.Infof("pipelinechange,webhook:%v,%v", p.Stages[0].Steps[0].Webhook, p.WebHookId)
-	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		if p.Stages[0].Steps[0].Webhook {
-			if p.WebHookId <= 0 {
-				webhookUrl := getWebhookUrl(req, p.Id)
-				logrus.Infof("get webhookUrl:%v", webhookUrl)
-				createWebhook(p, webhookUrl)
-			}
-		} else {
-			if p.WebHookId > 0 {
-				deleteWebhook(p)
-			}
-		}
-
-	}
-
 	p.NextRunTime = pipeline.GetNextRunTime(p)
 	a.Server.PipelineContext.UpdatePipeline(p)
 
@@ -279,89 +257,7 @@ func (a *Agent) onPipelineDelete(p *pipeline.Pipeline) {
 	if p.IsActivate {
 		a.unregisterCronRunnerC <- pId
 	}
-	deleteWebhook(p)
 }
-
-func deleteWebhook(p *pipeline.Pipeline) error {
-	logrus.Infof("deletewebhook for pipeline:%v", p.Id)
-	if p == nil {
-		return errors.New("empty pipeline to delete webhook")
-	}
-
-	//delete webhook
-	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		if p.WebHookId > 0 {
-			//TODO
-			repoUrl := p.Stages[0].Steps[0].Repository
-			token := p.Stages[0].Steps[0].Token
-			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
-			match := reg.FindStringSubmatch(repoUrl)
-			if len(match) < 3 {
-				logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
-				return errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
-			}
-			user := match[1]
-			repo := match[2]
-			err := util.DeleteWebhook(user, repo, token, p.WebHookId)
-			if err != nil {
-				logrus.Errorf("error delete webhook,%v", err)
-				return err
-			}
-			p.WebHookId = 0
-		}
-	}
-	return nil
-}
-
-func getWebhookUrl(req *http.Request, pipelineId string) string {
-	proto := "http://"
-	if req.TLS != nil {
-		proto = "https://"
-	}
-	url := proto + req.Host + req.URL.Path
-	reg := regexp.MustCompile("(.*?v1)/pipeline.*?")
-	match := reg.FindStringSubmatch(url)
-	var r string = "fail to get webhookurl"
-	if len(match) > 1 {
-		r = match[1] + "/webhook/" + pipelineId
-	}
-	return r
-
-}
-
-func createWebhook(p *pipeline.Pipeline, webhookUrl string) error {
-	logrus.Infof("createwebhook for pipeline:%v", p.Id)
-	if p == nil {
-		return errors.New("empty pipeline to create webhook")
-	}
-
-	//create webhook
-	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		if p.Stages[0].Steps[0].Webhook {
-			//TODO
-			repoUrl := p.Stages[0].Steps[0].Repository
-			token := p.Stages[0].Steps[0].Token
-			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
-			match := reg.FindStringSubmatch(repoUrl)
-			if len(match) < 3 {
-				logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
-				return errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
-			}
-			user := match[1]
-			repo := match[2]
-			secret := p.WebHookToken
-			id, err := util.CreateWebhook(user, repo, token, webhookUrl, secret)
-			logrus.Infof("get:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
-			if err != nil {
-				logrus.Errorf("error delete webhook,%v", err)
-				return err
-			}
-			p.WebHookId = id
-		}
-	}
-	return nil
-}
-
 func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
 	pId := p.Id
 	spec := p.TriggerSpec

@@ -91,6 +91,9 @@ func CreateWebhook(user string, repo string, accesstoken string, webhookUrl stri
 	}
 	respData, err := ioutil.ReadAll(resp.Body)
 	logrus.Infof("respData:%v", string(respData))
+	if resp.StatusCode > 399 {
+		return -1, errors.New(string(respData))
+	}
 	err = json.Unmarshal(respData, &hook)
 	if err != nil {
 		return -1, err
@@ -111,8 +114,14 @@ func ListWebhook(user string, repo string, accesstoken string) ([]*github.Hook, 
 	logrus.Infof("get encrpyt:%v", sEnc)
 	req.Header.Add("Authorization", "Basic "+sEnc)
 	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
 	respData, err := ioutil.ReadAll(resp.Body)
 	logrus.Infof("get response data:%v", string(respData))
+	if resp.StatusCode > 399 {
+		return nil, errors.New(string(respData))
+	}
 	err = json.Unmarshal(respData, &hooks)
 	if err != nil {
 		return nil, err
@@ -134,8 +143,14 @@ func GetWebhook(user string, repo string, accesstoken string, id string) (*githu
 	logrus.Infof("get encrpyt:%v", sEnc)
 	req.Header.Add("Authorization", "Basic "+sEnc)
 	resp, err := hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
 	respData, err := ioutil.ReadAll(resp.Body)
 	logrus.Infof("get response data:%v", string(respData))
+	if resp.StatusCode > 399 {
+		return nil, errors.New(string(respData))
+	}
 	err = json.Unmarshal(respData, hook)
 	if err != nil {
 		return nil, err
@@ -157,7 +172,13 @@ func DeleteWebhook(user string, repo string, accesstoken string, id int) error {
 	logrus.Infof("get encrpyt:%v", sEnc)
 	req.Header.Add("Authorization", "Basic "+sEnc)
 	resp, err := hc.Do(req)
+	if err != nil {
+		return err
+	}
 	respData, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode > 399 {
+		return errors.New(string(respData))
+	}
 	logrus.Infof("after delete,%v,%v", string(respData))
 	return err
 }

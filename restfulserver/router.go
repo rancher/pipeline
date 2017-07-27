@@ -3,7 +3,6 @@ package restfulserver
 import (
 	"net/http"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
@@ -13,14 +12,11 @@ import (
 func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) error) http.Handler {
 	return api.ApiHandler(s, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if err := t(rw, req); err != nil {
-			// apiContext := api.GetApiContext(req)
-			// apiContext.Write(err)
-			//apiContext.WriteErr(err)
-			logrus.Error(err)
-			logrus.Infof("req1:%v", req.URL.Path)
-			logrus.Infof("handle here")
+			//	apiContext := api.GetApiContext(req)
+			rw.WriteHeader(500)
+			rw.Write([]byte(err.Error()))
+
 		}
-		logrus.Infof("handle there")
 	}))
 }
 

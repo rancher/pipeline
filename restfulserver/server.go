@@ -14,6 +14,7 @@ import (
 	"github.com/rancher/go-rancher/client"
 	v2client "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
+	"github.com/rancher/pipeline/restfulserver/webhook"
 	"github.com/rancher/pipeline/storer"
 	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
@@ -166,12 +167,17 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
+	err = webhook.RenewWebhook(pipeline, req)
+	if err != nil {
+		logrus.Errorf("fail renewWebhook")
+		return err
+	}
 	err = s.PipelineContext.CreatePipeline(pipeline)
 	if err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(pipeline, req)
+	MyAgent.onPipelineChange(pipeline)
 	apiContext.Write(toPipelineResource(apiContext, pipeline))
 	return nil
 }
@@ -183,12 +189,17 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
+	err = webhook.RenewWebhook(pipeline, req)
+	if err != nil && err != webhook.ErrDelWebhook {
+		//fail to create webhook.block update
+		return err
+	}
 	err = s.PipelineContext.UpdatePipeline(pipeline)
 	if err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(pipeline, req)
+	MyAgent.onPipelineChange(pipeline)
 	apiContext.Write(toPipelineResource(apiContext, pipeline))
 	return nil
 }
@@ -196,6 +207,12 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
+	ppl := s.PipelineContext.GetPipelineById(id)
+	err := webhook.DeleteWebhook(ppl)
+	if err != nil {
+		//log delete webhook failure but not block
+		logrus.Errorf("fail to delete webhook for pipeline \"%v\",for %v", ppl.Name, err)
+	}
 	r, err := s.PipelineContext.DeletePipeline(id)
 	if err != nil {
 		return err
