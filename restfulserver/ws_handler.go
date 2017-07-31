@@ -5,9 +5,12 @@
 package restfulserver
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -103,12 +106,13 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 			if stepLog != "" && prevLog != stepLog {
 				logrus.Infof("writing step log:%v", stepLog)
 				ws.SetWriteDeadline(time.Now().Add(writeWait))
+				logData, _ := computeLogTimestamp(activity.StartTS, stepLog)
 				response := WSMsg{
 					Id:           uuid.Rand().Hex(),
 					Name:         "resource.change",
 					ResourceType: "log",
 					Time:         time.Now(),
-					Data:         stepLog,
+					Data:         logData,
 				}
 				b, err = json.Marshal(response)
 				if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
@@ -128,6 +132,29 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 			}
 		}
 	}
+}
+
+func computeLogTimestamp(startTS int64, stepLog string) (string, error) {
+	lines := strings.Split(stepLog, "\n")
+	b := bytes.NewBufferString("")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+		spans := strings.SplitN(line, "  ", 2)
+		duration, err := time.ParseDuration(spans[0])
+		if err != nil {
+			logrus.Errorf("parse duration error!%v", err)
+			return stepLog, errors.New("parse duration error!")
+		}
+		lineTime := startTS + (duration.Nanoseconds() / int64(time.Millisecond))
+		b.WriteString(strconv.FormatInt(lineTime, 10))
+		b.WriteString("  ")
+		b.WriteString(spans[1])
+		b.WriteString("\n")
+	}
+	logrus.Infof("get timestamp log:\n%v", b.String())
+	return b.String(), nil
 }
 
 func (s *Server) ServeStepLog(w http.ResponseWriter, r *http.Request) error {

@@ -356,7 +356,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 	if err != nil {
 		return "", err
 	}
-	token := "\\n\\[.*?\\].*?\\.sh"
+	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
 	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "\nCloning the remote Git repository\n") {
 		// SCM
@@ -389,14 +389,17 @@ func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
 
 //parse jenkins rawoutput to steps,return true if status updated
 func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, rawOutput string) bool {
-	token := "\\n\\[.*?\\].*?\\.sh"
+	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	lastStatus := pipeline.ActivityStepBuilding
 	var updated bool = false
-	if strings.HasSuffix(rawOutput, "\nFinished: SUCCESS\n") {
+	//TODO add timestamp
+	regexp.MustCompile("\\n\\w{14}\\s{2}Finished: SUCCESS")
+	if strings.HasSuffix(rawOutput, "  Finished: SUCCESS\n") {
 		lastStatus = pipeline.ActivityStepSuccess
-	} else if strings.HasSuffix(rawOutput, "\nFinished: FAILURE\n") {
+	} else if strings.HasSuffix(rawOutput, "  Finished: FAILURE\n") {
 		lastStatus = pipeline.ActivityStepFail
 	}
+	logrus.Infof("raw:%v,\ntoken:%v", rawOutput, token)
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
 	//logrus.Infof("split to %v parts,steps number:%v, parse outputs:%v", len(outputs), len(actiStage.ActivitySteps), outputs)
 	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "\nCloning the remote Git repository\n") {
@@ -408,6 +411,7 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 		}
 		return updated
 	}
+	logrus.Infof("parsed,len output:%v", len(outputs))
 	for i, step := range actiStage.ActivitySteps {
 		finishStepNum := len(outputs) - 1
 		prevStatus := step.Status

@@ -50,5 +50,5 @@ var JenkinsConfig = jenkinsConfig{
 	JenkinsJobBuildWithParamsURI: "/job/%s/buildWithParameters",
 	JenkinsJobInfoURI:            "/job/%s/api/json",
 	JenkinsBuildInfoURI:          "/job/%s/lastBuild/api/json",
-	JenkinsBuildLogURI:           "/job/%s/lastBuild/consoleText",
+	JenkinsBuildLogURI:           "/job/%s/lastBuild/timestamps/?elapsed=HH'h'mm'm'ss's'S'ms'&appendLog",
 }
