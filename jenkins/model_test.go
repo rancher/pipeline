@@ -21,6 +21,7 @@ func TestModel(t *testing.T) {
 		BlockBuildWhenUpstreamBuilding:   false,
 		CustomWorkspace:                  "$JENKINS_HOME/workspace/test",
 		Builders:                         JenkinsBuilder{[]JenkinsTaskShell{JenkinsTaskShell{Command: "echo build1"}, JenkinsTaskShell{Command: "echo build2"}}},
+		BuildWrappers:                    TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
 	}
 	output, err := xml.MarshalIndent(v, "  ", "    ")
 	if err != nil {

@@ -14,17 +14,17 @@ type JenkinsProject struct {
 	Description                      string   `xml:"description"`
 	KeepDependencies                 bool     `xml:"keepDependencies"`
 	Properties                       string
-	Scm                              JenkinsSCM     `xml:"scm"`
-	CanRoam                          bool           `xml:"canRoam"`
-	Disabled                         bool           `xml:"disabled"`
-	BlockBuildWhenDownstreamBuilding bool           `xml:"blockBuildWhenDownstreamBuilding"`
-	BlockBuildWhenUpstreamBuilding   bool           `xml:"blockBuildWhenUpstreamBuilding"`
-	Triggers                         JenkinsTrigger `xml:"triggers"`
-	ConcurrentBuild                  bool           `xml:"concurrentBuild"`
-	CustomWorkspace                  string         `xml:"customWorkspace"`
-	Builders                         JenkinsBuilder `xml:"builders,omitempty"`
-	Publishers                       string         `xml:"publishers"`
-	BuildWrappers                    string         `xml:"buildWrappers"`
+	Scm                              JenkinsSCM             `xml:"scm"`
+	CanRoam                          bool                   `xml:"canRoam"`
+	Disabled                         bool                   `xml:"disabled"`
+	BlockBuildWhenDownstreamBuilding bool                   `xml:"blockBuildWhenDownstreamBuilding"`
+	BlockBuildWhenUpstreamBuilding   bool                   `xml:"blockBuildWhenUpstreamBuilding"`
+	Triggers                         JenkinsTrigger         `xml:"triggers"`
+	ConcurrentBuild                  bool                   `xml:"concurrentBuild"`
+	CustomWorkspace                  string                 `xml:"customWorkspace"`
+	Builders                         JenkinsBuilder         `xml:"builders,omitempty"`
+	Publishers                       string                 `xml:"publishers"`
+	BuildWrappers                    TimestampWrapperPlugin `xml:"buildWrappers>hudson.plugins.timestamper.TimestamperBuildWrapper"`
 }
 
 type JenkinsSCM struct {
@@ -54,6 +54,10 @@ type JenkinsBuildTrigger struct {
 
 type JenkinsCronTrigger struct {
 	Spec string `xml:"spec"`
+}
+
+type TimestampWrapperPlugin struct {
+	Plugin string `xml:"plugin,attr"`
 }
 
 type JenkinsBuilder struct {

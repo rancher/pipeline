@@ -169,6 +169,7 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 		BlockBuildWhenUpstreamBuilding:   false,
 		CustomWorkspace:                  workspaceName,
 		Builders:                         commandBuilders,
+		BuildWrappers:                    TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
 	}
 	logrus.Infof("needapprove:%v,ordinal:%v", stage.NeedApprove, ordinal)
 	if !stage.NeedApprove && ordinal > 0 {
