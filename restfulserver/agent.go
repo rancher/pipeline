@@ -142,7 +142,7 @@ func (a *Agent) SyncActivityWatchList() {
 		logrus.Errorf("fail to get activities")
 	}
 	for _, activity := range activities {
-		if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
+		if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivityPending {
 			continue
 		} else {
 			//logrus.Infof("add %v to watchlist", activity.Id)
@@ -175,6 +175,10 @@ func (a *Agent) SyncActivityWatchList() {
 
 					if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
 						//done,remove from watchlist
+						delete(a.activityWatchlist, activity.Id)
+					}
+					if activity.Status == pipeline.ActivityPending {
+						//pending,remove from watchlist. add agin when approve
 						delete(a.activityWatchlist, activity.Id)
 					}
 					logrus.Infof("telling all holder to send messages!")

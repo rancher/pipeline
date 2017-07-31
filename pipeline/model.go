@@ -18,11 +18,13 @@ const (
 	ActivityStepFail     = "Fail"
 
 	ActivityStageWaiting  = "Waiting"
+	ActivityStagePending  = "Pending"
 	ActivityStageBuilding = "Building"
 	ActivityStageSuccess  = "Success"
 	ActivityStageFail     = "Fail"
 
 	ActivityWaiting  = "Waiting"
+	ActivityPending  = "Pending"
 	ActivityBuilding = "Building"
 	ActivitySuccess  = "Success"
 	ActivityFail     = "Fail"
@@ -121,6 +123,7 @@ type Activity struct {
 	RunSequence     int              `json:"runSequence,omitempty"`
 	CommitInfo      string           `json:"commitInfo,omitempty"`
 	Status          string           `json:"status,omitempty"`
+	PendingStage    int              `json:"pendingStage,omitempty"`
 	StartTS         int64            `json:"start_ts,omitempty"`
 	StopTS          int64            `json:"stop_ts,omitempty"`
 	ActivityStages  []*ActivityStage `json:"activity_stages,omitempty"`

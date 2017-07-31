@@ -102,9 +102,10 @@ func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) 
 
 func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
 	logrus.Info("begin jenkins stage")
+	logrus.Infof("hi,%v\nhi,%v\nhi,%v\nhi,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
 	stage := activity.Pipeline.Stages[ordinal]
 	activityId := activity.Id
-	jobName := j.pipeline.Name + "_" + stage.Name + "_" + activityId
+	jobName := activity.Pipeline.Name + "_" + stage.Name + "_" + activityId
 
 	if _, err := BuildJob(jobName, map[string]string{}); err != nil {
 		return err
@@ -270,6 +271,11 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 	for i, actiStage := range activity.ActivityStages {
 		jobName := p.Name + "_" + actiStage.Name + "_" + activity.Id
 		beforeStatus := actiStage.Status
+
+		if beforeStatus == pipeline.ActivityStageSuccess {
+			continue
+		}
+
 		jobInfo, err := GetJobInfo(jobName)
 		if err != nil {
 			//cannot get jobinfo
@@ -288,8 +294,11 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 		if err != nil {
 			//cannot get build info
 			//build not started
+			if actiStage.Status == pipeline.ActivityStagePending {
+				return updated, nil
+			}
 			actiStage.Status = pipeline.ActivityStageWaiting
-			continue
+			break
 		}
 		getCommit(activity, buildInfo)
 		//if any buildInfo found,activity in building status
@@ -306,6 +315,13 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 				//if all stage success , mark activity as success
 				activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
 				activity.Status = pipeline.ActivitySuccess
+			}
+
+			if i < len(p.Stages)-1 && activity.ActivityStages[i+1].NeedApproval {
+				logrus.Infof("set pending")
+				activity.Status = pipeline.ActivityPending
+				activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
+				activity.PendingStage = i + 1
 			}
 		}
 		//logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)

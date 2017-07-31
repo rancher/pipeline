@@ -33,13 +33,23 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 	var activities []interface{}
+
+	var pendingacti []interface{}
 	for _, gobj := range goCollection.Data {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
 		toActivityResource(apiContext, a)
-		activities = append(activities, a)
+
+		//prioritize pending activities
+		if a.Status == pipeline.ActivityPending {
+			pendingacti = append(pendingacti, a)
+		} else {
+
+			activities = append(activities, a)
+		}
 	}
+	activities = append(pendingacti, activities...)
 	logrus.Info("are you kiding?")
 	logrus.Infof("activity resource is :%v", &client.GenericCollection{
 		Data: activities,
@@ -108,6 +118,30 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 	return nil
 
 }
+
+func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) error {
+	logrus.Infof("start approve activity")
+	id := mux.Vars(req)["id"]
+	r, err := GetActivity(id, s.PipelineContext)
+	if err != nil {
+		logrus.Errorf("fail getting activity with id:%v", id)
+		return err
+	}
+	logrus.Infof("before approve,got acti:%v", r)
+	err = s.PipelineContext.ApproveActivity(&r)
+	if err != nil {
+		logrus.Errorf("fail approveActivity:%v", err)
+		return err
+	}
+	r.PendingStage = 0
+	UpdateActivity(r)
+	MyAgent.watchActivityC <- &r
+
+	logrus.Infof("approveactivitygeterror:%v", err)
+	return err
+
+}
+
 func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]

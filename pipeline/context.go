@@ -251,12 +251,26 @@ func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
 	return activity, nil
 }
 
+func (p *PipelineContext) ApproveActivity(activity *Activity) error {
+	if activity == nil {
+		return errors.New("nil activity!")
+	}
+	if activity.Status != ActivityPending {
+		return errors.New("activity not pending for approval!")
+	}
+	err := p.Provider.RunStage(activity, activity.PendingStage)
+	return err
+}
+
 func GetNextRunTime(pipeline *Pipeline) int64 {
 	nextRunTime := int64(0)
 	if !pipeline.IsActivate {
 		return nextRunTime
 	}
 	spec := pipeline.TriggerSpec
+	if pipeline.TriggerSpec == "" {
+		return nextRunTime
+	}
 	schedule, err := cron.Parse(spec)
 	if err != nil {
 		logrus.Errorf("error parse cron exp,%v,%v", spec, err)
