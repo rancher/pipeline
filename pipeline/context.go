@@ -262,6 +262,20 @@ func (p *PipelineContext) ApproveActivity(activity *Activity) error {
 	return err
 }
 
+func (p *PipelineContext) DenyActivity(activity *Activity) error {
+	if activity == nil {
+		return errors.New("nil activity!")
+	}
+	if activity.Status != ActivityPending {
+		return errors.New("activity not pending for deny!")
+	}
+	if activity.PendingStage < len(activity.ActivityStages) {
+		activity.ActivityStages[activity.PendingStage].Status = ActivityStageDenied
+		activity.Status = ActivityDenied
+	}
+	return nil
+
+}
 func GetNextRunTime(pipeline *Pipeline) int64 {
 	nextRunTime := int64(0)
 	if !pipeline.IsActivate {

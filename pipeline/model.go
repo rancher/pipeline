@@ -22,12 +22,14 @@ const (
 	ActivityStageBuilding = "Building"
 	ActivityStageSuccess  = "Success"
 	ActivityStageFail     = "Fail"
+	ActivityStageDenied   = "Denied"
 
 	ActivityWaiting  = "Waiting"
 	ActivityPending  = "Pending"
 	ActivityBuilding = "Building"
 	ActivitySuccess  = "Success"
 	ActivityFail     = "Fail"
+	ActivityDenied   = "Denied"
 )
 
 type Pipeline struct {

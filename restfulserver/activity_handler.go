@@ -47,6 +47,7 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		if canApprove(uid, a) {
 			//add approve action
 			a.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=approve"
+			a.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=deny"
 		}
 		activities = append(activities, a)
 	}
@@ -174,6 +175,24 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 
 }
 
+func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
+	logrus.Infof("start deny activity")
+	id := mux.Vars(req)["id"]
+	r, err := GetActivity(id, s.PipelineContext)
+	if err != nil {
+		logrus.Errorf("fail getting activity with id:%v", id)
+		return err
+	}
+	err = s.PipelineContext.DenyActivity(&r)
+	if err != nil {
+		logrus.Errorf("fail denyActivity:%v", err)
+		return err
+	}
+	err = UpdateActivity(r)
+
+	return err
+
+}
 func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
@@ -336,13 +355,23 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 
 	id := mux.Vars(req)["id"]
-	actiObj, err := GetActivity(id, s.PipelineContext)
+	a, err := GetActivity(id, s.PipelineContext)
 	if err != nil {
 		return err
 	}
-	toActivityResource(apiContext, &actiObj)
+	toActivityResource(apiContext, &a)
+	uid, err := GetCurrentUser(req.Cookies())
+	logrus.Infof("got currentUser,%v,%v", uid, err)
+	if err != nil || uid == "" {
+		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
+	}
+	if canApprove(uid, &a) {
+		//add approve action
+		a.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=approve"
+		a.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=deny"
+	}
 	//logrus.Infof("final object:%v", actiObj)
-	apiContext.WriteResource(&actiObj)
+	apiContext.WriteResource(&a)
 	return nil
 }
 
