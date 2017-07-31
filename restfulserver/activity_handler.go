@@ -32,36 +32,68 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
-	var activities []interface{}
+	var activities []*pipeline.Activity
+	uid, err := GetCurrentUser(req.Cookies())
+	logrus.Infof("got currentUser,%v,%v", uid, err)
+	if err != nil || uid == "" {
+		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
+	}
 
-	var pendingacti []interface{}
 	for _, gobj := range goCollection.Data {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
 		toActivityResource(apiContext, a)
-
-		//prioritize pending activities
-		if a.Status == pipeline.ActivityPending {
-			pendingacti = append(pendingacti, a)
-		} else {
-
-			activities = append(activities, a)
+		if canApprove(uid, a) {
+			//add approve action
+			a.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=approve"
 		}
+		activities = append(activities, a)
 	}
-	activities = append(pendingacti, activities...)
-	logrus.Info("are you kiding?")
+
+	datalist := priorityPendingActivity(activities)
 	logrus.Infof("activity resource is :%v", &client.GenericCollection{
-		Data: activities,
+		Data: datalist,
 	})
 	//v2client here generates error?
 	apiContext.Write(&v1client.GenericCollection{
-		Data: activities,
+		Data: datalist,
 	})
 	logrus.Infof("req3:%v", req.URL.Path)
 
 	return nil
 
+}
+
+func priorityPendingActivity(activities []*pipeline.Activity) []interface{} {
+	var actilist []interface{}
+	var pendinglist []interface{}
+	for _, a := range activities {
+		if a.Status == pipeline.ActivityPending {
+			pendinglist = append(pendinglist, a)
+		} else {
+			actilist = append(actilist, a)
+		}
+	}
+	actilist = append(pendinglist, actilist...)
+	return actilist
+}
+
+//canApprove checks whether a user can approve a pending activity
+func canApprove(uid string, activity *pipeline.Activity) bool {
+	if activity.Status == pipeline.ActivityPending && len(activity.ActivityStages) > activity.PendingStage {
+		approvers := activity.ActivityStages[activity.PendingStage].Approvers
+		if len(approvers) == 0 {
+			//no approver limit
+			return true
+		}
+		for _, approver := range approvers {
+			if approver == uid {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *Server) CleanActivities(rw http.ResponseWriter, req *http.Request) error {

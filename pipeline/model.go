@@ -133,6 +133,7 @@ type ActivityStage struct {
 	ActivityId    string          `json:"activity_id,omitempty"`
 	Name          string          `json:"name,omitempty"`
 	NeedApproval  bool            `json:"need_approval,omitempty"`
+	Approvers     []string        `json:"approvers,omitempty"`
 	ActivitySteps []*ActivityStep `json:"activity_steps,omitempty"`
 	StartTS       int64           `json:"start_ts,omitempty"`
 	Duration      int64           `json:"duration,omitempty"`

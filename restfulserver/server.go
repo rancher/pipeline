@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
 	v2client "github.com/rancher/go-rancher/v2"
+	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver/webhook"
 	"github.com/rancher/pipeline/storer"
@@ -369,4 +370,34 @@ func NewServer(pipelineContext *pipeline.PipelineContext) *Server {
 	return &Server{
 		PipelineContext: pipelineContext,
 	}
+}
+
+func GetCurrentUser(cookies []*http.Cookie) (string, error) {
+
+	client := &http.Client{}
+
+	requestURL := config.Config.CattleUrl + "/accounts"
+
+	req, err := http.NewRequest("GET", requestURL, nil)
+	if err != nil {
+		logrus.Infof("Cannot connect to the rancher server. Please check the rancher server URL")
+		return "", err
+	}
+	//req.SetBasicAuth(config.Config.CattleAccessKey, config.Config.CattleSecretKey)
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Infof("Cannot connect to the rancher server. Please check the rancher server URL")
+		return "", err
+	}
+	userid := resp.Header.Get("X-Api-User-Id")
+	if userid == "" {
+		logrus.Infof("Cannot get userid")
+		err := errors.New("Forbidden")
+		return "Forbidden", err
+
+	}
+	return userid, nil
 }
