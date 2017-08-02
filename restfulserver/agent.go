@@ -142,10 +142,7 @@ func (a *Agent) SyncActivityWatchList() {
 		logrus.Errorf("fail to get activities")
 	}
 	for _, activity := range activities {
-		if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivityPending {
-			continue
-		} else {
-			//logrus.Infof("add %v to watchlist", activity.Id)
+		if activity.Status == pipeline.ActivityWaiting || activity.Status == pipeline.ActivityBuilding {
 			a.activityWatchlist[activity.Id] = activity
 		}
 	}
