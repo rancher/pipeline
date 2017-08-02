@@ -119,7 +119,7 @@ type PipelineProvider interface {
 type Activity struct {
 	client.Resource
 	Id              string           `json:"id,omitempty"`
-	Pipeline        Pipeline         `json:"pipeline,omitempty"`
+	Pipeline        Pipeline         `json:"pipelineSource,omitempty"`
 	PipelineName    string           `json:"pipelineName,omitempty"`
 	PipelineVersion string           `json:"pipelineVersion,omitempty"`
 	RunSequence     int              `json:"runSequence,omitempty"`
