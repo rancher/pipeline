@@ -144,10 +144,11 @@ type ActivityStage struct {
 }
 
 type ActivityStep struct {
-	Name    string `json:"name,omitempty"`
-	Message string `json:"message,omitempty"`
-	Status  string `json:"status,omitempty"`
-	StartTS int64  `json:"start_ts,omitempty"`
+	Name     string `json:"name,omitempty"`
+	Message  string `json:"message,omitempty"`
+	Status   string `json:"status,omitempty"`
+	StartTS  int64  `json:"start_ts,omitempty"`
+	Duration int64  `json:"duration,omitempty"`
 }
 
 func ToDemoActivity() *Activity {

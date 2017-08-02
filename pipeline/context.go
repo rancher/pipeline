@@ -12,7 +12,6 @@ import (
 	"github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/util"
 	"github.com/robfig/cron"
-	"github.com/sluu99/uuid"
 
 	"github.com/Sirupsen/logrus"
 	"gopkg.in/yaml.v2"
@@ -65,8 +64,6 @@ func BuildPipelineContext(provider PipelineProvider) *PipelineContext {
 }
 
 func (p *PipelineContext) CreatePipeline(pipeline *Pipeline) error {
-	pipeline.Id = uuid.Rand().Hex()
-	pipeline.WebHookToken = uuid.Rand().Hex()
 	b, err := json.Marshal(*pipeline)
 	if err != nil {
 		return err

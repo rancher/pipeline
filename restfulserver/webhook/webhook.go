@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
+	"strings"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/pipeline/pipeline"
@@ -49,18 +51,22 @@ func DeleteWebhook(p *pipeline.Pipeline) error {
 }
 
 func GetWebhookUrl(req *http.Request, pipelineId string) string {
-	proto := "http://"
-	if req.TLS != nil {
-		proto = "https://"
+	/*
+		proto := "http://"
+		if req.TLS != nil {
+			proto = "https://"
+		}*/
+	host := os.Getenv("HOST_NAME")
+	if host == "" {
+		host = "<Proto://Host:Port>"
 	}
-	url := proto + req.Host + req.URL.Path
-	reg := regexp.MustCompile("(.*?v1)/pipeline.*?")
-	match := reg.FindStringSubmatch(url)
-	var r string = "fail to get webhookurl"
-	if len(match) > 1 {
-		r = match[1] + "/webhook/" + pipelineId
-	}
-	return r
+	host = strings.TrimRight(host, "/")
+	url := host + "/v1/webhook/" + pipelineId
+
+	//logrus.Infof("get X-API-request-url:%v", req.Header.Get("X-API-request-url"))
+	logrus.Infof("get webhook url:%v", url)
+
+	return url
 
 }
 

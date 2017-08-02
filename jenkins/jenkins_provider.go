@@ -202,7 +202,7 @@ func commandBuilder(step *pipeline.Step) string {
 	stringBuilder := new(bytes.Buffer)
 	switch step.Type {
 	case pipeline.StepTypeTask:
-		volumeInfo := "-v ${PWD}:${PWD} -w ${PWD}"
+		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(volumeInfo)
@@ -358,7 +358,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 	}
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
-	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "\nCloning the remote Git repository\n") {
+	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "  Cloning the remote Git repository\n") {
 		// SCM
 		return outputs[0], nil
 	}
@@ -420,10 +420,12 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			//passed steps
 			//step.Message = outputs[i+1]
 			step.Status = pipeline.ActivityStepSuccess
+			parseStepTime(step, outputs[i], activity.StartTS)
 		} else if i == finishStepNum-1 {
 			//last run step
 			//step.Message = outputs[i+1]
 			step.Status = lastStatus
+			parseStepTime(step, outputs[i], activity.StartTS)
 		} else {
 			//not run steps
 			step.Status = pipeline.ActivityStepWaiting
@@ -437,6 +439,35 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 	logrus.Infof("now actistage is %v.", actiStage)
 
 	return updated
+
+}
+
+func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int64) {
+	logrus.Infof("parsesteptime")
+	log = strings.TrimSuffix(log, "\n")
+	log = strings.TrimPrefix(log, "\n")
+	lines := strings.SplitN(log, "\n", -1)
+	if len(lines) == 0 {
+		return
+	}
+	logrus.Infof("step first line:%v", lines[0])
+
+	spans := strings.SplitN(lines[0], "  ", 2)
+	durationStart, err := time.ParseDuration(spans[0])
+	if err != nil {
+		logrus.Errorf("parse duration error!%v", err)
+		return
+	}
+	step.StartTS = activityStartTS + (durationStart.Nanoseconds() / int64(time.Millisecond))
+
+	spans = strings.SplitN(lines[len(lines)-1], "  ", 2)
+	durationEnd, err := time.ParseDuration(spans[0])
+	if err != nil {
+		logrus.Errorf("parse duration error!%v", err)
+		return
+	}
+	duration := (durationEnd.Nanoseconds() - durationStart.Nanoseconds()) / int64(time.Millisecond)
+	step.Duration = duration
 
 }
 

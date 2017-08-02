@@ -168,6 +168,8 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, pipeline); err != nil {
 		return err
 	}
+	pipeline.Id = uuid.Rand().Hex()
+	pipeline.WebHookToken = uuid.Rand().Hex()
 	err = webhook.RenewWebhook(pipeline, req)
 	if err != nil {
 		logrus.Errorf("fail renewWebhook")

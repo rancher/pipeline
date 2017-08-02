@@ -53,8 +53,6 @@ func NewRouter(s *Server) *mux.Router {
 	//test websocket
 	router.Methods(http.MethodGet).Path("/v1/ws/log").Handler(f(schemas, s.ServeStepLog))
 	router.Methods(http.MethodGet).Path("/v1/ws/status").Handler(f(schemas, s.ServeStatusWS))
-	//webhook
-	router.Methods(http.MethodPost).Path("/v1/webhook/{id}").Handler(f(schemas, s.Webhook))
 
 	pipelineActions := map[string]http.Handler{
 		"run":        f(schemas, s.RunPipeline),

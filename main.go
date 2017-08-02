@@ -65,6 +65,7 @@ func checkAndRun(c *cli.Context) (rtnerr error) {
 	pipelineContext := pipeline.BuildPipelineContext(&jenkins.JenkinsProvider{})
 	errChan := make(chan bool)
 	go restfulserver.ListenAndServe(pipelineContext, errChan)
+	go restfulserver.ListenAndServeExternal(pipelineContext, errChan)
 
 	server := restfulserver.NewServer(pipelineContext)
 
