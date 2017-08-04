@@ -32,6 +32,24 @@ func TestCommandBuild(t *testing.T) {
 		step   *pipeline.Step
 		result string
 	}{
+		/*
+			"basic task": {
+				step: &pipeline.Step{
+					Type:    "task",
+					Image:   "busybox",
+					Command: "echo \"hi\"",
+				},
+				result: "docker run --rm --volumes-from ${HOSTNAME} -w ${PWD} busybox sh -c \"set -ex\necho \\\\\\\"hi\\\\\\\"\"",
+			},
+			"multi line task": {
+				step: &pipeline.Step{
+					Type:    "task",
+					Image:   "busybox",
+					Command: "echo \"hi\"\\\nhi",
+				},
+				result: "docker run --rm --volumes-from ${HOSTNAME} -w ${PWD} busybox sh -c \"set -ex\necho \\\\\\\"hi\\\\\\\"\\\\hi\"",
+			},
+		*/
 		"build-sourcecode-notpush": {
 			step: &pipeline.Step{
 				Type:        "build",
