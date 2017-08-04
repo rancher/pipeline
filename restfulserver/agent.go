@@ -155,7 +155,8 @@ func (a *Agent) SyncActivityWatchList() {
 		select {
 		case <-ticker.C:
 			for _, activity := range a.activityWatchlist {
-				if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
+				if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivityDenied {
+					delete(a.activityWatchlist, activity.Id)
 					continue
 				}
 				updated, _ := a.Server.PipelineContext.Provider.SyncActivity(activity)
@@ -166,15 +167,15 @@ func (a *Agent) SyncActivityWatchList() {
 					err = UpdateActivity(*activity)
 					if err != nil {
 						logrus.Errorf("fail update activity,%v", err)
+						continue
 					}
-					logrus.Infof("trying to update lastactivity:%v", activity)
 					a.Server.UpdateLastActivity(activity.Pipeline.Id)
 
 					if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
 						//done,remove from watchlist
 						delete(a.activityWatchlist, activity.Id)
 					}
-					if activity.Status == pipeline.ActivityPending {
+					if activity.Status == pipeline.ActivityPending || activity.Status == pipeline.ActivityDenied {
 						//pending,remove from watchlist. add agin when approve
 						delete(a.activityWatchlist, activity.Id)
 					}
@@ -184,6 +185,7 @@ func (a *Agent) SyncActivityWatchList() {
 			}
 		case acti := <-a.watchActivityC:
 			a.activityWatchlist[acti.Id] = acti
+			a.broadcast <- []byte(acti.Id)
 
 		}
 	}
@@ -277,7 +279,15 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	existing := a.cronRunners[pId]
 	logrus.Infof("registering conrunner,pid:%v,spec:%v", pId, cr.Spec)
 	if existing == nil {
-		err := cr.AddFunc("0 "+cr.Spec, func() { logrus.Infof("cron job run,pid:%v", pId); a.Server.PipelineContext.RunPipeline(pId) })
+		err := cr.AddFunc(cr.Spec, func() {
+			acti, err := a.Server.PipelineContext.RunPipeline(pId)
+			if err != nil {
+				logrus.Errorf("cron job fail,pid:%v", pId)
+				return
+			}
+			a.watchActivityC <- acti
+
+		})
 		if err != nil {
 			logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
 			return
@@ -292,7 +302,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 			existing.Stop()
 			delete(a.cronRunners, pId)
 			if cr.Spec != "" {
-				err := cr.AddFunc("0 "+cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
+				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
 				if err != nil {
 					logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
 					return

@@ -28,7 +28,7 @@ func NewCronRunner(pipelineId string, spec string, timezone string) *CronRunner 
 	}
 	return &CronRunner{
 		PipelineId: pipelineId,
-		Spec:       spec,
+		Spec:       "0 " + spec, //accept standard cron spec and convert to 6 entries for corn library
 		Cron:       c,
 	}
 

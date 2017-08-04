@@ -58,10 +58,11 @@ type Pipeline struct {
 }
 
 type Stage struct {
-	Name        string  `json:"name,omitempty" yaml:"name,omitempty"`
-	Ordinal     int     `json:"ordinal,omitempty" yaml:"ordinal,omitempty"`
-	NeedApprove bool    `json:"needApprove,omitempty" yaml:"need-approve,omitempty"`
-	Steps       []*Step `json:"steps,omitempty" yaml:"steps,omitempty"`
+	Name        string   `json:"name,omitempty" yaml:"name,omitempty"`
+	Ordinal     int      `json:"ordinal,omitempty" yaml:"ordinal,omitempty"`
+	NeedApprove bool     `json:"needApprove,omitempty" yaml:"need-approve,omitempty"`
+	Approvers   []string `json:"approvers,omitempty"`
+	Steps       []*Step  `json:"steps,omitempty" yaml:"steps,omitempty"`
 }
 
 type Step struct {

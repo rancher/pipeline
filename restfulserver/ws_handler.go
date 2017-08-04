@@ -137,11 +137,18 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 func computeLogTimestamp(startTS int64, stepLog string) (string, error) {
 	lines := strings.Split(stepLog, "\n")
 	b := bytes.NewBufferString("")
+	timestr := ""
 	for _, line := range lines {
 		if line == "" {
 			continue
 		}
 		spans := strings.SplitN(line, "  ", 2)
+		// to handle misformat log from jenkins timestamper
+		if spans[0] != "" {
+			timestr = spans[0]
+		} else {
+			spans[0] = timestr
+		}
 		duration, err := time.ParseDuration(spans[0])
 		if err != nil {
 			logrus.Errorf("parse duration error!%v", err)

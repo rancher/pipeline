@@ -282,7 +282,7 @@ func GetNextRunTime(pipeline *Pipeline) int64 {
 	if pipeline.TriggerSpec == "" {
 		return nextRunTime
 	}
-	schedule, err := cron.Parse(spec)
+	schedule, err := cron.ParseStandard(spec)
 	if err != nil {
 		logrus.Errorf("error parse cron exp,%v,%v", spec, err)
 		return nextRunTime

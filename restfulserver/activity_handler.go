@@ -82,8 +82,8 @@ func priorityPendingActivity(activities []*pipeline.Activity) []interface{} {
 
 //canApprove checks whether a user can approve a pending activity
 func canApprove(uid string, activity *pipeline.Activity) bool {
-	if activity.Status == pipeline.ActivityPending && len(activity.ActivityStages) > activity.PendingStage {
-		approvers := activity.ActivityStages[activity.PendingStage].Approvers
+	if activity.Status == pipeline.ActivityPending && len(activity.Pipeline.Stages) > activity.PendingStage {
+		approvers := activity.Pipeline.Stages[activity.PendingStage].Approvers
 		if len(approvers) == 0 {
 			//no approver limit
 			return true
@@ -166,6 +166,8 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 		logrus.Errorf("fail approveActivity:%v", err)
 		return err
 	}
+	r.Status = pipeline.ActivityWaiting
+	r.ActivityStages[r.PendingStage].Status = pipeline.ActivityStageWaiting
 	r.PendingStage = 0
 	UpdateActivity(r)
 	MyAgent.watchActivityC <- &r
@@ -189,6 +191,7 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 	err = UpdateActivity(r)
+	MyAgent.broadcast <- []byte(r.Id)
 
 	return err
 

@@ -133,7 +133,6 @@ func (s *Server) UpdateLastActivity(pId string) {
 	if err != nil {
 		logrus.Errorf("fail update pipeline last run status,%v", err)
 	}
-	logrus.Infof("updated pipeline last activity,%v", p)
 }
 
 /*

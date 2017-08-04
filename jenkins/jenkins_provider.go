@@ -48,7 +48,7 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 	for _, stage := range p.Stages {
 		activity.ActivityStages = append(activity.ActivityStages, ToActivityStage(stage))
 	}
-	logrus.Infof("creating activity:%v", activity)
+	//logrus.Infof("creating activity:%v", activity)
 	_, err := restfulserver.CreateActivity(activity)
 	if err != nil {
 		return &pipeline.Activity{}, err
@@ -66,13 +66,13 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
 	}
 	for i := 0; i < len(p.Stages); i++ {
-		logrus.Infof("creating stage:%v", p.Stages[i])
+		//logrus.Infof("creating stage:%v", p.Stages[i])
 		if err := j.CreateStage(&activity, i); err != nil {
 			logrus.Error(errors.Wrapf(err, "stage <%s> fail", p.Stages[i].Name))
 			return &pipeline.Activity{}, err
 		}
 	}
-	logrus.Infof("running stage:%v", p.Stages[0])
+	//logrus.Infof("running stage:%v", p.Stages[0])
 	err = j.RunStage(&activity, 0)
 
 	if err != nil {
@@ -102,7 +102,7 @@ func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) 
 
 func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
 	logrus.Info("begin jenkins stage")
-	logrus.Infof("hi,%v\nhi,%v\nhi,%v\nhi,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
+	//logrus.Infof("hi,%v\nhi,%v\nhi,%v\nhi,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
 	stage := activity.Pipeline.Stages[ordinal]
 	activityId := activity.Id
 	jobName := activity.Pipeline.Name + "_" + stage.Name + "_" + activityId
@@ -171,7 +171,7 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 		Builders:                         commandBuilders,
 		BuildWrappers:                    TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
 	}
-	logrus.Infof("needapprove:%v,ordinal:%v", stage.NeedApprove, ordinal)
+	//logrus.Infof("needapprove:%v,ordinal:%v", stage.NeedApprove, ordinal)
 	if !stage.NeedApprove && ordinal > 0 {
 		//Add build trigger
 		prevJobName := j.pipeline.Name + "_" + j.pipeline.Stages[ordinal-1].Name + "_" + activityId
@@ -186,8 +186,8 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 		}
 	}
 
-	logrus.Infof("before xml:%v", v)
-	logrus.Infof("v.Triggers:%v", v.Triggers)
+	//logrus.Infof("before xml:%v", v)
+	//logrus.Infof("v.Triggers:%v", v.Triggers)
 	output, err := xml.MarshalIndent(v, "  ", "    ")
 	//logrus.Infof("get xml:%v\n end xml.", string(output))
 	if err != nil {
@@ -202,6 +202,13 @@ func commandBuilder(step *pipeline.Step) string {
 	stringBuilder := new(bytes.Buffer)
 	switch step.Type {
 	case pipeline.StepTypeTask:
+		//write to a sh file,then docker run it
+		stringBuilder.WriteString("cat>.r_cicd_entrypoint.sh<<EOF\n")
+		cmd := strings.Replace(step.Command, "\\", "\\\\", -1)
+		cmd = strings.Replace(cmd, "$", "\\$", -1)
+		stringBuilder.WriteString(cmd)
+		stringBuilder.WriteString("\nEOF\n")
+
 		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
@@ -209,21 +216,26 @@ func commandBuilder(step *pipeline.Step) string {
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(step.Image)
 		stringBuilder.WriteString(" ")
-		cmdAllBuf := new(bytes.Buffer)
-		cmdAllBuf.WriteString("sh -c \"")
-		cmds := strings.Split(step.Command, "\n")
-		for _, cmd := range cmds {
-			if strings.HasSuffix(cmd, "\\n") {
-				cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
-				continue
-			} else {
-				cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
-				cmdAllBuf.WriteString(";")
-			}
-		}
-		cmdAllBuf.WriteString("\"")
-		stringBuilder.WriteString(cmdAllBuf.String())
+		stringBuilder.WriteString("/bin/sh -xe .r_cicd_entrypoint.sh")
+		/*
+			cmdAllBuf := new(bytes.Buffer)
+			cmdAllBuf.WriteString("/bin/sh -xe .r_cicd_entrypoint.sh")
 
+				cmdAllBuf.WriteString(strings.Replace(step.Command, "\"", "\\\"", -1))
+
+					cmds := strings.Split(step.Command, "\n")
+					for _, cmd := range cmds {
+						if strings.HasSuffix(cmd, "\\n") {
+							cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
+							continue
+						} else {
+							cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
+							cmdAllBuf.WriteString(";")
+						}
+					}
+				cmdAllBuf.WriteString("\"")
+				stringBuilder.WriteString(cmdAllBuf.String())
+		*/
 	case pipeline.StepTypeBuild:
 
 		if step.SourceType == "sc" {
@@ -258,7 +270,7 @@ func commandBuilder(step *pipeline.Step) string {
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
 	}
-	logrus.Infof("Finish building command for step command is %s", stringBuilder.String())
+	//logrus.Infof("Finish building command for step command is %s", stringBuilder.String())
 	return stringBuilder.String()
 }
 
@@ -267,7 +279,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 	p := activity.Pipeline
 	var updated bool
 
-	logrus.Infof("syncing activity:%v", activity.Id)
+	//logrus.Infof("syncing activity:%v", activity.Id)
 	//logrus.Infof("activity is:%v", activity)
 	for i, actiStage := range activity.ActivityStages {
 		jobName := p.Name + "_" + actiStage.Name + "_" + activity.Id
@@ -317,8 +329,9 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 				activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
 				activity.Status = pipeline.ActivitySuccess
 			}
+			logrus.Infof("stage success:%v", i)
 
-			if i < len(p.Stages)-1 && activity.ActivityStages[i+1].NeedApproval {
+			if i < len(p.Stages)-1 && activity.Pipeline.Stages[i+1].NeedApprove {
 				logrus.Infof("set pending")
 				activity.Status = pipeline.ActivityPending
 				activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
@@ -333,9 +346,11 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 			}
 			//actiStage.RawOutput = rawOutput
 			stepStatusUpdated := parseSteps(activity, actiStage, rawOutput)
+
 			updated = updated || stepStatusUpdated
 		}
 		if beforeStatus != actiStage.Status {
+			updated = true
 			logrus.Infof("sync activity %v,updated !", activity.Id)
 		}
 		logrus.Infof("after sync,beforestatus and after:%v,%v", beforeStatus, actiStage.Status)
@@ -366,7 +381,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 		//no printed log
 		return "", nil
 	}
-	logrus.Infof("got step log:%v", outputs[stepOrdinal+1])
+	//logrus.Infof("got step log:%v", outputs[stepOrdinal+1])
 	return outputs[stepOrdinal+1], nil
 
 }
@@ -393,22 +408,25 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 	lastStatus := pipeline.ActivityStepBuilding
 	var updated bool = false
 	//TODO add timestamp
-	regexp.MustCompile("\\n\\w{14}\\s{2}Finished: SUCCESS")
 	if strings.HasSuffix(rawOutput, "  Finished: SUCCESS\n") {
 		lastStatus = pipeline.ActivityStepSuccess
+		actiStage.Status = pipeline.ActivityStageSuccess
 	} else if strings.HasSuffix(rawOutput, "  Finished: FAILURE\n") {
 		lastStatus = pipeline.ActivityStepFail
+		actiStage.Status = pipeline.ActivityStageFail
 	}
-	logrus.Infof("raw:%v,\ntoken:%v", rawOutput, token)
+	//logrus.Infof("raw:%v,\ntoken:%v", rawOutput, token)
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
 	//logrus.Infof("split to %v parts,steps number:%v, parse outputs:%v", len(outputs), len(actiStage.ActivitySteps), outputs)
-	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "\nCloning the remote Git repository\n") {
+	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "  Cloning the remote Git repository\n") {
 		// SCM
 		//actiStage.ActivitySteps[0].Message = outputs[0]
 		if actiStage.ActivitySteps[0].Status != lastStatus {
 			updated = true
 			actiStage.ActivitySteps[0].Status = lastStatus
 		}
+		//get step time for SCM
+		parseStepTime(actiStage.ActivitySteps[0], outputs[0], activity.StartTS)
 		return updated
 	}
 	logrus.Infof("parsed,len output:%v", len(outputs))
@@ -420,12 +438,12 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			//passed steps
 			//step.Message = outputs[i+1]
 			step.Status = pipeline.ActivityStepSuccess
-			parseStepTime(step, outputs[i], activity.StartTS)
+			parseStepTime(step, outputs[i+1], activity.StartTS)
 		} else if i == finishStepNum-1 {
 			//last run step
 			//step.Message = outputs[i+1]
 			step.Status = lastStatus
-			parseStepTime(step, outputs[i], activity.StartTS)
+			parseStepTime(step, outputs[i+1], activity.StartTS)
 		} else {
 			//not run steps
 			step.Status = pipeline.ActivityStepWaiting
@@ -444,31 +462,36 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 
 func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int64) {
 	logrus.Infof("parsesteptime")
-	log = strings.TrimSuffix(log, "\n")
-	log = strings.TrimPrefix(log, "\n")
-	lines := strings.SplitN(log, "\n", -1)
+	token := "(^|\\n)\\w{14}  "
+	r, _ := regexp.Compile(token)
+	lines := r.FindAllString(log, -1)
 	if len(lines) == 0 {
 		return
 	}
-	logrus.Infof("step first line:%v", lines[0])
 
-	spans := strings.SplitN(lines[0], "  ", 2)
-	durationStart, err := time.ParseDuration(spans[0])
+	start := strings.TrimLeft(lines[0], "\n")
+	start = strings.TrimRight(start, " ")
+	durationStart, err := time.ParseDuration(start)
 	if err != nil {
 		logrus.Errorf("parse duration error!%v", err)
 		return
 	}
+
+	if step.Status != pipeline.ActivityStepSuccess && step.Status != pipeline.ActivityStepFail {
+		return
+	}
+	//compute step duration when done
 	step.StartTS = activityStartTS + (durationStart.Nanoseconds() / int64(time.Millisecond))
 
-	spans = strings.SplitN(lines[len(lines)-1], "  ", 2)
-	durationEnd, err := time.ParseDuration(spans[0])
+	end := strings.TrimLeft(lines[len(lines)-1], "\n")
+	end = strings.TrimRight(end, " ")
+	durationEnd, err := time.ParseDuration(end)
 	if err != nil {
-		logrus.Errorf("parse duration error!%v", err)
+		logrus.Errorf("parse duration error!%vparseStepTime", err)
 		return
 	}
 	duration := (durationEnd.Nanoseconds() - durationStart.Nanoseconds()) / int64(time.Millisecond)
 	step.Duration = duration
-
 }
 
 func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
