@@ -42,7 +42,7 @@ func (c *ConnHolder) DoRead() {
 	}
 }
 
-func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
+func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 	pingTicker := time.NewTicker(pingPeriod)
 	pollTicker := time.NewTicker(pollPeriod)
 	defer func() {
@@ -69,6 +69,11 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext) {
 				return
 			}
 			toActivityResource(apiContext, &activity)
+			if canApprove(uid, &activity) {
+				//add approve action
+				activity.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=approve"
+				activity.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=deny"
+			}
 			response := WSMsg{
 				Id:           uuid.Rand().Hex(),
 				Name:         "resource.change",
@@ -128,12 +133,17 @@ func (s *Server) ServeStatusWS(w http.ResponseWriter, r *http.Request) error {
 		}
 		return err
 	}
+	uid, err := GetCurrentUser(r.Cookies())
+	logrus.Infof("got currentUser,%v,%v", uid, err)
+	if err != nil || uid == "" {
+		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
+	}
 	connHolder := &ConnHolder{agent: MyAgent, conn: conn, send: make(chan []byte, 256)}
 
 	connHolder.agent.register <- connHolder
 
 	//new go routines
-	go connHolder.DoWrite(apiContext)
+	go connHolder.DoWrite(apiContext, uid)
 	connHolder.DoRead()
 
 	return nil
