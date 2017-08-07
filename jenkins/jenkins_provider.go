@@ -316,7 +316,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 		getCommit(activity, buildInfo)
 		//if any buildInfo found,activity in building status
 		activity.Status = pipeline.ActivityBuilding
-		actiStage.Duration = buildInfo.Duration
+		//actiStage.Duration = buildInfo.Duration
 		if buildInfo.Result == "" {
 			actiStage.Status = pipeline.ActivityStageBuilding
 		} else if buildInfo.Result == "FAILURE" {
@@ -427,9 +427,11 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 		}
 		//get step time for SCM
 		parseStepTime(actiStage.ActivitySteps[0], outputs[0], activity.StartTS)
+		actiStage.Duration = actiStage.ActivitySteps[0].Duration
 		return updated
 	}
 	logrus.Infof("parsed,len output:%v", len(outputs))
+	stageTime := int64(0)
 	for i, step := range actiStage.ActivitySteps {
 		finishStepNum := len(outputs) - 1
 		prevStatus := step.Status
@@ -439,11 +441,13 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			//step.Message = outputs[i+1]
 			step.Status = pipeline.ActivityStepSuccess
 			parseStepTime(step, outputs[i+1], activity.StartTS)
+			stageTime = stageTime + step.Duration
 		} else if i == finishStepNum-1 {
 			//last run step
 			//step.Message = outputs[i+1]
 			step.Status = lastStatus
 			parseStepTime(step, outputs[i+1], activity.StartTS)
+			stageTime = stageTime + step.Duration
 		} else {
 			//not run steps
 			step.Status = pipeline.ActivityStepWaiting
@@ -454,6 +458,7 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 		actiStage.ActivitySteps[i] = step
 		logrus.Infof("now step is %v.", step)
 	}
+	actiStage.Duration = stageTime
 	logrus.Infof("now actistage is %v.", actiStage)
 
 	return updated
