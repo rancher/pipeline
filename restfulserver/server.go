@@ -122,7 +122,7 @@ func (s *Server) UpdateLastActivity(pId string) {
 	activityId := p.LastRunId
 	activity, err := GetActivity(activityId, s.PipelineContext)
 	if err != nil {
-		logrus.Errorf("fail update pipeline last run status,%v", err)
+		logrus.Errorf("fail update pipeline:%v last run:%v status,%v", pId, activityId, err)
 		return
 	}
 	p.LastRunStatus = activity.Status

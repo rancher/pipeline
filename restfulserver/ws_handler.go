@@ -104,7 +104,6 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 				return
 			}
 			if stepLog != "" && prevLog != stepLog {
-				logrus.Infof("writing step log:%v", stepLog)
 				ws.SetWriteDeadline(time.Now().Add(writeWait))
 				logData, _ := computeLogTimestamp(activity.StartTS, stepLog)
 				response := WSMsg{
@@ -160,7 +159,6 @@ func computeLogTimestamp(startTS int64, stepLog string) (string, error) {
 		b.WriteString(spans[1])
 		b.WriteString("\n")
 	}
-	logrus.Infof("get timestamp log:\n%v", b.String())
 	return b.String(), nil
 }
 

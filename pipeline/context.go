@@ -203,7 +203,6 @@ func (p *PipelineContext) ListPipelines() []*Pipeline {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &Pipeline{}
 		json.Unmarshal(b, a)
-		logrus.Infof("get pipeline:%v", a)
 		pipelines = append(pipelines, a)
 	}
 	return pipelines
@@ -246,6 +245,44 @@ func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
 	pp.NextRunTime = GetNextRunTime(pp)
 	p.UpdatePipeline(pp)
 	return activity, nil
+}
+
+func (p *PipelineContext) RerunActivity(activity *Activity) error {
+	err := p.Provider.RerunActivity(activity)
+	if err != nil {
+		return err
+	}
+	//TODO whether update last run of pipeline or not
+	return nil
+}
+
+//ResetActivity delete previous build info and reset activity status
+func (p *PipelineContext) ResetActivity(activity *Activity) error {
+	err := p.Provider.DeleteFormerBuild(activity)
+	if err != nil {
+		return err
+	}
+	resetActivityStatus(activity)
+	return nil
+
+}
+
+//resetActivityStatus reset status and timestamp
+func resetActivityStatus(activity *Activity) {
+	activity.Status = ActivityWaiting
+	activity.PendingStage = 0
+	activity.StartTS = 0
+	activity.StopTS = 0
+	for _, stage := range activity.ActivityStages {
+		stage.Duration = 0
+		stage.StartTS = 0
+		stage.Status = ActivityStageWaiting
+		for _, step := range stage.ActivitySteps {
+			step.Duration = 0
+			step.StartTS = 0
+			step.Status = ActivityStepWaiting
+		}
+	}
 }
 
 func (p *PipelineContext) ApproveActivity(activity *Activity) error {

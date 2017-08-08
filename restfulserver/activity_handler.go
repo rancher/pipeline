@@ -152,6 +152,30 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 
 }
 
+func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error {
+	id := mux.Vars(req)["id"]
+	r, err := GetActivity(id, s.PipelineContext)
+	if err != nil {
+		logrus.Errorf("fail getting activity with id:%v", id)
+		return err
+	}
+	err = s.PipelineContext.ResetActivity(&r)
+
+	if err != nil {
+		logrus.Errorf("fail resetActivity:%v", err)
+		return err
+	}
+	err = s.PipelineContext.RerunActivity(&r)
+	if err != nil {
+		return err
+	}
+	UpdateActivity(r)
+	MyAgent.watchActivityC <- &r
+
+	logrus.Infof("approveactivitygeterror:%v", err)
+	return err
+}
+
 func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) error {
 	logrus.Infof("start approve activity")
 	id := mux.Vars(req)["id"]

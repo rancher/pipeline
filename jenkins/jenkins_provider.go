@@ -2,7 +2,6 @@ package jenkins
 
 import (
 	"encoding/xml"
-	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -53,15 +52,6 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 	if err != nil {
 		return &pipeline.Activity{}, err
 	}
-	//provider run
-	/*
-		if len(p.Stages) > 0 {
-			logrus.Info("building")
-			if err := j.RunBuild(p.Stages[0], activity.Id); err != nil {
-				logrus.Error(errors.Wrap(err, "build stage fail"))
-				return err
-			}
-		}*/
 	if len(p.Stages) == 0 {
 		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
 	}
@@ -82,6 +72,19 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 	return &activity, nil
 }
 
+//RerunActivity runs an existing activity
+func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
+	err := j.SetSCMCommit(a)
+	if err != nil {
+		logrus.Errorf("set scm commit fail,%v", err)
+		return err
+	}
+	a.RunSequence = a.Pipeline.RunCount + 1
+	a.StartTS = time.Now().UnixNano() / int64(time.Millisecond)
+	err = j.RunStage(a, 0)
+	return err
+}
+
 //CreateStage init jenkins project settings of the stage
 func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) error {
 	logrus.Info("create jenkins job from stage")
@@ -89,12 +92,51 @@ func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) 
 	activityId := activity.Id
 	jobName := j.pipeline.Name + "_" + stage.Name + "_" + activityId
 
-	conf, err := j.generateJenkinsProject(activity, ordinal)
-	if err != nil {
+	conf := j.generateJenkinsProject(activity, ordinal)
+
+	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
+	if err := CreateJob(jobName, bconf); err != nil {
 		return err
 	}
+	return nil
+}
 
-	if err := CreateJob(jobName, conf); err != nil {
+//DeleteFormerBuild delete last build info of a completed activity
+func (j *JenkinsProvider) DeleteFormerBuild(activity *pipeline.Activity) error {
+	if activity.Status == pipeline.ActivityBuilding || activity.Status == pipeline.ActivityWaiting {
+		return errors.New("cannot delete lastbuild of running activity!")
+	}
+	activityId := activity.Id
+	for _, stage := range activity.ActivityStages {
+		jobName := activity.Pipeline.Name + "_" + stage.Name + "_" + activityId
+		if stage.Status == pipeline.ActivityStageSuccess || stage.Status == pipeline.ActivityStageFail {
+			logrus.Infof("deleting:%v", jobName)
+			err := DeleteBuild(jobName)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+
+}
+
+//SetSCMCommit update jenkins job SCM to use commit id in activity
+func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
+	if activity.CommitInfo == "" {
+		return errors.New("no commit info in activity")
+	}
+	conf := j.generateJenkinsProject(activity, 0)
+	conf.Scm.GitBranch = activity.CommitInfo
+
+	stageName := activity.ActivityStages[0].Name
+	jobName := activity.Pipeline.Name + "_" + stageName + "_" + activity.Id
+
+	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
+	logrus.Infof("conf:\n%v", string(bconf))
+	logrus.Infof("trying to set commit")
+	if err := UpdateJob(jobName, bconf); err != nil {
+		logrus.Infof("updatejob error:%v", err)
 		return err
 	}
 	return nil
@@ -118,27 +160,7 @@ func (j *JenkinsProvider) RunBuild(stage *pipeline.Stage, activityId string) err
 	return nil
 }
 
-/*
-func (j *JenkinsProvider) RunBuild(stage *pipeline.Stage, activityId string) error {
-	logrus.Info("begin jenkins building")
-	jobName := j.pipeline.Name + "_" + stage.Name + "_" + activityId
-
-	conf, err := j.generateJenkinsProject(stage, activityId)
-	if err != nil {
-		return err
-	}
-
-	if err := CreateJob(jobName, conf); err != nil {
-		return err
-	}
-	if _, err := BuildJob(jobName, map[string]string{}); err != nil {
-		return err
-	}
-
-	return nil
-}
-*/
-func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, ordinal int) ([]byte, error) {
+func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, ordinal int) *JenkinsProject {
 	logrus.Info("generating jenkins project config")
 	stage := activity.Pipeline.Stages[ordinal]
 	activityId := activity.Id
@@ -186,15 +208,7 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 		}
 	}
 
-	//logrus.Infof("before xml:%v", v)
-	//logrus.Infof("v.Triggers:%v", v.Triggers)
-	output, err := xml.MarshalIndent(v, "  ", "    ")
-	//logrus.Infof("get xml:%v\n end xml.", string(output))
-	if err != nil {
-		fmt.Printf("error: %v\n", err)
-		return nil, err
-	}
-	return output, nil
+	return v
 
 }
 
@@ -361,7 +375,6 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 
 func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) (string, error) {
 	p := activity.Pipeline
-	logrus.Infof("getting step log")
 	if stageOrdinal < 0 || stageOrdinal > len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal > len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
 		return "", errors.New("ordinal out of range")
 	}
@@ -373,7 +386,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 	}
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
-	if len(outputs) > 0 && len(actiStage.ActivitySteps) > 0 && strings.Contains(outputs[0], "  Cloning the remote Git repository\n") {
+	if len(outputs) > 0 && stageOrdinal == 0 && stepOrdinal == 0 {
 		// SCM
 		return outputs[0], nil
 	}

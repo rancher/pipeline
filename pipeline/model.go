@@ -111,10 +111,12 @@ type BuildStep struct {
 type PipelineProvider interface {
 	Init(*Pipeline) error
 	RunPipeline(*Pipeline) (*Activity, error)
+	RerunActivity(*Activity) error
 	RunBuild(*Stage, string) error
 	RunStage(*Activity, int) error
 	SyncActivity(*Activity) (bool, error)
 	GetStepLog(*Activity, int, int) (string, error)
+	DeleteFormerBuild(activity *Activity) error
 }
 
 type Activity struct {
