@@ -89,11 +89,7 @@ func DeleteBuild(jobname string) error {
 
 	req.Header.Add(CrumbHeader, Crumb)
 	req.SetBasicAuth(user, token)
-	client := http.Client{
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
+	client := http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
 		logrus.Error(err)
@@ -108,6 +104,56 @@ func DeleteBuild(jobname string) error {
 	}
 	return nil
 
+}
+
+func ExecScript(script string) (string, error) {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	scriptURI, _ := JenkinsConfig.Get(ScriptURI)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	var targetURL *url.URL
+	var err error
+	targetURL, err = url.Parse(sah + scriptURI)
+	if err != nil {
+		logrus.Error(err)
+		return "", err
+	}
+	v := url.Values{}
+	v.Add("script", script)
+	req, _ := http.NewRequest(http.MethodPost, targetURL.String(), bytes.NewBufferString(v.Encode()))
+	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return "", err
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
+		logrus.Infof("jenkins run script fail,response code is :%v", resp.StatusCode)
+		logrus.Error(ErrDeleteBuildFail)
+		return string(data), ErrDeleteBuildFail
+	}
+	return string(data), nil
+}
+
+//GetActiveNodesName gets all available jenkins slaves name
+func GetActiveNodesName() ([]string, error) {
+	nlist, err := ExecScript(GetActiveNodesScript)
+	nlist = strings.TrimLeft(nlist, "\n")
+	nlist = strings.TrimRight(nlist, "\n")
+	logrus.Infof("exec result:%v", nlist)
+	if err != nil {
+		logrus.Errorf("get active node fail,%v", err)
+		return []string{}, err
+	}
+	r := strings.SplitN(nlist, "\n", -1)
+	return r, nil
 }
 
 func CreateJob(jobname string, content []byte) error {

@@ -2,6 +2,8 @@ package jenkins
 
 import (
 	"encoding/xml"
+	"fmt"
+	"hash/fnv"
 	"regexp"
 	"strings"
 	"time"
@@ -37,18 +39,26 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 	j.Init(p)
 
 	//init and create  activity
+	id := uuid.Rand().Hex()
+	//Find a jenkins slave on which to run
+	nodeName, err := getNodeNameToRun(id)
+	if err != nil {
+		return &pipeline.Activity{}, err
+	}
+	logrus.Infof("runpipeline,get nodeName:%v", nodeName)
 	activity := pipeline.Activity{
-		Id:          uuid.Rand().Hex(),
+		Id:          id,
 		Pipeline:    *p,
 		RunSequence: p.RunCount + 1,
 		Status:      pipeline.ActivityWaiting,
 		StartTS:     time.Now().UnixNano() / int64(time.Millisecond),
+		NodeName:    nodeName,
 	}
 	for _, stage := range p.Stages {
 		activity.ActivityStages = append(activity.ActivityStages, ToActivityStage(stage))
 	}
 	//logrus.Infof("creating activity:%v", activity)
-	_, err := restfulserver.CreateActivity(activity)
+	_, err = restfulserver.CreateActivity(activity)
 	if err != nil {
 		return &pipeline.Activity{}, err
 	}
@@ -74,11 +84,20 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 
 //RerunActivity runs an existing activity
 func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
-	err := j.SetSCMCommit(a)
+	//find an available node to run
+	nodeName, err := getNodeNameToRun(a.Id)
+	if err != nil {
+		return err
+	}
+	a.NodeName = nodeName
+	//set to original git commit
+	err = j.SetSCMCommit(a)
 	if err != nil {
 		logrus.Errorf("set scm commit fail,%v", err)
 		return err
 	}
+
+	logrus.Infof("rerunpipeline,get nodeName:%v", nodeName)
 	a.RunSequence = a.Pipeline.RunCount + 1
 	a.StartTS = time.Now().UnixNano() / int64(time.Millisecond)
 	err = j.RunStage(a, 0)
@@ -99,6 +118,19 @@ func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) 
 		return err
 	}
 	return nil
+}
+
+//getNodeNameToRun gets a specific slave name to run given activity id
+func getNodeNameToRun(id string) (string, error) {
+	nodes, err := GetActiveNodesName()
+	if err != nil || len(nodes) == 0 {
+		return "", errors.Wrapf(err, "fail to find an active slave to work")
+	}
+	//hash to one of the nodes
+	h := fnv.New32a()
+	h.Write([]byte(id))
+	index := int(h.Sum32()) % len(nodes)
+	return nodes[index], nil
 }
 
 //DeleteFormerBuild delete last build info of a completed activity
@@ -167,9 +199,9 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 	workspaceName := path.Join("${JENKINS_HOME}", "workspace", activityId)
 
 	taskShells := []JenkinsTaskShell{}
-	for _, step := range stage.Steps {
-		taskShells = append(taskShells, JenkinsTaskShell{Command: commandBuilder(step)})
-		//logrus.Infof("get step:%v,commandbuilders:%v", step, commandBuilders)
+	for stepOrdinal, step := range stage.Steps {
+		step.Services = pipeline.GetServices(activity, ordinal, stepOrdinal)
+		taskShells = append(taskShells, JenkinsTaskShell{Command: commandBuilder(activity, step)})
 	}
 	commandBuilders := JenkinsBuilder{TaskShells: taskShells}
 
@@ -184,9 +216,10 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 		}
 	}
 	v := &JenkinsProject{
-		Scm:      scm,
-		CanRoam:  true,
-		Disabled: false,
+		Scm:          scm,
+		AssignedNode: activity.NodeName,
+		CanRoam:      false,
+		Disabled:     false,
 		BlockBuildWhenDownstreamBuilding: false,
 		BlockBuildWhenUpstreamBuilding:   false,
 		CustomWorkspace:                  workspaceName,
@@ -212,7 +245,7 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 
 }
 
-func commandBuilder(step *pipeline.Step) string {
+func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	stringBuilder := new(bytes.Buffer)
 	switch step.Type {
 	case pipeline.StepTypeTask:
@@ -223,10 +256,22 @@ func commandBuilder(step *pipeline.Step) string {
 		stringBuilder.WriteString(cmd)
 		stringBuilder.WriteString("\nEOF\n")
 
+		//add link service
+		linkInfo := ""
+		if len(step.Services) > 0 {
+			linkInfo += ""
+			for _, svc := range step.Services {
+				linkInfo += fmt.Sprintf("--link %s:%s ", svc.ContainerName, svc.Name)
+			}
+
+		}
+
 		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(volumeInfo)
+		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString(linkInfo)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(step.Image)
 		stringBuilder.WriteString(" ")
@@ -281,6 +326,14 @@ func commandBuilder(step *pipeline.Step) string {
 			stringBuilder.WriteString(";")
 		}
 	case pipeline.StepTypeSCM:
+	case pipeline.StepTypeService:
+		entrypointPara := ""
+		if step.Entrypoint != "" {
+			entrypointPara = "--entrypoint " + step.Entrypoint
+		}
+		containerName := activity.Id + step.Alias
+		command := step.Command
+		stringBuilder.WriteString(fmt.Sprintf("docker run -d --name %s %s %s %s", containerName, entrypointPara, step.Image, command))
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
 	}
@@ -373,6 +426,20 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 	return updated, nil
 }
 
+//OnActivityCompelte helps clean up
+func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
+	//clean services in activity
+	services := pipeline.GetAllServices(activity)
+	containerNames := []string{}
+	for _, service := range services {
+		containerNames = append(containerNames, service.ContainerName)
+	}
+	command := "docker rm -f " + strings.Join(containerNames, " ")
+	cleanServiceScript := fmt.Sprintf(ScriptSkel, command)
+	logrus.Infof("cleanservicescript is: %v", cleanServiceScript)
+	res, err := ExecScript(cleanServiceScript)
+	logrus.Infof("clean services result:%v,%v", res, err)
+}
 func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) (string, error) {
 	p := activity.Pipeline
 	if stageOrdinal < 0 || stageOrdinal > len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal > len(activity.ActivityStages[stageOrdinal].ActivitySteps) {

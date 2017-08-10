@@ -15,6 +15,7 @@ type JenkinsProject struct {
 	KeepDependencies                 bool     `xml:"keepDependencies"`
 	Properties                       string
 	Scm                              JenkinsSCM             `xml:"scm"`
+	AssignedNode                     string                 `xml:"assignedNode"`
 	CanRoam                          bool                   `xml:"canRoam"`
 	Disabled                         bool                   `xml:"disabled"`
 	BlockBuildWhenDownstreamBuilding bool                   `xml:"blockBuildWhenDownstreamBuilding"`
@@ -75,7 +76,7 @@ type JenkinsBuild struct {
 	QueueId           int       `json:"queueId,omitempty"`
 	Result            string    `json:"result,omitempty"`
 	TimeStamp         int64     `json:"timestamp,omitempty"`
-	BuiltOn           string    `json:"building,omitempty"`
+	BuiltOn           string    `json:"builtOn,omitempty"`
 	ChangeSet         ChangeSet `json:"chanSet,omitempty"`
 	Duration          int       `json:"duration,omitempty"`
 	EstimatedDuration int       `json:"estimatedDuration,omitempty"`

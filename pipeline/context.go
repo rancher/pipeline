@@ -340,3 +340,40 @@ func (p *PipelineContext) SyncActivity(activity *Activity) error {
 	_, err := p.Provider.SyncActivity(activity)
 	return err
 }
+
+//GetServices gets run services before the step
+func GetServices(activity *Activity, stageOrdinal int, stepOrdinal int) []*CIService {
+	services := []*CIService{}
+	for i := 0; i <= stageOrdinal; i++ {
+		for j := 0; j < len(activity.Pipeline.Stages[i].Steps); j++ {
+			if i == stageOrdinal && j >= stepOrdinal {
+				break
+			}
+			step := activity.Pipeline.Stages[i].Steps[j]
+			if step.Type == StepTypeService {
+				service := &CIService{
+					ContainerName: activity.Id + step.Alias,
+					Name:          step.Alias,
+					Image:         step.Image,
+					Entrypoint:    step.Entrypoint,
+					Command:       step.Command,
+				}
+				services = append(services, service)
+			}
+		}
+	}
+	return services
+}
+
+//GetAllServices gets all run services of the activity
+func GetAllServices(activity *Activity) []*CIService {
+	lastStageOrdinal := len(activity.ActivityStages) - 1
+	if lastStageOrdinal < 0 {
+		lastStageOrdinal = 0
+	}
+	lastStepOrdinal := len(activity.ActivityStages[lastStageOrdinal].ActivitySteps) - 1
+	if lastStepOrdinal < 0 {
+		lastStepOrdinal = 0
+	}
+	return GetServices(activity, lastStageOrdinal, lastStepOrdinal)
+}

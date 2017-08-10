@@ -11,6 +11,7 @@ const StepTypeCatalog = "catalog"
 const StepTypeDeploy = "deploy"
 const StepTypeSCM = "scm"
 const StepTypeBuild = "build"
+const StepTypeService = "service"
 const (
 	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
@@ -82,9 +83,10 @@ type Step struct {
 	RegUserName string `json:"username,omitempty" yaml:"username,omitempty"`
 	RegPassword string `json:"password,omitempty" yaml:"password,omitempty"`
 	//---task step
-	Command    string   `json:"command,omitempty" yaml:"command,omitempty"`
-	Image      string   `json:"image,omitempty" yaml:"image,omitempty"`
-	Parameters []string `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Command    string       `json:"command,omitempty" yaml:"command,omitempty"`
+	Image      string       `json:"image,omitempty" yaml:"image,omitempty"`
+	Parameters []string     `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Services   []*CIService `json:"services,omitempty"`
 	//---catalog step
 	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"docker-compose,omitempty"`
 	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancher-compose,omitempty"`
@@ -93,6 +95,14 @@ type Step struct {
 	DeployName        string `json:"deployName,omitempty" yaml:"deploy-name,omitempty"`
 	DeployEnvironment string `json:"deployEnvironment,omitempty" yaml:"deploy-environment,omitempty"`
 	Count             int    `json:"count,omitempty" yaml:"count,omitempty"`
+	//---service step
+	//Name
+	//Image
+	Entrypoint string `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
+	//Command
+	Alias string `json:"alias,omitempty" yaml:"alias,omitempty"`
+	//Scope string `json:"scope,omitempty" yaml:"scope,omitempty"`
+
 }
 
 type Trigger struct {
@@ -116,7 +126,8 @@ type PipelineProvider interface {
 	RunStage(*Activity, int) error
 	SyncActivity(*Activity) (bool, error)
 	GetStepLog(*Activity, int, int) (string, error)
-	DeleteFormerBuild(activity *Activity) error
+	DeleteFormerBuild(*Activity) error
+	OnActivityCompelte(*Activity)
 }
 
 type Activity struct {
@@ -131,6 +142,7 @@ type Activity struct {
 	PendingStage    int              `json:"pendingStage,omitempty"`
 	StartTS         int64            `json:"start_ts,omitempty"`
 	StopTS          int64            `json:"stop_ts,omitempty"`
+	NodeName        string           `json:"nodename,omitempty"`
 	ActivityStages  []*ActivityStage `json:"activity_stages,omitempty"`
 }
 
@@ -152,6 +164,14 @@ type ActivityStep struct {
 	Status   string `json:"status,omitempty"`
 	StartTS  int64  `json:"start_ts,omitempty"`
 	Duration int64  `json:"duration,omitempty"`
+}
+
+type CIService struct {
+	ContainerName string `json:"containerName,omitempty"`
+	Name          string `json:"name,omitempty"`
+	Image         string `json:"image,omitempty"`
+	Entrypoint    string `json:"entrypoint,omitempty"`
+	Command       string `json:"command,omitempty"`
 }
 
 func ToDemoActivity() *Activity {

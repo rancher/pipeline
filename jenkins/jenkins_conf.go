@@ -12,6 +12,7 @@ const JenkinsUser = "JenkinsUser"
 const JenkinsToken = "JenkinsToken"
 const CreateJobURI = "CreateJobURI"
 const UpdateJobURI = "UpdateJobURI"
+const ScriptURI = "ScriptURI"
 const DeleteBuildURI = "DeleteBuildURI"
 const GetCrumbURI = "GetCrumbURI"
 const JenkinsCrumbHeader = "JenkinsCrumbHeader"
@@ -25,6 +26,25 @@ const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
 
 //const JenkinsBaseWorkspacePath = "JenkinsBaseWorkspacePath"
 const BuildJobStageConfigFile = "build_stage_example.xml"
+
+const ScriptSkel = `import hudson.util.RemotingDiagnostics; 
+print_ip = 'println InetAddress.localHost.hostAddress'; 
+print_hostname = 'println InetAddress.localHost.canonicalHostName';
+
+// here it is - the shell command, uname as example 
+uname = 'def proc = "%s".execute(); proc.waitFor(); println proc.in.text';
+println hudson.model.Hudson.instance.slaves.size
+for (slave in hudson.model.Hudson.instance.slaves) {
+	    println slave.name;
+		    println RemotingDiagnostics.executeGroovy(uname, slave.getChannel());
+		}
+`
+
+const GetActiveNodesScript = `for (slave in hudson.model.Hudson.instance.slaves) {
+  if (!slave.getComputer().isOffline()){
+	    println slave.name;
+  }
+}`
 
 var ErrConfigItemNotFound = errors.New("Jenkins configuration not fount")
 var ErrJenkinsTemplateNotVaild = errors.New("Jenkins template folder path is not vaild")
@@ -55,4 +75,5 @@ var JenkinsConfig = jenkinsConfig{
 	JenkinsJobInfoURI:            "/job/%s/api/json",
 	JenkinsBuildInfoURI:          "/job/%s/lastBuild/api/json",
 	JenkinsBuildLogURI:           "/job/%s/lastBuild/timestamps/?elapsed=HH'h'mm'm'ss's'S'ms'&appendLog",
+	ScriptURI:                    "/scriptText",
 }

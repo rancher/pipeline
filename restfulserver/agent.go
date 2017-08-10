@@ -84,56 +84,6 @@ func (a *Agent) handleWS() {
 		}
 	}
 }
-func (a *Agent) SyncWatchList() {
-
-	logrus.Infof("start sync")
-	var watchlist []*pipeline.Activity
-	var err error
-	ticker := time.NewTicker(syncPeriod)
-	defer func() {
-		ticker.Stop()
-	}()
-
-	for {
-		watchlist, err = a.getWatchList()
-		if err != nil {
-			logrus.Errorf("error get watchlist,%v", err)
-		}
-	watchingLabel:
-		for {
-			select {
-			case <-ticker.C:
-				for _, activity := range watchlist {
-					if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
-						continue
-					}
-					updated, _ := a.Server.PipelineContext.Provider.SyncActivity(activity)
-					logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
-					/*
-						if activity.Id == "1def6e31-345d-48ee-b443-6f633f35a636" {
-							updated = true
-						}
-					*/
-					if updated {
-						//status changed,then update in rancher server
-
-						err = UpdateActivity(*activity)
-						if err != nil {
-							logrus.Errorf("fail update activity,%v", err)
-						}
-
-						logrus.Infof("telling all holder to send messages!")
-						a.broadcast <- []byte(activity.Id)
-					}
-				}
-			case <-a.ReWatch:
-				logrus.Infof("rewatch signal")
-				//reget the watchlist
-				break watchingLabel
-			}
-		}
-	}
-}
 
 func (a *Agent) SyncActivityWatchList() {
 	activities, err := ListActivities(a.Server.PipelineContext)
@@ -178,6 +128,11 @@ func (a *Agent) SyncActivityWatchList() {
 					if activity.Status == pipeline.ActivityPending || activity.Status == pipeline.ActivityDenied {
 						//pending,remove from watchlist. add agin when approve
 						delete(a.activityWatchlist, activity.Id)
+					}
+					//when activity done,invoke providor.onActivityComplete
+					if activity.Status != pipeline.ActivityBuilding && activity.Status != pipeline.ActivityWaiting {
+						a.Server.PipelineContext.Provider.OnActivityCompelte(activity)
+
 					}
 					logrus.Infof("telling all holder to send messages!")
 					a.broadcast <- []byte(activity.Id)
@@ -324,4 +279,9 @@ func (a *Agent) unregisterCronRunner(pipelineId string) {
 		existing.Stop()
 	}
 	delete(a.cronRunners, pipelineId)
+}
+
+func (a *Agent) onActivityComplete(activity *pipeline.Activity) {
+	//clean service
+
 }
