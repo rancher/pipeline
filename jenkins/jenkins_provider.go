@@ -435,7 +435,7 @@ func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
 		containerNames = append(containerNames, service.ContainerName)
 	}
 	command := "docker rm -f " + strings.Join(containerNames, " ")
-	cleanServiceScript := fmt.Sprintf(ScriptSkel, command)
+	cleanServiceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
 	logrus.Infof("cleanservicescript is: %v", cleanServiceScript)
 	res, err := ExecScript(cleanServiceScript)
 	logrus.Infof("clean services result:%v,%v", res, err)

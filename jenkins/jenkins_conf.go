@@ -27,24 +27,29 @@ const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
 //const JenkinsBaseWorkspacePath = "JenkinsBaseWorkspacePath"
 const BuildJobStageConfigFile = "build_stage_example.xml"
 
+//TODO add master
 const ScriptSkel = `import hudson.util.RemotingDiagnostics; 
-print_ip = 'println InetAddress.localHost.hostAddress'; 
-print_hostname = 'println InetAddress.localHost.canonicalHostName';
-
-// here it is - the shell command, uname as example 
-uname = 'def proc = "%s".execute(); proc.waitFor(); println proc.in.text';
-println hudson.model.Hudson.instance.slaves.size
+node = "%s"
+script = "%s"
+cmd = 'def proc = "'+script+'".execute(); proc.waitFor(); println proc.in.text';
 for (slave in hudson.model.Hudson.instance.slaves) {
-	    println slave.name;
-		    println RemotingDiagnostics.executeGroovy(uname, slave.getChannel());
-		}
+  if(slave.name==node){
+	println RemotingDiagnostics.executeGroovy(cmd, slave.getChannel());
+  }
+}
+//on master
+if(node == "master"){
+	def proc = script.execute(); proc.waitFor(); println proc.in.text
+}
 `
 
 const GetActiveNodesScript = `for (slave in hudson.model.Hudson.instance.slaves) {
   if (!slave.getComputer().isOffline()){
 	    println slave.name;
   }
-}`
+}
+println "master"
+`
 
 var ErrConfigItemNotFound = errors.New("Jenkins configuration not fount")
 var ErrJenkinsTemplateNotVaild = errors.New("Jenkins template folder path is not vaild")
