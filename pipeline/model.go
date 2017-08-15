@@ -86,6 +86,9 @@ type Step struct {
 	Command    string       `json:"command,omitempty" yaml:"command,omitempty"`
 	Image      string       `json:"image,omitempty" yaml:"image,omitempty"`
 	Parameters []string     `json:"parameters,omitempty" yaml:"parameters,omitempty"`
+	Entrypoint string       `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
+	Alias      string       `json:"alias,omitempty" yaml:"alias,omitempty"`
+	IsService  bool         `json:"isService,omitempty"`
 	Services   []*CIService `json:"services,omitempty"`
 	//---catalog step
 	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"docker-compose,omitempty"`
@@ -98,9 +101,7 @@ type Step struct {
 	//---service step
 	//Name
 	//Image
-	Entrypoint string `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
 	//Command
-	Alias string `json:"alias,omitempty" yaml:"alias,omitempty"`
 	//Scope string `json:"scope,omitempty" yaml:"scope,omitempty"`
 
 }

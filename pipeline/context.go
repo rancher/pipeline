@@ -350,7 +350,7 @@ func GetServices(activity *Activity, stageOrdinal int, stepOrdinal int) []*CISer
 				break
 			}
 			step := activity.Pipeline.Stages[i].Steps[j]
-			if step.Type == StepTypeService {
+			if step.IsService && step.Type == StepTypeTask {
 				service := &CIService{
 					ContainerName: activity.Id + step.Alias,
 					Name:          step.Alias,

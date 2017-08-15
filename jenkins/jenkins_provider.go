@@ -249,6 +249,19 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	stringBuilder := new(bytes.Buffer)
 	switch step.Type {
 	case pipeline.StepTypeTask:
+
+		//isService
+		if step.IsService {
+			entrypointPara := ""
+			if step.Entrypoint != "" {
+				entrypointPara = "--entrypoint " + step.Entrypoint
+			}
+			command := step.Command
+			containerName := activity.Id + step.Alias
+			stringBuilder.WriteString(fmt.Sprintf("docker run -d --name %s %s %s %s", containerName, entrypointPara, step.Image, command))
+			break
+		}
+
 		//write to a sh file,then docker run it
 		stringBuilder.WriteString("cat>.r_cicd_entrypoint.sh<<EOF\n")
 		cmd := strings.Replace(step.Command, "\\", "\\\\", -1)
@@ -326,14 +339,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(";")
 		}
 	case pipeline.StepTypeSCM:
-	case pipeline.StepTypeService:
-		entrypointPara := ""
-		if step.Entrypoint != "" {
-			entrypointPara = "--entrypoint " + step.Entrypoint
-		}
-		containerName := activity.Id + step.Alias
-		command := step.Command
-		stringBuilder.WriteString(fmt.Sprintf("docker run -d --name %s %s %s %s", containerName, entrypointPara, step.Image, command))
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
 	}
@@ -439,6 +444,13 @@ func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
 	logrus.Infof("cleanservicescript is: %v", cleanServiceScript)
 	res, err := ExecScript(cleanServiceScript)
 	logrus.Infof("clean services result:%v,%v", res, err)
+
+	//clean workspace
+	command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
+	cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
+	res, err = ExecScript(cleanWorkspaceScript)
+	logrus.Infof("clean workspace result:%v,%v", res, err)
+
 }
 func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) (string, error) {
 	p := activity.Pipeline

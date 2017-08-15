@@ -27,7 +27,7 @@ const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
 //const JenkinsBaseWorkspacePath = "JenkinsBaseWorkspacePath"
 const BuildJobStageConfigFile = "build_stage_example.xml"
 
-//TODO add master
+//Script to execute on specific node
 const ScriptSkel = `import hudson.util.RemotingDiagnostics; 
 node = "%s"
 script = "%s"
