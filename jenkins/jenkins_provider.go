@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,7 +95,6 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	err = j.SetSCMCommit(a)
 	if err != nil {
 		logrus.Errorf("set scm commit fail,%v", err)
-		return err
 	}
 
 	logrus.Infof("rerunpipeline,get nodeName:%v", nodeName)
@@ -258,7 +258,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			}
 			command := step.Command
 			containerName := activity.Id + step.Alias
-			stringBuilder.WriteString(fmt.Sprintf("docker run -d --name %s %s %s %s", containerName, entrypointPara, step.Image, command))
+			stringBuilder.WriteString(fmt.Sprintf("docker run -d --env-file ${PWD}/.r_cicd.env --name %s %s %s %s", containerName, entrypointPara, step.Image, command))
 			break
 		}
 
@@ -282,6 +282,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
+		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(volumeInfo)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(linkInfo)
@@ -289,27 +291,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString(step.Image)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString("/bin/sh -xe .r_cicd_entrypoint.sh")
-		/*
-			cmdAllBuf := new(bytes.Buffer)
-			cmdAllBuf.WriteString("/bin/sh -xe .r_cicd_entrypoint.sh")
-
-				cmdAllBuf.WriteString(strings.Replace(step.Command, "\"", "\\\"", -1))
-
-					cmds := strings.Split(step.Command, "\n")
-					for _, cmd := range cmds {
-						if strings.HasSuffix(cmd, "\\n") {
-							cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
-							continue
-						} else {
-							cmdAllBuf.WriteString(strings.Replace(cmd, "\"", "\\\"", -1))
-							cmdAllBuf.WriteString(";")
-						}
-					}
-				cmdAllBuf.WriteString("\"")
-				stringBuilder.WriteString(cmdAllBuf.String())
-		*/
 	case pipeline.StepTypeBuild:
-
+		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.SourceType == "sc" {
 			stringBuilder.WriteString("docker build --tag ")
 			stringBuilder.WriteString(step.TargetImage)
@@ -339,6 +322,37 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(";")
 		}
 	case pipeline.StepTypeSCM:
+		//run a context container to share environment variables
+		/*volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
+		stringBuilder.WriteString("docker run --privileged --name ")
+		stringBuilder.WriteString(activity.Id + "_context ")
+		stringBuilder.WriteString("-e GIT_COMMIT=${GIT_COMMIT} ")
+		stringBuilder.WriteString("-v /var/lib/docker:/var/lib/docker -d docker:dind")
+
+		*/
+
+		//write to a env file that provides the environment variables to use throughout the activity.
+		stringBuilder.WriteString("cat>.r_cicd.env<<EOF\n")
+		stringBuilder.WriteString("GIT_COMMIT=$GIT_COMMIT\n")
+		stringBuilder.WriteString("GIT_PREVIOUS_COMMIT=$GIT_PREVIOUS_COMMIT\n")
+		stringBuilder.WriteString("GIT_PREVIOUS_SUCCESSFUL_COMMIT=$GIT_PREVIOUS_SUCCESSFUL_COMMIT\n")
+		stringBuilder.WriteString("GIT_BRANCH=$GIT_BRANCH\n")
+		stringBuilder.WriteString("GIT_LOCAL_BRANCH=$GIT_LOCAL_BRANCH\n")
+		stringBuilder.WriteString("GIT_URL=$GIT_URL\n")
+		stringBuilder.WriteString("GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME\n")
+		stringBuilder.WriteString("GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME\n")
+		stringBuilder.WriteString("GIT_COMMITTER_EMAIL=$GIT_COMMITTER_EMAIL\n")
+		stringBuilder.WriteString("GIT_AUTHOR_EMAIL=$GIT_AUTHOR_EMAIL\n")
+		stringBuilder.WriteString("SVN_REVISION=$SVN_REVISION\n")
+		stringBuilder.WriteString("SVN_URL=$SVN_URL\n")
+		stringBuilder.WriteString("PIPELINE_NAME=" + activity.Pipeline.Name + "\n")
+		stringBuilder.WriteString("PIPELINE_ID=" + activity.Pipeline.Id + "\n")
+		stringBuilder.WriteString("TRIGGER_TYPE=\n")
+		stringBuilder.WriteString("NODE_NAME=" + activity.NodeName + "\n")
+		stringBuilder.WriteString("ACTIVITY_ID=" + activity.Id + "\n")
+		stringBuilder.WriteString("ACTIVITY_SEQUENCE=" + strconv.Itoa(activity.RunSequence) + "\n")
+		stringBuilder.WriteString("\nEOF\n")
+
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
 	}
