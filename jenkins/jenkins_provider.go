@@ -250,6 +250,12 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	switch step.Type {
 	case pipeline.StepTypeTask:
 
+		envVars := ""
+		if len(step.Parameters) > 0 {
+			for _, para := range step.Parameters {
+				envVars += fmt.Sprintf("-e %s ", para)
+			}
+		}
 		//isService
 		if step.IsService {
 			entrypointPara := ""
@@ -258,7 +264,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			}
 			command := step.Command
 			containerName := activity.Id + step.Alias
-			stringBuilder.WriteString(fmt.Sprintf("docker run -d --env-file ${PWD}/.r_cicd.env --name %s %s %s %s", containerName, entrypointPara, step.Image, command))
+			stringBuilder.WriteString(fmt.Sprintf("docker run -d --env-file ${PWD}/.r_cicd.env %s --name %s %s %s %s", envVars, containerName, entrypointPara, step.Image, command))
 			break
 		}
 
@@ -283,6 +289,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
+		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString(envVars)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(volumeInfo)
 		stringBuilder.WriteString(" ")
@@ -353,6 +361,39 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString("ACTIVITY_SEQUENCE=" + strconv.Itoa(activity.RunSequence) + "\n")
 		stringBuilder.WriteString("\nEOF\n")
 
+	case pipeline.StepTypeUpgradeService:
+		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
+		stringBuilder.WriteString("docker run reg.cnrancher.com/rancher/rancher-upgrader:dev service")
+		if step.Tag != "" {
+			stringBuilder.WriteString(" --image ")
+			stringBuilder.WriteString(step.Tag)
+		}
+		if step.BatchSize > 0 {
+			stringBuilder.WriteString(" --batchsize ")
+			stringBuilder.WriteString(strconv.Itoa(step.BatchSize))
+		}
+		if step.Interval != 0 {
+			stringBuilder.WriteString(" --interval ")
+			stringBuilder.WriteString(strconv.Itoa(step.Interval))
+		}
+		if step.StartFirst != false {
+			stringBuilder.WriteString(" --startfirst")
+			stringBuilder.WriteString(" true")
+		}
+		if step.DeployEnv == "others" {
+			stringBuilder.WriteString(" --envurl ")
+			stringBuilder.WriteString(step.Endpoint)
+			stringBuilder.WriteString(" --accesskey ")
+			stringBuilder.WriteString(step.Accesskey)
+			stringBuilder.WriteString(" --secretkey ")
+			stringBuilder.WriteString(step.Secretkey)
+		}
+		for k, v := range step.ServiceSelector {
+			stringBuilder.WriteString(" --selector ")
+			stringBuilder.WriteString(k)
+			stringBuilder.WriteString("=")
+			stringBuilder.WriteString(v)
+		}
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
 	}

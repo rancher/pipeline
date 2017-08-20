@@ -130,7 +130,7 @@ func (a *Agent) SyncActivityWatchList() {
 						delete(a.activityWatchlist, activity.Id)
 					}
 					//when activity done,invoke providor.onActivityComplete
-					if activity.Status != pipeline.ActivityBuilding && activity.Status != pipeline.ActivityWaiting {
+					if activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityDenied {
 						a.Server.PipelineContext.Provider.OnActivityCompelte(activity)
 
 					}

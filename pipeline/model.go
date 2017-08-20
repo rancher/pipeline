@@ -12,6 +12,7 @@ const StepTypeDeploy = "deploy"
 const StepTypeSCM = "scm"
 const StepTypeBuild = "build"
 const StepTypeService = "service"
+const StepTypeUpgradeService = "upgradeService"
 const (
 	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
@@ -98,12 +99,17 @@ type Step struct {
 	DeployName        string `json:"deployName,omitempty" yaml:"deploy-name,omitempty"`
 	DeployEnvironment string `json:"deployEnvironment,omitempty" yaml:"deploy-environment,omitempty"`
 	Count             int    `json:"count,omitempty" yaml:"count,omitempty"`
-	//---service step
-	//Name
-	//Image
-	//Command
-	//Scope string `json:"scope,omitempty" yaml:"scope,omitempty"`
-
+	//---upgradeService step
+	Tag             string            `json:"tag,omitempty" yaml:"tag,omitempty"`
+	ServiceSelector map[string]string `json:"serviceSelector,omitempty" yaml:"serviceSelector,omitempty"`
+	BatchSize       int               `json:"batchSize,omitempty" yaml:"batchSize,omitempty"`
+	Interval        int               `json:"interval,omitempty" yaml:"interval,omitempty"`
+	StartFirst      bool              `json:"startFirst,omitempty" yaml:"startFirst,omitempty"`
+	DeployEnv       string            `json:"deployEnv,omitempty" yaml:"deployEnv,omitempty"`
+	EnvironmentId   string            `json:"environmentId,omitempty" yaml:"environmentId,omitempty"`
+	Endpoint        string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
+	Accesskey       string            `json:"accesskey,omitempty" yaml:"accesskey,omitempty"`
+	Secretkey       string            `json:"secretkey,omitempty" yaml:"secretkey,omitempty"`
 }
 
 type Trigger struct {
