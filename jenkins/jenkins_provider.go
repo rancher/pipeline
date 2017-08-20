@@ -340,6 +340,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		*/
 
 		//write to a env file that provides the environment variables to use throughout the activity.
+		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)")
 		stringBuilder.WriteString("cat>.r_cicd.env<<EOF\n")
 		stringBuilder.WriteString("GIT_COMMIT=$GIT_COMMIT\n")
 		stringBuilder.WriteString("GIT_PREVIOUS_COMMIT=$GIT_PREVIOUS_COMMIT\n")
