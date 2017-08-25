@@ -13,6 +13,7 @@ const StepTypeSCM = "scm"
 const StepTypeBuild = "build"
 const StepTypeService = "service"
 const StepTypeUpgradeService = "upgradeService"
+const StepTypeUpgradeStack = "upgradeStack"
 const (
 	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
@@ -54,7 +55,7 @@ type Pipeline struct {
 	//trigger
 	TriggerType     string `json:"triggerType,omitempty" yaml:"triggerType,omitempty"`
 	TriggerSpec     string `json:"triggerSpec" yaml:"triggerSpec,omitempty"`
-	TriggerTimezone string `json:"triggerTimezone,omitempty" yaml:"triggerTimezone,omitempty"`
+	TriggerTimezone string `json:"s,omitempty" yaml:"triggerTimezone,omitempty"`
 
 	Stages []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
@@ -91,10 +92,14 @@ type Step struct {
 	Alias      string       `json:"alias,omitempty" yaml:"alias,omitempty"`
 	IsService  bool         `json:"isService,omitempty"`
 	Services   []*CIService `json:"services,omitempty"`
-	//---catalog step
+
+	//---upgradeStack step
+	//Endpoint,Accesskey,Secretkey
+	StackType      string `json:"stackType,omitempty" yaml:"stackType,omitempty"` //catalog or custom
+	StackName      string `json:"stackName,omitempty" yaml:"stackType,omitempty"`
 	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"docker-compose,omitempty"`
 	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancher-compose,omitempty"`
-	Environment    string `json:"environment,omitempty" yaml:"environment,omitempty"`
+
 	//---deploy step
 	DeployName        string `json:"deployName,omitempty" yaml:"deploy-name,omitempty"`
 	DeployEnvironment string `json:"deployEnvironment,omitempty" yaml:"deploy-environment,omitempty"`

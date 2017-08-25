@@ -340,7 +340,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		*/
 
 		//write to a env file that provides the environment variables to use throughout the activity.
-		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)")
+		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)\n")
 		stringBuilder.WriteString("cat>.r_cicd.env<<EOF\n")
 		stringBuilder.WriteString("GIT_COMMIT=$GIT_COMMIT\n")
 		stringBuilder.WriteString("GIT_PREVIOUS_COMMIT=$GIT_PREVIOUS_COMMIT\n")
@@ -388,12 +388,26 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(step.Accesskey)
 			stringBuilder.WriteString(" --secretkey ")
 			stringBuilder.WriteString(step.Secretkey)
+		} else if step.DeployEnv == "local" {
+			//read from env var
+			stringBuilder.WriteString(" --envurl $CATTLE_URL")
+			stringBuilder.WriteString(" --accesskey $CATTLE_ACCESS_KEY")
+			stringBuilder.WriteString(" --secretkey $CATTLE_SECRET_KEY")
 		}
 		for k, v := range step.ServiceSelector {
 			stringBuilder.WriteString(" --selector ")
 			stringBuilder.WriteString(k)
 			stringBuilder.WriteString("=")
 			stringBuilder.WriteString(v)
+		}
+	case pipeline.StepTypeUpgradeStack:
+		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
+		if step.DeployEnv == "local" {
+			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.Alias, step.DockerCompose, step.RancherCompose)
+			stringBuilder.WriteString(script)
+		} else {
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.Alias, step.DockerCompose, step.RancherCompose)
+			stringBuilder.WriteString(script)
 		}
 	case pipeline.StepTypeCatalog:
 	case pipeline.StepTypeDeploy:
@@ -502,10 +516,10 @@ func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
 	logrus.Infof("clean services result:%v,%v", res, err)
 
 	//clean workspace
-	command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
-	cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
-	res, err = ExecScript(cleanWorkspaceScript)
-	logrus.Infof("clean workspace result:%v,%v", res, err)
+	// command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
+	// cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
+	// res, err = ExecScript(cleanWorkspaceScript)
+	// logrus.Infof("clean workspace result:%v,%v", res, err)
 
 }
 func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) (string, error) {

@@ -45,6 +45,7 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodGet).Path("/v1/activities").Handler(f(schemas, s.ListActivities))
 	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodGet).Path("/v1/activitys/{id}").Handler(f(schemas, s.GetActivity))
+	router.Methods(http.MethodDelete).Path("/v1/activitys/{id}").Handler(f(schemas, s.DeleteActivity))
 	//router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.UpdateActivity))
 	//router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.ActivatePipeline))
 	//router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.DeActivatePipeline))
