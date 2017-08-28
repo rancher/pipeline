@@ -403,10 +403,10 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	case pipeline.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.DeployEnv == "local" {
-			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.Alias, step.DockerCompose, step.RancherCompose)
+			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, step.DockerCompose, step.RancherCompose)
 			stringBuilder.WriteString(script)
 		} else {
-			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.Alias, step.DockerCompose, step.RancherCompose)
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, step.DockerCompose, step.RancherCompose)
 			stringBuilder.WriteString(script)
 		}
 	case pipeline.StepTypeCatalog:
