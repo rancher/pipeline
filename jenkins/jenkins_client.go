@@ -72,7 +72,11 @@ func GetCSRF() error {
 	data, _ := ioutil.ReadAll(resp.Body)
 	Crumbs := strings.Split(string(data), ":")
 	if len(Crumbs) != 2 {
-		logrus.Errorf("Return Crumbs From Jenkins Error:<%s>", err.Error())
+		if err != nil {
+			logrus.Errorf("Return Crumbs From Jenkins Error:<%s>", err.Error())
+		} else {
+			logrus.Errorln("Return Crumbs From Jenkins Error,Jenkins not ready.")
+		}
 		return errors.New("error get crumbs from jenkins")
 	}
 	JenkinsConfig.Set(JenkinsCrumbHeader, Crumbs[0])
