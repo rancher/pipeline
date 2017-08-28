@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
@@ -33,9 +34,20 @@ func InitJenkins() {
 	JenkinsConfig.Set(JenkinsUser, user)
 	JenkinsConfig.Set(JenkinsToken, token)
 	logrus.Info("Connectting to Jenkins...")
-	if err := GetCSRF(); err != nil {
-		logrus.Fatalf("Error Connectting to Jenkins err:%s", err.Error())
+
+	RetryTime := 10
+	for i := 0; i < RetryTime; i++ {
+		if err := GetCSRF(); err != nil {
+			logrus.Errorf("Error Connecting to Jenkins err:%s\n", err.Error())
+			if i < RetryTime-1 {
+				logrus.Infoln("Retry in 10s...")
+				time.Sleep(10 * time.Second)
+			} else {
+				logrus.Fatalln("Reach retry limit, fail connecting Jenkins master and exit!")
+			}
+		}
 	}
+
 	logrus.Info("Connected to Jenkins")
 }
 
