@@ -27,6 +27,38 @@ const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
 //const JenkinsBaseWorkspacePath = "JenkinsBaseWorkspacePath"
 const BuildJobStageConfigFile = "build_stage_example.xml"
 
+var ErrConfigItemNotFound = errors.New("Jenkins configuration not fount")
+var ErrJenkinsTemplateNotVaild = errors.New("Jenkins template folder path is not vaild")
+var jenkinsConfLock = &sync.RWMutex{}
+
+func (j jenkinsConfig) Set(key, value string) {
+	jenkinsConfLock.Lock()
+	defer jenkinsConfLock.Unlock()
+	j[key] = value
+}
+
+func (j jenkinsConfig) Get(key string) (string, error) {
+	jenkinsConfLock.RLock()
+	defer jenkinsConfLock.RUnlock()
+	if value, ok := j[key]; ok {
+		return value, nil
+	}
+	return "", ErrConfigItemNotFound
+}
+
+var JenkinsConfig = jenkinsConfig{
+	CreateJobURI:                 "/createItem",
+	UpdateJobURI:                 "/job/%s/config.xml",
+	DeleteBuildURI:               "/job/%s/lastBuild/doDelete", //purge-job-history/doPurge",
+	GetCrumbURI:                  "/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)",
+	JenkinsJobBuildURI:           "/job/%s/build",
+	JenkinsJobBuildWithParamsURI: "/job/%s/buildWithParameters",
+	JenkinsJobInfoURI:            "/job/%s/api/json",
+	JenkinsBuildInfoURI:          "/job/%s/lastBuild/api/json",
+	JenkinsBuildLogURI:           "/job/%s/lastBuild/timestamps/?elapsed=HH'h'mm'm'ss's'S'ms'&appendLog",
+	ScriptURI:                    "/scriptText",
+}
+
 //Script to execute on specific node
 const ScriptSkel = `import hudson.util.RemotingDiagnostics; 
 node = "%s"
@@ -72,7 +104,7 @@ mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml
 mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml 
 #cat new-docker-compose.yml
 #cat new-rancher-compose.yml
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-docker-compose.yml -d
+rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
 
 rm -r ../../$TEMPDIR
 
@@ -113,34 +145,86 @@ echo "upgrade stack $R_UPGRADESTACK_STACKNAME time out."
 exit 1
 `
 
-var ErrConfigItemNotFound = errors.New("Jenkins configuration not fount")
-var ErrJenkinsTemplateNotVaild = errors.New("Jenkins template folder path is not vaild")
-var jenkinsConfLock = &sync.RWMutex{}
+const upgradeCatalogScript = `# upgrade catalog
+R_UPGRADECATALOG_REPO=%s
+R_UPGRADECATALOG_BRANCH=%s
+R_UPGRADECATALOG_GITUSER=%s
+R_UPGRADECATALOG_GITPASSWORD=%s
+R_UPGRADECATALOG_SYSTEMFLAG=%s
+R_UPGRADECATALOG_FOLDERNAME=%s
+R_UPGRADESTACK_FLAG=%s
 
-func (j jenkinsConfig) Set(key, value string) {
-	jenkinsConfLock.Lock()
-	defer jenkinsConfLock.Unlock()
-	j[key] = value
+TEMPDIR=$(mktemp -d .r_cicd_catalog.XXXX) && cd $TEMPDIR && mkdir catalog
+
+cat>docker-compose.yml<<EOF
+%s
+EOF
+cat>rancher-compose.yml<<EOF
+%s
+EOF
+cat>README.md<<EOF
+%s
+EOF
+cat>env_file<<EOF
+%s
+EOF
+
+rancher-upgrader --debug catalog --repourl $R_UPGRADECATALOG_REPO --branch $R_UPGRADECATALOG_BRANCH --user $R_UPGRADECATALOG_GITUSER --password $R_UPGRADECATALOG_GITPASSWORD \
+--cacheroot catalog --foldername $R_UPGRADECATALOG_FOLDERNAME --readme README.md $R_UPGRADECATALOG_SYSTEMFLAG
+
+if [ $? -eq 0 ]; then
+	echo "upgrade catalog success."
+	if [ "$R_UPGRADESTACK_FLAG" = "" ]; then
+		exit 0
+	fi
+elif [ $? -ne 0 ]; then
+	exit 1
+fi
+
+# upgrade catalog stack
+
+R_UPGRADESTACK_ENDPOINT=%s
+R_UPGRADESTACK_ACCESSKEY=%s
+R_UPGRADESTACK_SECRETKEY=%s
+R_UPGRADESTACK_STACKNAME=%s
+
+rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --stack $R_UPGRADESTACK_STACKNAME --env-file env_file -d
+
+rm -r ../../$TEMPDIR
+
+#check stack upgrade
+checkSvc()
+{
+	SvcStatus=$(rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}")
+	if [ $? -ne 0 ]; then
+		echo "upgrade stack $R_UPGRADESTACK_STACKNAME fail: $SvcStatus"
+		exit 1
+	fi 
+
+	ErrorSvcCount=$(echo "$SvcStatus"|awk '$4=="error" {print $1}'|wc -l);
+	if [ $ErrorSvcCount -ne 0 ]; then
+		echo "$SvcStatus"|awk '$4=="error" {print "upgrade service ",$1," fail:",}'|cut -f2,5-
+		exit 1
+	fi
+	UpgradingSvcCount=$(echo "$SvcStatus"|awk '$4=="yes" {print $1}'|wc -l);
+	if [ $UpgradingSvcCount -ne 0 ]; then
+		return 1
+	fi
+	#upgrade success
+	return 0
 }
 
-func (j jenkinsConfig) Get(key string) (string, error) {
-	jenkinsConfLock.RLock()
-	defer jenkinsConfLock.RUnlock()
-	if value, ok := j[key]; ok {
-		return value, nil
-	}
-	return "", ErrConfigItemNotFound
-}
+for i in {1..36}
+do
+	checkSvc;
+	if [ $? -eq 0 ]; then
+		echo "upgrade stack $R_UPGRADESTACK_STACKNAME success."
+		exit 0
+	elif [ $? -ne 0 ]; then
+		sleep 5
+	fi
+done
 
-var JenkinsConfig = jenkinsConfig{
-	CreateJobURI:                 "/createItem",
-	UpdateJobURI:                 "/job/%s/config.xml",
-	DeleteBuildURI:               "/job/%s/lastBuild/doDelete", //purge-job-history/doPurge",
-	GetCrumbURI:                  "/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)",
-	JenkinsJobBuildURI:           "/job/%s/build",
-	JenkinsJobBuildWithParamsURI: "/job/%s/buildWithParameters",
-	JenkinsJobInfoURI:            "/job/%s/api/json",
-	JenkinsBuildInfoURI:          "/job/%s/lastBuild/api/json",
-	JenkinsBuildLogURI:           "/job/%s/lastBuild/timestamps/?elapsed=HH'h'mm'm'ss's'S'ms'&appendLog",
-	ScriptURI:                    "/scriptText",
-}
+echo "upgrade stack $R_UPGRADESTACK_STACKNAME time out."
+exit 1
+`

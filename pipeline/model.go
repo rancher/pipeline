@@ -7,13 +7,13 @@ import (
 )
 
 const StepTypeTask = "task"
-const StepTypeCatalog = "catalog"
 const StepTypeDeploy = "deploy"
 const StepTypeSCM = "scm"
 const StepTypeBuild = "build"
 const StepTypeService = "service"
 const StepTypeUpgradeService = "upgradeService"
 const StepTypeUpgradeStack = "upgradeStack"
+const StepTypeUpgradeCatalog = "upgradeCatalog"
 const (
 	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
@@ -34,6 +34,13 @@ const (
 	ActivityFail     = "Fail"
 	ActivityDenied   = "Denied"
 )
+
+var PreservedEnvs = [...]string{"GIT_COMMIT", "GIT_PREVIOUS_COMMIT", "GIT_PREVIOUS_SUCCESSFUL_COMMIT",
+	"GIT_BRANCH", "GIT_LOCAL_BRANCH", "GIT_URL", "GIT_COMMITTER_NAME",
+	"GIT_AUTHOR_NAME", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL", "SVN_REVISION",
+	"SVN_URL", "PIPELINE_NAME", "PIPELINE_ID", "TRIGGER_TYPE", "NODE_NAME", "ACTIVITY_ID",
+	"ACTIVITY_SEQUENCE",
+}
 
 type Pipeline struct {
 	client.Resource
@@ -82,8 +89,8 @@ type Step struct {
 	Dockerfile  string `json:"file,omitempty" yaml:"file,omitempty"`
 	TargetImage string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
 	PushFlag    bool   `json:"push,omitempty" yaml:"push,omitempty"`
-	RegUserName string `json:"username,omitempty" yaml:"username,omitempty"`
-	RegPassword string `json:"password,omitempty" yaml:"password,omitempty"`
+	UserName    string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password    string `json:"password,omitempty" yaml:"password,omitempty"`
 	//---task step
 	Command    string       `json:"command,omitempty" yaml:"command,omitempty"`
 	Image      string       `json:"image,omitempty" yaml:"image,omitempty"`
@@ -115,6 +122,20 @@ type Step struct {
 	Endpoint        string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	Accesskey       string            `json:"accesskey,omitempty" yaml:"accesskey,omitempty"`
 	Secretkey       string            `json:"secretkey,omitempty" yaml:"secretkey,omitempty"`
+
+	//---upgradeCatalog step
+	//Endpoint,Accesskey,Secretkey,StackName,
+	//Repository,Branch,Username,Password,DeployEnv
+	DeployFlag bool        `json:"deploy,omitempty" yaml:"deploy,omitempty"`
+	ExternalId string      `json:"externalId,omitempty" yaml:"externalId,omitempty"`
+	FilesArray []PlainFile `json:"filesAry,omitempty" yaml:"filesAry,omitempty"`
+	Readme     string      `json:"readme,omitempty" yaml:"readme,omitempty"`
+	Answers    string      `json:"answerString,omitempty" yaml:"answerString,omitempty"`
+}
+
+type PlainFile struct {
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	Body string `json:"body,omitempty" yaml:"body,omitempty"`
 }
 
 type Trigger struct {

@@ -320,9 +320,9 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 				registry = step.TargetImage[:sep]
 			}
 			stringBuilder.WriteString("docker login --username ")
-			stringBuilder.WriteString(step.RegUserName)
+			stringBuilder.WriteString(step.UserName)
 			stringBuilder.WriteString(" --password ")
-			stringBuilder.WriteString(step.RegPassword)
+			stringBuilder.WriteString(step.Password)
 			stringBuilder.WriteString(" ")
 			stringBuilder.WriteString(registry)
 			stringBuilder.WriteString(";docker push ")
@@ -409,7 +409,49 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, step.DockerCompose, step.RancherCompose)
 			stringBuilder.WriteString(script)
 		}
-	case pipeline.StepTypeCatalog:
+	case pipeline.StepTypeUpgradeCatalog:
+		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
+
+		_, templateName, templateBase, _, _ := templateURLPath(step.ExternalId)
+
+		systemFlag := ""
+		if templateBase != "" {
+			systemFlag = "--system "
+		}
+		deployFlag := ""
+		if step.DeployFlag {
+			deployFlag = "true"
+		}
+
+		dockerCompose := ""
+		rancherCompose := ""
+		readme := ""
+		for _, pf := range step.FilesArray {
+			if strings.HasPrefix(pf.Name, "docker-compose") {
+				dockerCompose = pf.Body
+			} else if strings.HasPrefix(pf.Name, "rancher-compose") {
+				rancherCompose = pf.Body
+			} else if pf.Name == "README.md" {
+				readme = pf.Body
+			}
+
+		}
+		dockerCompose = EscapeShell(dockerCompose)
+		rancherCompose = EscapeShell(rancherCompose)
+		readme = EscapeShell(readme)
+		answers := step.Answers
+
+		endpoint := step.Endpoint
+		accessKey := step.Accesskey
+		secretKey := step.Secretkey
+
+		if step.DeployFlag && step.DeployEnv == "local" {
+			endpoint = "$CATTLE_URL"
+			accessKey = "$CATTLE_ACCESS_KEY"
+			secretKey = "$CATTLE_SECRET_KEY"
+		}
+		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, step.UserName, step.Password, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
+		stringBuilder.WriteString(script)
 	case pipeline.StepTypeDeploy:
 	}
 	//logrus.Infof("Finish building command for step command is %s", stringBuilder.String())
@@ -464,12 +506,14 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 		} else if buildInfo.Result == "FAILURE" {
 			actiStage.Status = pipeline.ActivityStageFail
 			activity.Status = pipeline.ActivityFail
+			updated = true
 		} else if buildInfo.Result == "SUCCESS" {
 			actiStage.Status = pipeline.ActivityStageSuccess
 			if i == len(p.Stages)-1 {
 				//if all stage success , mark activity as success
 				activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
 				activity.Status = pipeline.ActivitySuccess
+				updated = true
 			}
 			logrus.Infof("stage success:%v", i)
 
@@ -677,4 +721,57 @@ func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
 	}
 	return &actiStage
 
+}
+
+func EscapeShell(script string) string {
+	escaped := strings.Replace(script, "\\", "\\\\", -1)
+	escaped = strings.Replace(escaped, "$", "\\$", -1)
+
+	//TODO preserve a pattern
+	for _, str := range pipeline.PreservedEnvs {
+		escaped = strings.Replace(escaped, "\\$"+str+" ", "\\$"+str+" ", -1)
+		escaped = strings.Replace(escaped, "\\$"+str+"\n", "\\$"+str+"\n", -1)
+		escaped = strings.Replace(escaped, "\\${"+str+"}", "\\${"+str+"}", -1)
+
+	}
+	return escaped
+}
+
+func templateURLPath(path string) (string, string, string, string, bool) {
+	pathSplit := strings.Split(path, ":")
+	switch len(pathSplit) {
+	case 2:
+		catalog := pathSplit[0]
+		template := pathSplit[1]
+		templateSplit := strings.Split(template, "*")
+		templateBase := ""
+		switch len(templateSplit) {
+		case 1:
+			template = templateSplit[0]
+		case 2:
+			templateBase = templateSplit[0]
+			template = templateSplit[1]
+		default:
+			return "", "", "", "", false
+		}
+		return catalog, template, templateBase, "", true
+	case 3:
+		catalog := pathSplit[0]
+		template := pathSplit[1]
+		revisionOrVersion := pathSplit[2]
+		templateSplit := strings.Split(template, "*")
+		templateBase := ""
+		switch len(templateSplit) {
+		case 1:
+			template = templateSplit[0]
+		case 2:
+			templateBase = templateSplit[0]
+			template = templateSplit[1]
+		default:
+			return "", "", "", "", false
+		}
+		return catalog, template, templateBase, revisionOrVersion, true
+	default:
+		return "", "", "", "", false
+	}
 }
