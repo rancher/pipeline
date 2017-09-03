@@ -75,7 +75,6 @@ func pipelineSchema(pipeline *client.Schema) {
 
 func acitvitySchema(activity *client.Schema) {
 	activity.CollectionMethods = []string{http.MethodGet, http.MethodPost}
-	activity.IncludeableLinks = []string{"pipeline"}
 }
 
 func pipelineSettingSchema(setting *client.Schema) {
@@ -125,7 +124,8 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 		a.Actions["rerun"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=rerun"
 	}
 
-	a.Links["pipeline"] = apiContext.UrlBuilder.ReferenceByIdLink("pipeline", a.PipelineName+":"+a.PipelineVersion)
+	//remove pipeline reference
+	a.Pipeline.Type = ""
 	return a
 }
 
