@@ -500,30 +500,32 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 		getCommit(activity, buildInfo)
 		//if any buildInfo found,activity in building status
 		activity.Status = pipeline.ActivityBuilding
-		//actiStage.Duration = buildInfo.Duration
-		if buildInfo.Result == "" {
-			actiStage.Status = pipeline.ActivityStageBuilding
-		} else if buildInfo.Result == "FAILURE" {
-			actiStage.Status = pipeline.ActivityStageFail
-			activity.Status = pipeline.ActivityFail
-			updated = true
-		} else if buildInfo.Result == "SUCCESS" {
-			actiStage.Status = pipeline.ActivityStageSuccess
-			if i == len(p.Stages)-1 {
-				//if all stage success , mark activity as success
-				activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
-				activity.Status = pipeline.ActivitySuccess
+		actiStage.Status = pipeline.ActivityStageBuilding
+		/*
+			if buildInfo.Result == "" {
+				actiStage.Status = pipeline.ActivityStageBuilding
+			} else if buildInfo.Result == "FAILURE" {
+				actiStage.Status = pipeline.ActivityStageFail
+				activity.Status = pipeline.ActivityFail
 				updated = true
-			}
-			logrus.Infof("stage success:%v", i)
+			} else if buildInfo.Result == "SUCCESS" {
+				actiStage.Status = pipeline.ActivityStageSuccess
+				if i == len(p.Stages)-1 {
+					//if all stage success , mark activity as success
+					activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
+					activity.Status = pipeline.ActivitySuccess
+					updated = true
+				}
+				logrus.Infof("stage success:%v", i)
 
-			if i < len(p.Stages)-1 && activity.Pipeline.Stages[i+1].NeedApprove {
-				logrus.Infof("set pending")
-				activity.Status = pipeline.ActivityPending
-				activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
-				activity.PendingStage = i + 1
+				if i < len(p.Stages)-1 && activity.Pipeline.Stages[i+1].NeedApprove {
+					logrus.Infof("set pending")
+					activity.Status = pipeline.ActivityPending
+					activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
+					activity.PendingStage = i + 1
+				}
 			}
-		}
+		*/
 		//logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
 		if err == nil {
 			rawOutput, err := GetBuildRawOutput(jobName)
@@ -533,6 +535,25 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 			//actiStage.RawOutput = rawOutput
 			stepStatusUpdated := parseSteps(activity, actiStage, rawOutput)
 
+			if actiStage.Status == pipeline.ActivityStageFail {
+				activity.Status = pipeline.ActivityFail
+				updated = true
+			} else if actiStage.Status == pipeline.ActivityStageSuccess {
+				if i == len(p.Stages)-1 {
+					//if all stage success , mark activity as success
+					activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
+					activity.Status = pipeline.ActivitySuccess
+					updated = true
+				}
+				logrus.Infof("stage success:%v", i)
+
+				if i < len(p.Stages)-1 && activity.Pipeline.Stages[i+1].NeedApprove {
+					logrus.Infof("set pending")
+					activity.Status = pipeline.ActivityPending
+					activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
+					activity.PendingStage = i + 1
+				}
+			}
 			updated = updated || stepStatusUpdated
 		}
 		if beforeStatus != actiStage.Status {

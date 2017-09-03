@@ -188,43 +188,7 @@ R_UPGRADESTACK_ACCESSKEY=%s
 R_UPGRADESTACK_SECRETKEY=%s
 R_UPGRADESTACK_STACKNAME=%s
 
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --stack $R_UPGRADESTACK_STACKNAME --env-file env_file -d
+rancher-upgrader stack --tolatest --envurl $R_UPGRADESTACK_ENDPOINT --accesskey $R_UPGRADESTACK_ACCESSKEY --secretkey $R_UPGRADESTACK_SECRETKEY --stackname $R_UPGRADESTACK_STACKNAME --env-file env_file
 
-rm -r ../../$TEMPDIR
-
-#check stack upgrade
-checkSvc()
-{
-	SvcStatus=$(rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}")
-	if [ $? -ne 0 ]; then
-		echo "upgrade stack $R_UPGRADESTACK_STACKNAME fail: $SvcStatus"
-		exit 1
-	fi 
-
-	ErrorSvcCount=$(echo "$SvcStatus"|awk '$4=="error" {print $1}'|wc -l);
-	if [ $ErrorSvcCount -ne 0 ]; then
-		echo "$SvcStatus"|awk '$4=="error" {print "upgrade service ",$1," fail:",}'|cut -f2,5-
-		exit 1
-	fi
-	UpgradingSvcCount=$(echo "$SvcStatus"|awk '$4=="yes" {print $1}'|wc -l);
-	if [ $UpgradingSvcCount -ne 0 ]; then
-		return 1
-	fi
-	#upgrade success
-	return 0
-}
-
-for i in {1..36}
-do
-	checkSvc;
-	if [ $? -eq 0 ]; then
-		echo "upgrade stack $R_UPGRADESTACK_STACKNAME success."
-		exit 0
-	elif [ $? -ne 0 ]; then
-		sleep 5
-	fi
-done
-
-echo "upgrade stack $R_UPGRADESTACK_STACKNAME time out."
-exit 1
+rm -r ../$TEMPDIR
 `
