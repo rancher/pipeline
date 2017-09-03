@@ -42,6 +42,11 @@ var PreservedEnvs = [...]string{"GIT_COMMIT", "GIT_PREVIOUS_COMMIT", "GIT_PREVIO
 	"ACTIVITY_SEQUENCE",
 }
 
+type PipelineSetting struct {
+	client.Resource
+	HostUrl string `json:"hostUrl,omitempty" yaml:"hostUrl,omitempty"`
+}
+
 type Pipeline struct {
 	client.Resource
 	Name            string `json:"name,omitempty" yaml:"name,omitempty"`

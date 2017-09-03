@@ -15,6 +15,7 @@ func NewSchema() *client.Schemas {
 	schemas.AddType("schema", client.Schema{})
 	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))
 	acitvitySchema(schemas.AddType("activity", pipeline.Activity{}))
+	pipelineSettingSchema(schemas.AddType("pipelineSetting", pipeline.PipelineSetting{}))
 	return schemas
 }
 
@@ -77,6 +78,14 @@ func acitvitySchema(activity *client.Schema) {
 	activity.IncludeableLinks = []string{"pipeline"}
 }
 
+func pipelineSettingSchema(setting *client.Schema) {
+	setting.ResourceActions = map[string]client.Action{
+		"update": client.Action{
+			Output: "pipelineSetting",
+		},
+	}
+}
+
 func toPipelineCollections(apiContext *api.ApiContext, pipelines []*pipeline.Pipeline) []interface{} {
 	var r []interface{}
 	for _, p := range pipelines {
@@ -118,6 +127,17 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 
 	a.Links["pipeline"] = apiContext.UrlBuilder.ReferenceByIdLink("pipeline", a.PipelineName+":"+a.PipelineVersion)
 	return a
+}
+
+func toPipelineSettingResource(apiContext *api.ApiContext, setting *pipeline.PipelineSetting) *pipeline.PipelineSetting {
+	setting.Resource = client.Resource{
+		Type:    "pipelineSetting",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
+	setting.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
+
+	return setting
 }
 
 func initActivityResource(a *pipeline.Activity) {

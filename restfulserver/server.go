@@ -406,6 +406,7 @@ func GetCurrentUser(cookies []*http.Cookie) (string, error) {
 		logrus.Infof("Cannot connect to the rancher server. Please check the rancher server URL")
 		return "", err
 	}
+	defer resp.Body.Close()
 	userid := resp.Header.Get("X-Api-User-Id")
 	if userid == "" {
 		logrus.Infof("Cannot get userid")
