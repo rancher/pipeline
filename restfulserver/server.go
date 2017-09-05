@@ -390,7 +390,7 @@ func GetCurrentUser(cookies []*http.Cookie) (string, error) {
 
 	client := &http.Client{}
 
-	requestURL := config.Config.CattleUrl + "/accounts"
+	requestURL := config.Config.CattleUrl + "/token"
 
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {

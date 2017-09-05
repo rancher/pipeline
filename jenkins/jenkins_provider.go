@@ -256,24 +256,35 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 				envVars += fmt.Sprintf("-e %s ", para)
 			}
 		}
+
+		entrypointPara := ""
+		argsPara := ""
+		svcPara := ""
+		if step.IsShell {
+			entrypointPara = "--entrypoint /bin/sh"
+			argsPara = ".r_cicd_entrypoint.sh"
+
+			//write to a sh file,then docker run it
+			stringBuilder.WriteString("cat>.r_cicd_entrypoint.sh<<EOF\n")
+			cmd := strings.Replace(step.Command, "\\", "\\\\", -1)
+			cmd = strings.Replace(cmd, "$", "\\$", -1)
+			stringBuilder.WriteString(cmd)
+			stringBuilder.WriteString("\nEOF\n")
+			stringBuilder.WriteString("set -xe\n")
+		} else {
+			stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
+			argsPara = step.Args
+		}
+		if step.Entrypoint != "" {
+			entrypointPara = "--entrypoint " + step.Entrypoint
+		}
 		//isService
 		if step.IsService {
-			entrypointPara := ""
-			if step.Entrypoint != "" {
-				entrypointPara = "--entrypoint " + step.Entrypoint
-			}
-			command := step.Command
 			containerName := activity.Id + step.Alias
-			stringBuilder.WriteString(fmt.Sprintf("docker run -d --env-file ${PWD}/.r_cicd.env %s --name %s %s %s %s", envVars, containerName, entrypointPara, step.Image, command))
-			break
+			svcPara = "-d --name " + containerName
+			//stringBuilder.WriteString(fmt.Sprintf("docker run -d --env-file ${PWD}/.r_cicd.env %s --name %s %s %s %s", envVars, containerName, entrypointPara, step.Image, command))
+			//break
 		}
-
-		//write to a sh file,then docker run it
-		stringBuilder.WriteString("cat>.r_cicd_entrypoint.sh<<EOF\n")
-		cmd := strings.Replace(step.Command, "\\", "\\\\", -1)
-		cmd = strings.Replace(cmd, "$", "\\$", -1)
-		stringBuilder.WriteString(cmd)
-		stringBuilder.WriteString("\nEOF\n")
 
 		//add link service
 		linkInfo := ""
@@ -292,19 +303,29 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(envVars)
 		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString(svcPara)
+		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(volumeInfo)
+		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString(entrypointPara)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(linkInfo)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(step.Image)
 		stringBuilder.WriteString(" ")
-		stringBuilder.WriteString("/bin/sh -xe .r_cicd_entrypoint.sh")
+		stringBuilder.WriteString(argsPara)
 	case pipeline.StepTypeBuild:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.SourceType == "sc" {
+			buildPath := "."
+			if step.DockerfilePath != "" {
+				buildPath = step.DockerfilePath
+			}
 			stringBuilder.WriteString("docker build --tag ")
 			stringBuilder.WriteString(step.TargetImage)
-			stringBuilder.WriteString(" .;")
+			stringBuilder.WriteString(" ")
+			stringBuilder.WriteString(buildPath)
+			stringBuilder.WriteString(";")
 		} else if step.SourceType == "file" {
 			stringBuilder.WriteString("echo \"")
 			stringBuilder.WriteString(strings.Replace(step.Dockerfile, "\"", "\\\"", -1))
@@ -501,31 +522,8 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 		//if any buildInfo found,activity in building status
 		activity.Status = pipeline.ActivityBuilding
 		actiStage.Status = pipeline.ActivityStageBuilding
-		/*
-			if buildInfo.Result == "" {
-				actiStage.Status = pipeline.ActivityStageBuilding
-			} else if buildInfo.Result == "FAILURE" {
-				actiStage.Status = pipeline.ActivityStageFail
-				activity.Status = pipeline.ActivityFail
-				updated = true
-			} else if buildInfo.Result == "SUCCESS" {
-				actiStage.Status = pipeline.ActivityStageSuccess
-				if i == len(p.Stages)-1 {
-					//if all stage success , mark activity as success
-					activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
-					activity.Status = pipeline.ActivitySuccess
-					updated = true
-				}
-				logrus.Infof("stage success:%v", i)
+		actiStage.StartTS = buildInfo.Timestamp
 
-				if i < len(p.Stages)-1 && activity.Pipeline.Stages[i+1].NeedApprove {
-					logrus.Infof("set pending")
-					activity.Status = pipeline.ActivityPending
-					activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
-					activity.PendingStage = i + 1
-				}
-			}
-		*/
 		//logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
 		if err == nil {
 			rawOutput, err := GetBuildRawOutput(jobName)
@@ -533,7 +531,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 				logrus.Infof("got rawOutput:%v,err:%v", rawOutput, err)
 			}
 			//actiStage.RawOutput = rawOutput
-			stepStatusUpdated := parseSteps(activity, actiStage, rawOutput)
+			stepStatusUpdated := parseSteps(actiStage, rawOutput)
 
 			if actiStage.Status == pipeline.ActivityStageFail {
 				activity.Status = pipeline.ActivityFail
@@ -630,7 +628,7 @@ func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
 }
 
 //parse jenkins rawoutput to steps,return true if status updated
-func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, rawOutput string) bool {
+func parseSteps(actiStage *pipeline.ActivityStage, rawOutput string) bool {
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	lastStatus := pipeline.ActivityStepBuilding
 	var updated bool = false
@@ -653,7 +651,7 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			actiStage.ActivitySteps[0].Status = lastStatus
 		}
 		//get step time for SCM
-		parseStepTime(actiStage.ActivitySteps[0], outputs[0], activity.StartTS)
+		parseStepTime(actiStage.ActivitySteps[0], outputs[0], actiStage.StartTS)
 		actiStage.Duration = actiStage.ActivitySteps[0].Duration
 		return updated
 	}
@@ -667,13 +665,13 @@ func parseSteps(activity *pipeline.Activity, actiStage *pipeline.ActivityStage, 
 			//passed steps
 			//step.Message = outputs[i+1]
 			step.Status = pipeline.ActivityStepSuccess
-			parseStepTime(step, outputs[i+1], activity.StartTS)
+			parseStepTime(step, outputs[i+1], actiStage.StartTS)
 			stageTime = stageTime + step.Duration
 		} else if i == finishStepNum-1 {
 			//last run step
 			//step.Message = outputs[i+1]
 			step.Status = lastStatus
-			parseStepTime(step, outputs[i+1], activity.StartTS)
+			parseStepTime(step, outputs[i+1], actiStage.StartTS)
 			stageTime = stageTime + step.Duration
 		} else {
 			//not run steps
@@ -709,11 +707,12 @@ func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int6
 		return
 	}
 
+	//compute step duration when done
+	step.StartTS = activityStartTS + (durationStart.Nanoseconds() / int64(time.Millisecond))
+
 	if step.Status != pipeline.ActivityStepSuccess && step.Status != pipeline.ActivityStepFail {
 		return
 	}
-	//compute step duration when done
-	step.StartTS = activityStartTS + (durationStart.Nanoseconds() / int64(time.Millisecond))
 
 	end := strings.TrimLeft(lines[len(lines)-1], "\n")
 	end = strings.TrimRight(end, " ")

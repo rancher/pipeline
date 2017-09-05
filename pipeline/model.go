@@ -90,19 +90,23 @@ type Step struct {
 	Webhook    bool   `json:"webhook,omitempty" yaml:"webhook,omitempty"`
 	Token      string `json:"token,omitempty" yaml:"token,omitempty"`
 	//---Build step
-	SourceType  string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
-	Dockerfile  string `json:"file,omitempty" yaml:"file,omitempty"`
-	TargetImage string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
-	PushFlag    bool   `json:"push,omitempty" yaml:"push,omitempty"`
-	UserName    string `json:"username,omitempty" yaml:"username,omitempty"`
-	Password    string `json:"password,omitempty" yaml:"password,omitempty"`
+	SourceType     string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
+	Dockerfile     string `json:"file,omitempty" yaml:"file,omitempty"`
+	DockerfilePath string `json:"dockerfilePath,omittempty" yaml:"dockerfilePath,omitempty"`
+	TargetImage    string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
+	PushFlag       bool   `json:"push,omitempty" yaml:"push,omitempty"`
+	UserName       string `json:"username,omitempty" yaml:"username,omitempty"`
+	Password       string `json:"password,omitempty" yaml:"password,omitempty"`
+
 	//---task step
 	Command    string       `json:"command,omitempty" yaml:"command,omitempty"`
 	Image      string       `json:"image,omitempty" yaml:"image,omitempty"`
 	Parameters []string     `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	Entrypoint string       `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
+	Args       string       `json:"args,omitempty" yaml:"args,omitempty"`
 	Alias      string       `json:"alias,omitempty" yaml:"alias,omitempty"`
 	IsService  bool         `json:"isService,omitempty"`
+	IsShell    bool         `json:"isShell,omitempty"`
 	Services   []*CIService `json:"services,omitempty"`
 
 	//---upgradeStack step
