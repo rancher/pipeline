@@ -348,13 +348,7 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 
 //list available env vars
 func (s *Server) ListEnvVars(rw http.ResponseWriter, req *http.Request) error {
-	envVars := []string{"GIT_COMMIT", "GIT_PREVIOUS_COMMIT", "GIT_PREVIOUS_SUCCESSFUL_COMMIT",
-		"GIT_BRANCH", "GIT_LOCAL_BRANCH", "GIT_URL", "GIT_COMMITTER_NAME",
-		"GIT_AUTHOR_NAME", "GIT_COMMITTER_EMAIL", "GIT_AUTHOR_EMAIL", "SVN_REVISION",
-		"SVN_URL", "PIPELINE_NAME", "PIPELINE_ID", "TRIGGER_TYPE", "NODE_NAME", "ACTIVITY_ID",
-		"ACTIVITY_SEQUENCE",
-	}
-	b, err := json.Marshal(envVars)
+	b, err := json.Marshal(pipeline.PreservedEnvs)
 	_, err = rw.Write(b)
 	return err
 }

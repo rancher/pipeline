@@ -363,24 +363,24 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		//write to a env file that provides the environment variables to use throughout the activity.
 		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)\n")
 		stringBuilder.WriteString("cat>.r_cicd.env<<EOF\n")
-		stringBuilder.WriteString("GIT_COMMIT=$GIT_COMMIT\n")
-		stringBuilder.WriteString("GIT_PREVIOUS_COMMIT=$GIT_PREVIOUS_COMMIT\n")
-		stringBuilder.WriteString("GIT_PREVIOUS_SUCCESSFUL_COMMIT=$GIT_PREVIOUS_SUCCESSFUL_COMMIT\n")
-		stringBuilder.WriteString("GIT_BRANCH=$GIT_BRANCH\n")
-		stringBuilder.WriteString("GIT_LOCAL_BRANCH=$GIT_LOCAL_BRANCH\n")
-		stringBuilder.WriteString("GIT_URL=$GIT_URL\n")
-		stringBuilder.WriteString("GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME\n")
-		stringBuilder.WriteString("GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME\n")
-		stringBuilder.WriteString("GIT_COMMITTER_EMAIL=$GIT_COMMITTER_EMAIL\n")
-		stringBuilder.WriteString("GIT_AUTHOR_EMAIL=$GIT_AUTHOR_EMAIL\n")
-		stringBuilder.WriteString("SVN_REVISION=$SVN_REVISION\n")
-		stringBuilder.WriteString("SVN_URL=$SVN_URL\n")
-		stringBuilder.WriteString("PIPELINE_NAME=" + activity.Pipeline.Name + "\n")
-		stringBuilder.WriteString("PIPELINE_ID=" + activity.Pipeline.Id + "\n")
-		stringBuilder.WriteString("TRIGGER_TYPE=\n")
-		stringBuilder.WriteString("NODE_NAME=" + activity.NodeName + "\n")
-		stringBuilder.WriteString("ACTIVITY_ID=" + activity.Id + "\n")
-		stringBuilder.WriteString("ACTIVITY_SEQUENCE=" + strconv.Itoa(activity.RunSequence) + "\n")
+		stringBuilder.WriteString("CICD_GIT_COMMIT=$GIT_COMMIT\n")
+		stringBuilder.WriteString("CICD_GIT_PREVIOUS_COMMIT=$GIT_PREVIOUS_COMMIT\n")
+		stringBuilder.WriteString("CICD_GIT_PREVIOUS_SUCCESSFUL_COMMIT=$GIT_PREVIOUS_SUCCESSFUL_COMMIT\n")
+		stringBuilder.WriteString("CICD_GIT_BRANCH=$GIT_BRANCH\n")
+		stringBuilder.WriteString("CICD_GIT_LOCAL_BRANCH=$GIT_LOCAL_BRANCH\n")
+		stringBuilder.WriteString("CICD_GIT_URL=$GIT_URL\n")
+		stringBuilder.WriteString("CICD_GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME\n")
+		stringBuilder.WriteString("CICD_GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME\n")
+		stringBuilder.WriteString("CICD_GIT_COMMITTER_EMAIL=$GIT_COMMITTER_EMAIL\n")
+		stringBuilder.WriteString("CICD_GIT_AUTHOR_EMAIL=$GIT_AUTHOR_EMAIL\n")
+		stringBuilder.WriteString("CICD_SVN_REVISION=$SVN_REVISION\n")
+		stringBuilder.WriteString("CICD_SVN_URL=$SVN_URL\n")
+		stringBuilder.WriteString("CICD_PIPELINE_NAME=" + activity.Pipeline.Name + "\n")
+		stringBuilder.WriteString("CICD_PIPELINE_ID=" + activity.Pipeline.Id + "\n")
+		stringBuilder.WriteString("CICD_TRIGGER_TYPE=\n")
+		stringBuilder.WriteString("CICD_NODE_NAME=" + activity.NodeName + "\n")
+		stringBuilder.WriteString("CICD_ACTIVITY_ID=" + activity.Id + "\n")
+		stringBuilder.WriteString("CICD_ACTIVITY_SEQUENCE=" + strconv.Itoa(activity.RunSequence) + "\n")
 		stringBuilder.WriteString("\nEOF\n")
 
 	case pipeline.StepTypeUpgradeService:
@@ -749,9 +749,9 @@ func EscapeShell(script string) string {
 
 	//TODO preserve a pattern
 	for _, str := range pipeline.PreservedEnvs {
-		escaped = strings.Replace(escaped, "\\$"+str+" ", "\\$"+str+" ", -1)
-		escaped = strings.Replace(escaped, "\\$"+str+"\n", "\\$"+str+"\n", -1)
-		escaped = strings.Replace(escaped, "\\${"+str+"}", "\\${"+str+"}", -1)
+		escaped = strings.Replace(escaped, "\\$"+str+" ", "$"+str+" ", -1)
+		escaped = strings.Replace(escaped, "\\$"+str+"\n", "$"+str+"\n", -1)
+		escaped = strings.Replace(escaped, "\\${"+str+"}", "${"+str+"}", -1)
 
 	}
 	return escaped
