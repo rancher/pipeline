@@ -2,6 +2,7 @@ package restfulserver
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -22,12 +23,6 @@ func (s *Server) GetPipelineSetting(rw http.ResponseWriter, req *http.Request) e
 		return err
 	}
 	toPipelineSettingResource(apiContext, a)
-	uid, err := GetCurrentUser(req.Cookies())
-	logrus.Infof("got currentUser,%v,%v", uid, err)
-	if err != nil || uid == "" {
-		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
-	}
-
 	if err = apiContext.WriteResource(a); err != nil {
 		return err
 	}
@@ -48,7 +43,8 @@ func GetPipelineSetting() (*pipeline.PipelineSetting, error) {
 		return &pipeline.PipelineSetting{}, fmt.Errorf("Error %v filtering genericObjects by key", err)
 	}
 	if len(goCollection.Data) == 0 {
-		return &pipeline.PipelineSetting{}, fmt.Errorf("Requested activity not found")
+		//init new settings
+		return &pipeline.PipelineSetting{}, nil
 	}
 	data := goCollection.Data[0]
 	setting := &pipeline.PipelineSetting{}
@@ -79,6 +75,9 @@ func (s *Server) UpdatePipelineSetting(rw http.ResponseWriter, req *http.Request
 }
 
 func CreateOrUpdatePipelineSetting(setting *pipeline.PipelineSetting) error {
+	if setting == nil {
+		return errors.New("empty pipelinesetting to update.")
+	}
 	b, err := json.Marshal(setting)
 	if err != nil {
 		return err

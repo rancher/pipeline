@@ -52,6 +52,11 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
 	router.Methods(http.MethodGet).Path("/v1/envvars").Handler(f(schemas, s.ListEnvVars))
 
+	//pipeline settings
+
+	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
+	router.Methods(http.MethodPost).Path("/v1/settings").Handler(f(schemas, s.UpdatePipelineSetting))
+
 	//test websocket
 	router.Methods(http.MethodGet).Path("/v1/ws/log").Handler(f(schemas, s.ServeStepLog))
 	router.Methods(http.MethodGet).Path("/v1/ws/status").Handler(f(schemas, s.ServeStatusWS))
