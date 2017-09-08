@@ -8,6 +8,7 @@ import (
 	yaml "gopkg.in/yaml.v2"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
@@ -73,6 +74,17 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		return errors.New("Invalid signature")
 	}
 	logrus.Infof("token validate pass")
+
+	//check branch
+	payload := &github.WebHookPayload{}
+	if err := json.Unmarshal(body, payload); err != nil {
+		return err
+	}
+	if *payload.Ref != "refs/heads/"+r.Stages[0].Steps[0].Branch {
+		logrus.Warningf("branch not match:%v,%v", *payload.Ref, r.Stages[0].Steps[0].Branch)
+		return nil
+	}
+
 	if !r.IsActivate {
 		logrus.Errorf("pipeline is not activated!")
 		return errors.New("pipeline is not activated!")
@@ -384,7 +396,7 @@ func GetCurrentUser(cookies []*http.Cookie) (string, error) {
 
 	client := &http.Client{}
 
-	requestURL := config.Config.CattleUrl + "/token"
+	requestURL := config.Config.CattleUrl + "/accounts"
 
 	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
