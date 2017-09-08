@@ -174,47 +174,54 @@ func GetNextRunTime(pipeline *pipeline.Pipeline) int64 {
 func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
-	pipeline := &pipeline.Pipeline{}
+	ppl := &pipeline.Pipeline{}
 	logrus.Infof("start create pipeline,get data:%v", string(data))
-	if err := json.Unmarshal(data, pipeline); err != nil {
+	if err := json.Unmarshal(data, ppl); err != nil {
 		return err
 	}
-	pipeline.Id = uuid.Rand().Hex()
-	pipeline.WebHookToken = uuid.Rand().Hex()
-	err = webhook.RenewWebhook(pipeline, req)
+	if err := pipeline.Validate(ppl); err != nil {
+		return err
+	}
+
+	ppl.Id = uuid.Rand().Hex()
+	ppl.WebHookToken = uuid.Rand().Hex()
+	err = webhook.RenewWebhook(ppl, req)
 	if err != nil {
 		logrus.Errorf("fail renewWebhook")
 		return err
 	}
-	err = s.PipelineContext.CreatePipeline(pipeline)
+	err = s.PipelineContext.CreatePipeline(ppl)
 	if err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(pipeline)
-	apiContext.Write(toPipelineResource(apiContext, pipeline))
+	MyAgent.onPipelineChange(ppl)
+	apiContext.Write(toPipelineResource(apiContext, ppl))
 	return nil
 }
 
 func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	data, err := ioutil.ReadAll(req.Body)
-	pipeline := &pipeline.Pipeline{}
-	if err := json.Unmarshal(data, pipeline); err != nil {
+	ppl := &pipeline.Pipeline{}
+	if err := json.Unmarshal(data, ppl); err != nil {
 		return err
 	}
-	err = webhook.RenewWebhook(pipeline, req)
+	if err := pipeline.Validate(ppl); err != nil {
+		return err
+	}
+	err = webhook.RenewWebhook(ppl, req)
 	if err != nil && err != webhook.ErrDelWebhook {
 		//fail to create webhook.block update
 		return err
 	}
-	err = s.PipelineContext.UpdatePipeline(pipeline)
+	err = s.PipelineContext.UpdatePipeline(ppl)
 	if err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(pipeline)
-	apiContext.Write(toPipelineResource(apiContext, pipeline))
+	MyAgent.onPipelineChange(ppl)
+	apiContext.Write(toPipelineResource(apiContext, ppl))
 	return nil
 }
 

@@ -317,7 +317,7 @@ func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
 	}
 	//logrus.Infof("response code is :%v", resp.StatusCode)
 	if resp.StatusCode != 200 {
-		logrus.Error(ErrGetBuildInfoFail)
+		//logrus.Error(ErrGetBuildInfoFail)
 		return nil, ErrGetBuildInfoFail
 	}
 	buildInfo := &JenkinsBuildInfo{}

@@ -17,6 +17,7 @@ import (
 
 //List All Activities
 func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error {
+
 	apiContext := api.GetApiContext(req)
 	apiClient, err := util.GetRancherClient()
 	logrus.Infof("req2:%v", req.URL.Path)
@@ -28,7 +29,6 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
 	})
-
 	if err != nil {
 		return err
 	}

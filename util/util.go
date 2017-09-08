@@ -51,7 +51,6 @@ func VerifyWebhookSignature(secret []byte, signature string, body []byte) bool {
 
 	actual := make([]byte, 20)
 	hex.Decode(actual, []byte(signature[5:]))
-
 	computed := hmac.New(sha1.New, secret)
 	computed.Write(body)
 
