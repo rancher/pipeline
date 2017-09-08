@@ -7,10 +7,21 @@ import (
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/pkg/errors"
 )
 
 func Clone(path, url, branch string) error {
 	return runcmd("git", "clone", "-b", branch, "--single-branch", url, path)
+}
+
+func BranchHeadCommit(url, branch string) (string, error) {
+	cmd := exec.Command("git", "ls-remote", url, branch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", errors.Wrap(err, string(output))
+	}
+	strs := strings.Split(string(output), "\t")
+	return strs[0], nil
 }
 
 func Init(path string, url string) error {

@@ -66,8 +66,9 @@ type Pipeline struct {
 	WebHookToken    string `json:"webhookToken,omitempty" yaml:"webhookToken,omitempty"`
 	//trigger
 	TriggerType     string `json:"triggerType,omitempty" yaml:"triggerType,omitempty"`
+	TriggerOnUpdate bool   `json:"triggerOnUpdate,omitempty" yaml:"triggerOnUpdate,omitempty"`
 	TriggerSpec     string `json:"triggerSpec" yaml:"triggerSpec,omitempty"`
-	TriggerTimezone string `json:"s,omitempty" yaml:"triggerTimezone,omitempty"`
+	TriggerTimezone string `json:"triggerTimezone,omitempty" yaml:"triggerTimezone,omitempty"`
 
 	Stages []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
 }
@@ -106,7 +107,7 @@ type Step struct {
 	Args       string       `json:"args,omitempty" yaml:"args,omitempty"`
 	Alias      string       `json:"alias,omitempty" yaml:"alias,omitempty"`
 	IsService  bool         `json:"isService,omitempty"`
-	IsShell    bool         `json:"isShell,omitempty"`
+	IsShell    bool         `json:"isShell"`
 	Services   []*CIService `json:"services,omitempty"`
 
 	//---upgradeStack step

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/rancher/pipeline/git"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/scheduler"
 )
@@ -110,10 +111,9 @@ func (a *Agent) SyncActivityWatchList() {
 					continue
 				}
 				updated, _ := a.Server.PipelineContext.Provider.SyncActivity(activity)
-				logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
+				//logrus.Infof("sync activity:%v,updated:%v", activity.Id, updated)
 				if updated {
 					//status changed,then update in rancher server
-
 					err = UpdateActivity(*activity)
 					if err != nil {
 						logrus.Errorf("fail update activity,%v", err)
@@ -235,6 +235,17 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	logrus.Infof("registering conrunner,pid:%v,spec:%v", pId, cr.Spec)
 	if existing == nil {
 		err := cr.AddFunc(cr.Spec, func() {
+			logrus.Infoln("invoke pipeline %v cron job", cr.PipelineId)
+			ppl := a.Server.PipelineContext.GetPipelineById(pId)
+			latestCommit, err := git.BranchHeadCommit(ppl.Stages[0].Steps[0].Repository, ppl.Stages[0].Steps[0].Branch)
+			if err != nil {
+				logrus.Errorf("cron job fail,Error:%v", err)
+				return
+			}
+			if ppl.TriggerOnUpdate && latestCommit == ppl.CommitInfo {
+				//run only when new changes exist
+				return
+			}
 			acti, err := a.Server.PipelineContext.RunPipeline(pId)
 			if err != nil {
 				logrus.Errorf("cron job fail,pid:%v", pId)
@@ -279,9 +290,4 @@ func (a *Agent) unregisterCronRunner(pipelineId string) {
 		existing.Stop()
 	}
 	delete(a.cronRunners, pipelineId)
-}
-
-func (a *Agent) onActivityComplete(activity *pipeline.Activity) {
-	//clean service
-
 }
