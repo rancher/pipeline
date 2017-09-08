@@ -17,7 +17,7 @@ ENV GOLANG_ARCH_amd64=amd64 GOLANG_ARCH_arm=armv6l GOLANG_ARCH=GOLANG_ARCH_${ARC
 # RUN wget -O - https://storage.googleapis.com/golang/go1.7.4.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
 #     go get github.com/rancher/trash && go get github.com/golang/lint/golint
 
-RUN wget -O - http://dev-tool.oss-cn-shenzhen.aliyuncs.com/golang/go1.7.4.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
+RUN wget -O - http://dev-tool.oss-cn-shenzhen.aliyuncs.com/golang/go1.8.1.linux-${!GOLANG_ARCH}.tar.gz | tar -xzf - -C /usr/local && \
     go get github.com/rancher/trash && mkdir -p ${GOPATH}/src/golang.org/x/tools && cd ${GOPATH}/src/golang.org/x && tar -xzvf /tmp/tools.tar.gz && go get github.com/golang/lint/golint
 
 ENV DOCKER_URL_amd64=http://dev-tool.oss-cn-shenzhen.aliyuncs.com/docker/Linux/x86_64/docker-1.10.3 \
