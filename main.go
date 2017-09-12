@@ -55,11 +55,19 @@ func main() {
 			EnvVar: "CATTLE_SECRET_KEY",
 			Value:  "",
 		},
+		cli.BoolFlag{
+			Name:   "debug",
+			Usage:  "enable debug mode",
+			EnvVar: "DEBUG",
+		},
 	}
 	app.Run(os.Args)
 }
 
 func checkAndRun(c *cli.Context) (rtnerr error) {
+	if c.GlobalBool("debug") {
+		logrus.SetLevel(logrus.DebugLevel)
+	}
 	config.Parse(c)
 	jenkins.InitJenkins()
 	pipelineContext := pipeline.BuildPipelineContext(&jenkins.JenkinsProvider{})

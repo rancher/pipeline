@@ -192,3 +192,13 @@ rancher-upgrader stack --tolatest --envurl $R_UPGRADESTACK_ENDPOINT --accesskey 
 
 rm -r ../$TEMPDIR
 `
+const stepFinishScript = `def result = manager.build.result
+def command =  ["sh","-c","curl -d '' '192.168.99.1:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]
+manager.listener.logger.println command.execute().text`
+
+const stepStartScript = "curl -d '' '192.168.99.1:60080/v1/events/stepstart?id=%v&stageOrdinal=%v&stepOrdinal=%v'"
+
+//const stepStartScript = "curl -d '' 'pipeline-server:60080/v1/events/stepstart?id=%v&stageOrdinal=%v&stepOrdinal=%v'"
+
+//["sh","-c","curl -d '' 'pipeline-server:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]
+//["sh","-c","curl -d '' '192.168.99.1:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]

@@ -14,18 +14,19 @@ type JenkinsProject struct {
 	Description                      string   `xml:"description"`
 	KeepDependencies                 bool     `xml:"keepDependencies"`
 	Properties                       string
-	Scm                              JenkinsSCM             `xml:"scm"`
-	AssignedNode                     string                 `xml:"assignedNode"`
-	CanRoam                          bool                   `xml:"canRoam"`
-	Disabled                         bool                   `xml:"disabled"`
-	BlockBuildWhenDownstreamBuilding bool                   `xml:"blockBuildWhenDownstreamBuilding"`
-	BlockBuildWhenUpstreamBuilding   bool                   `xml:"blockBuildWhenUpstreamBuilding"`
-	Triggers                         JenkinsTrigger         `xml:"triggers"`
-	ConcurrentBuild                  bool                   `xml:"concurrentBuild"`
-	CustomWorkspace                  string                 `xml:"customWorkspace"`
-	Builders                         JenkinsBuilder         `xml:"builders,omitempty"`
-	Publishers                       string                 `xml:"publishers"`
-	BuildWrappers                    TimestampWrapperPlugin `xml:"buildWrappers>hudson.plugins.timestamper.TimestamperBuildWrapper"`
+	Scm                              JenkinsSCM              `xml:"scm"`
+	AssignedNode                     string                  `xml:"assignedNode"`
+	CanRoam                          bool                    `xml:"canRoam"`
+	Disabled                         bool                    `xml:"disabled"`
+	BlockBuildWhenDownstreamBuilding bool                    `xml:"blockBuildWhenDownstreamBuilding"`
+	BlockBuildWhenUpstreamBuilding   bool                    `xml:"blockBuildWhenUpstreamBuilding"`
+	Triggers                         JenkinsTrigger          `xml:"triggers"`
+	ConcurrentBuild                  bool                    `xml:"concurrentBuild"`
+	CustomWorkspace                  string                  `xml:"customWorkspace"`
+	Builders                         JenkinsBuilder          `xml:"builders,omitempty"`
+	Publishers                       PostBuildTask           `xml:"publishers>org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder"`
+	TimeStampWrapper                 TimestampWrapperPlugin  `xml:"buildWrappers>hudson.plugins.timestamper.TimestamperBuildWrapper"`
+	PreSCMBuildStepsWrapper          PreSCMBuildStepsWrapper `xml:"buildWrappers>org.jenkinsci.plugins.preSCMbuildstep.PreSCMBuildStepsWrapper"`
 }
 
 type JenkinsSCM struct {
@@ -59,6 +60,24 @@ type JenkinsCronTrigger struct {
 
 type TimestampWrapperPlugin struct {
 	Plugin string `xml:"plugin,attr"`
+}
+
+type PreSCMBuildStepsWrapper struct {
+	Plugin      string `xml:"plugin,attr"`
+	FailOnError bool   `xml:"failOnError"`
+	Command     string `xml:"buildSteps>hudson.tasks.Shell>command"`
+}
+type PostBuildTask struct {
+	Plugin             string       `xml:"plugin,attr"`
+	GroovyScript       GroovyScript `xml:"script"`
+	Behavior           int          `xml:"behavior"`
+	RunForMatrixParent bool         `xml:"runForMatrixParent"`
+}
+
+type GroovyScript struct {
+	Plugin  string `xml:"plugin,attr"`
+	Script  string `xml:"script"`
+	Sandbox bool   `xml:"sandbox"`
 }
 
 type JenkinsBuilder struct {

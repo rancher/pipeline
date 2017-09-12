@@ -3,7 +3,8 @@ package jenkins
 import (
 	"encoding/xml"
 	"fmt"
-	"hash/fnv"
+	"math/rand"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -39,54 +40,39 @@ func (j *JenkinsProvider) Init(pipeline *pipeline.Pipeline) error {
 func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity, error) {
 	j.Init(p)
 
-	//init and create  activity
-	id := uuid.Rand().Hex()
-	//Find a jenkins slave on which to run
-	nodeName, err := getNodeNameToRun(id)
+	activity, err := ToActivity(p)
 	if err != nil {
 		return &pipeline.Activity{}, err
 	}
-	logrus.Infof("runpipeline,get nodeName:%v", nodeName)
-	activity := pipeline.Activity{
-		Id:          id,
-		Pipeline:    *p,
-		RunSequence: p.RunCount + 1,
-		Status:      pipeline.ActivityWaiting,
-		StartTS:     time.Now().UnixNano() / int64(time.Millisecond),
-		NodeName:    nodeName,
-	}
-	for _, stage := range p.Stages {
-		activity.ActivityStages = append(activity.ActivityStages, ToActivityStage(stage))
-	}
-	//logrus.Infof("creating activity:%v", activity)
-	_, err = restfulserver.CreateActivity(activity)
-	if err != nil {
-		return &pipeline.Activity{}, err
-	}
+
 	if len(p.Stages) == 0 {
 		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
 	}
 	for i := 0; i < len(p.Stages); i++ {
 		//logrus.Infof("creating stage:%v", p.Stages[i])
-		if err := j.CreateStage(&activity, i); err != nil {
+		if err := j.CreateStage(activity, i); err != nil {
 			logrus.Error(errors.Wrapf(err, "stage <%s> fail", p.Stages[i].Name))
 			return &pipeline.Activity{}, err
 		}
 	}
 	//logrus.Infof("running stage:%v", p.Stages[0])
-	err = j.RunStage(&activity, 0)
+	if err = j.RunStage(activity, 0); err != nil {
+		return &pipeline.Activity{}, err
+	}
 
+	logrus.Debugf("creating activity:%v", activity)
+	_, err = restfulserver.CreateActivity(*activity)
 	if err != nil {
 		return &pipeline.Activity{}, err
 	}
 
-	return &activity, nil
+	return activity, nil
 }
 
 //RerunActivity runs an existing activity
 func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	//find an available node to run
-	nodeName, err := getNodeNameToRun(a.Id)
+	nodeName, err := getNodeNameToRun()
 	if err != nil {
 		return err
 	}
@@ -104,32 +90,30 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	return err
 }
 
-//CreateStage init jenkins project settings of the stage
+//CreateStage init jenkins projects settings of the stage, each step forms a jenkins job.
 func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) error {
 	logrus.Info("create jenkins job from stage")
-	stage := activity.Pipeline.Stages[ordinal]
-	activityId := activity.Id
-	jobName := j.pipeline.Name + "_" + stage.Name + "_" + activityId
-
-	conf := j.generateJenkinsProject(activity, ordinal)
-
-	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
-	if err := CreateJob(jobName, bconf); err != nil {
-		return err
+	stage := activity.ActivityStages[ordinal]
+	for i, _ := range stage.ActivitySteps {
+		conf := j.generateStepJenkinsProject(activity, ordinal, i)
+		jobName := getJobName(activity, ordinal, i)
+		bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
+		if err := CreateJob(jobName, bconf); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-//getNodeNameToRun gets a specific slave name to run given activity id
-func getNodeNameToRun(id string) (string, error) {
+//getNodeNameToRun gets a random node name to run given activity id
+func getNodeNameToRun() (string, error) {
 	nodes, err := GetActiveNodesName()
 	if err != nil || len(nodes) == 0 {
-		return "", errors.Wrapf(err, "fail to find an active slave to work")
+		return "", errors.Wrapf(err, "fail to find an active node to work")
 	}
 	//hash to one of the nodes
-	h := fnv.New32a()
-	h.Write([]byte(id))
-	index := int(h.Sum32()) % len(nodes)
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	index := r.Intn(len(nodes))
 	return nodes[index], nil
 }
 
@@ -138,14 +122,14 @@ func (j *JenkinsProvider) DeleteFormerBuild(activity *pipeline.Activity) error {
 	if activity.Status == pipeline.ActivityBuilding || activity.Status == pipeline.ActivityWaiting {
 		return errors.New("cannot delete lastbuild of running activity!")
 	}
-	activityId := activity.Id
-	for _, stage := range activity.ActivityStages {
-		jobName := activity.Pipeline.Name + "_" + stage.Name + "_" + activityId
-		if stage.Status == pipeline.ActivityStageSuccess || stage.Status == pipeline.ActivityStageFail {
-			logrus.Infof("deleting:%v", jobName)
-			err := DeleteBuild(jobName)
-			if err != nil {
-				return err
+	for stageOrdinal, stage := range activity.ActivityStages {
+		for stepOrdinal, step := range stage.ActivitySteps {
+			jobName := getJobName(activity, stageOrdinal, stepOrdinal)
+			if step.Status == pipeline.ActivityStepSuccess || step.Status == pipeline.ActivityStepFail {
+				logrus.Infof("deleting:%v", jobName)
+				if err := DeleteBuild(jobName); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -158,33 +142,27 @@ func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
 	if activity.CommitInfo == "" {
 		return errors.New("no commit info in activity")
 	}
-	conf := j.generateJenkinsProject(activity, 0)
+	conf := j.generateStepJenkinsProject(activity, 0, 0)
 	conf.Scm.GitBranch = activity.CommitInfo
 
-	stageName := activity.ActivityStages[0].Name
-	jobName := activity.Pipeline.Name + "_" + stageName + "_" + activity.Id
-
+	jobName := getJobName(activity, 0, 0)
 	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
-	logrus.Infof("conf:\n%v", string(bconf))
-	logrus.Infof("trying to set commit")
+	logrus.Debugf("conf:\n%v", string(bconf))
+	logrus.Debugf("trying to set commit")
 	if err := UpdateJob(jobName, bconf); err != nil {
-		logrus.Infof("updatejob error:%v", err)
+		logrus.Errorf("updatejob error:%v", err)
 		return err
 	}
 	return nil
 }
 
 func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
-	logrus.Info("begin jenkins stage")
-	//logrus.Infof("hi,%v\nhi,%v\nhi,%v\nhi,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
-	stage := activity.Pipeline.Stages[ordinal]
-	activityId := activity.Id
-	jobName := activity.Pipeline.Name + "_" + stage.Name + "_" + activityId
-
+	logrus.Info("run stage")
+	logrus.Debugf("paras:%v,%v,%v,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
+	jobName := getJobName(activity, ordinal, 0)
 	if _, err := BuildJob(jobName, map[string]string{}); err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -192,29 +170,34 @@ func (j *JenkinsProvider) RunBuild(stage *pipeline.Stage, activityId string) err
 	return nil
 }
 
-func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, ordinal int) *JenkinsProject {
+func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) *JenkinsProject {
 	logrus.Info("generating jenkins project config")
-	stage := activity.Pipeline.Stages[ordinal]
 	activityId := activity.Id
 	workspaceName := path.Join("${JENKINS_HOME}", "workspace", activityId)
+	stage := activity.Pipeline.Stages[stageOrdinal]
+	step := stage.Steps[stepOrdinal]
 
+	step.Services = pipeline.GetServices(activity, stageOrdinal, stepOrdinal)
 	taskShells := []JenkinsTaskShell{}
-	for stepOrdinal, step := range stage.Steps {
-		step.Services = pipeline.GetServices(activity, ordinal, stepOrdinal)
-		taskShells = append(taskShells, JenkinsTaskShell{Command: commandBuilder(activity, step)})
-	}
+	taskShells = append(taskShells, JenkinsTaskShell{Command: commandBuilder(activity, step)})
 	commandBuilders := JenkinsBuilder{TaskShells: taskShells}
 
 	scm := JenkinsSCM{Class: "hudson.scm.NullSCM"}
-	if len(stage.Steps) == 1 && stage.Steps[0].Type == pipeline.StepTypeSCM {
+	if step.Type == pipeline.StepTypeSCM {
 		scm = JenkinsSCM{
 			Class:         "hudson.plugins.git.GitSCM",
 			Plugin:        "git@3.3.1",
 			ConfigVersion: 2,
-			GitRepo:       stage.Steps[0].Repository,
-			GitBranch:     stage.Steps[0].Branch,
+			GitRepo:       step.Repository,
+			GitBranch:     step.Branch,
 		}
 	}
+	preSCMStep := PreSCMBuildStepsWrapper{
+		Plugin:      "preSCMbuildstep@0.3",
+		FailOnError: true,
+		Command:     fmt.Sprintf(stepStartScript, url.QueryEscape(activityId), stageOrdinal, stepOrdinal),
+	}
+
 	v := &JenkinsProject{
 		Scm:          scm,
 		AssignedNode: activity.NodeName,
@@ -224,12 +207,24 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 		BlockBuildWhenUpstreamBuilding:   false,
 		CustomWorkspace:                  workspaceName,
 		Builders:                         commandBuilders,
-		BuildWrappers:                    TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
+		TimeStampWrapper:                 TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
+		PreSCMBuildStepsWrapper:          preSCMStep,
 	}
-	//logrus.Infof("needapprove:%v,ordinal:%v", stage.NeedApprove, ordinal)
-	if !stage.NeedApprove && ordinal > 0 {
+	if stepOrdinal == 0 && stageOrdinal > 0 && !stage.NeedApprove {
+		prevStage := activity.ActivityStages[stageOrdinal-1]
+		prevJobName := getJobName(activity, stageOrdinal-1, len(prevStage.ActivitySteps)-1)
+		v.Triggers = JenkinsTrigger{
+			BuildTrigger: JenkinsBuildTrigger{
+				UpstreamProjects:       prevJobName,
+				ThresholdName:          "SUCCESS",
+				ThresholdOrdinal:       0,
+				ThresholdColor:         "BLUE",
+				ThresholdCompleteBuild: true,
+			},
+		}
+	} else if stepOrdinal > 0 {
 		//Add build trigger
-		prevJobName := j.pipeline.Name + "_" + j.pipeline.Stages[ordinal-1].Name + "_" + activityId
+		prevJobName := getJobName(activity, stageOrdinal, stepOrdinal-1)
 		v.Triggers = JenkinsTrigger{
 			BuildTrigger: JenkinsBuildTrigger{
 				UpstreamProjects:       prevJobName,
@@ -240,6 +235,18 @@ func (j *JenkinsProvider) generateJenkinsProject(activity *pipeline.Activity, or
 			},
 		}
 	}
+	//post task to notify pipelineserver
+	pbt := PostBuildTask{
+		Plugin:             "groovy-postbuild@2.3.1",
+		Behavior:           0,
+		RunForMatrixParent: false,
+		GroovyScript: GroovyScript{
+			Plugin:  "script-security@1.30",
+			Sandbox: false,
+			Script:  fmt.Sprintf(stepFinishScript, url.QueryEscape(activity.Id), stageOrdinal, stepOrdinal),
+		},
+	}
+	v.Publishers = pbt
 
 	return v
 
@@ -586,12 +593,10 @@ func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
 
 }
 func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) (string, error) {
-	p := activity.Pipeline
-	if stageOrdinal < 0 || stageOrdinal > len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal > len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
+	if stageOrdinal < 0 || stageOrdinal >= len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal >= len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
 		return "", errors.New("ordinal out of range")
 	}
-	actiStage := activity.ActivityStages[stageOrdinal]
-	jobName := p.Name + "_" + actiStage.Name + "_" + activity.Id
+	jobName := getJobName(activity, stageOrdinal, stepOrdinal)
 	rawOutput, err := GetBuildRawOutput(jobName)
 	if err != nil {
 		return "", err
@@ -607,7 +612,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 		return "", nil
 	}
 	//logrus.Infof("got step log:%v", outputs[stepOrdinal+1])
-	return outputs[stepOrdinal+1], nil
+	return outputs[1], nil
 
 }
 
@@ -725,6 +730,28 @@ func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int6
 	step.Duration = duration
 }
 
+//ToActivity init an activity from pipeline def
+func ToActivity(p *pipeline.Pipeline) (*pipeline.Activity, error) {
+
+	//Find a jenkins slave on which to run
+	nodeName, err := getNodeNameToRun()
+	if err != nil {
+		return &pipeline.Activity{}, err
+	}
+	activity := &pipeline.Activity{
+		Id:          uuid.Rand().Hex(),
+		Pipeline:    *p,
+		RunSequence: p.RunCount + 1,
+		Status:      pipeline.ActivityWaiting,
+		StartTS:     time.Now().UnixNano() / int64(time.Millisecond),
+		NodeName:    nodeName,
+	}
+	for _, stage := range p.Stages {
+		activity.ActivityStages = append(activity.ActivityStages, ToActivityStage(stage))
+	}
+	return activity, nil
+}
+
 func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
 	actiStage := pipeline.ActivityStage{
 		Name:          stage.Name,
@@ -794,4 +821,10 @@ func templateURLPath(path string) (string, string, string, string, bool) {
 	default:
 		return "", "", "", "", false
 	}
+}
+
+func getJobName(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) string {
+	stage := activity.ActivityStages[stageOrdinal]
+	jobName := strings.Join([]string{activity.Pipeline.Name, activity.Id, stage.Name, strconv.Itoa(stepOrdinal)}, "_")
+	return jobName
 }

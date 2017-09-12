@@ -170,7 +170,7 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		return err
 	}
 	UpdateActivity(r)
-	MyAgent.watchActivityC <- &r
+	//MyAgent.watchActivityC <- &r
 
 	logrus.Infof("approveactivitygeterror:%v", err)
 	return err
@@ -194,7 +194,7 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 	r.ActivityStages[r.PendingStage].Status = pipeline.ActivityStageWaiting
 	r.PendingStage = 0
 	UpdateActivity(r)
-	MyAgent.watchActivityC <- &r
+	//MyAgent.watchActivityC <- &r
 
 	logrus.Infof("approveactivitygeterror:%v", err)
 	return err
@@ -310,8 +310,8 @@ func DeleteActivity(id string) error {
 	return nil
 }
 func UpdateActivity(activity pipeline.Activity) error {
-	logrus.Infof("updating activity %v.", activity.Id)
-	logrus.Infof("activity stages:%v", activity.ActivityStages)
+	logrus.Debugf("updating activity %v.", activity.Id)
+	logrus.Debugf("activity stages:%v", activity.ActivityStages)
 	b, err := json.Marshal(activity)
 	if err != nil {
 		return err

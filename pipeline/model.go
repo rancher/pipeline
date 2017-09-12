@@ -175,18 +175,20 @@ type PipelineProvider interface {
 
 type Activity struct {
 	client.Resource
-	Id              string           `json:"id,omitempty"`
-	Pipeline        Pipeline         `json:"pipelineSource,omitempty"`
-	PipelineName    string           `json:"pipelineName,omitempty"`
-	PipelineVersion string           `json:"pipelineVersion,omitempty"`
-	RunSequence     int              `json:"runSequence,omitempty"`
-	CommitInfo      string           `json:"commitInfo,omitempty"`
-	Status          string           `json:"status,omitempty"`
-	PendingStage    int              `json:"pendingStage,omitempty"`
-	StartTS         int64            `json:"start_ts,omitempty"`
-	StopTS          int64            `json:"stop_ts,omitempty"`
-	NodeName        string           `json:"nodename,omitempty"`
-	ActivityStages  []*ActivityStage `json:"activity_stages,omitempty"`
+	Id              string            `json:"id,omitempty"`
+	Pipeline        Pipeline          `json:"pipelineSource,omitempty"`
+	PipelineName    string            `json:"pipelineName,omitempty"`
+	PipelineVersion string            `json:"pipelineVersion,omitempty"`
+	RunSequence     int               `json:"runSequence,omitempty"`
+	CommitInfo      string            `json:"commitInfo,omitempty"`
+	Status          string            `json:"status,omitempty"`
+	FailMessage     string            `json:"failMessage,omitempty"`
+	PendingStage    int               `json:"pendingStage,omitempty"`
+	StartTS         int64             `json:"start_ts,omitempty"`
+	StopTS          int64             `json:"stop_ts,omitempty"`
+	NodeName        string            `json:"nodename,omitempty"`
+	ActivityStages  []*ActivityStage  `json:"activity_stages,omitempty"`
+	EnvVars         map[string]string `json:"envVars,omitempty"`
 }
 
 type ActivityStage struct {

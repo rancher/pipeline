@@ -61,6 +61,10 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodGet).Path("/v1/ws/log").Handler(f(schemas, s.ServeStepLog))
 	router.Methods(http.MethodGet).Path("/v1/ws/status").Handler(f(schemas, s.ServeStatusWS))
 
+	// trigger step status update when jenkins job is done
+	router.Methods(http.MethodPost).Path("/v1/events/stepfinish").Handler(f(schemas, s.StepFinish))
+	router.Methods(http.MethodPost).Path("/v1/events/stepstart").Handler(f(schemas, s.StepStart))
+
 	pipelineActions := map[string]http.Handler{
 		"run":        f(schemas, s.RunPipeline),
 		"update":     f(schemas, s.UpdatePipeline),

@@ -53,7 +53,7 @@ func InitAgent(s *Server) {
 	}
 	logrus.Infof("inited myagent:%v", MyAgent)
 	go MyAgent.handleWS()
-	go MyAgent.SyncActivityWatchList()
+	//go MyAgent.SyncActivityWatchList()
 	go MyAgent.RunScheduler()
 
 }
@@ -147,27 +147,6 @@ func (a *Agent) SyncActivityWatchList() {
 
 }
 
-func (a *Agent) getWatchList() ([]*pipeline.Activity, error) {
-	logrus.Infof("getting watchlist")
-	activities, err := ListActivities(a.Server.PipelineContext)
-	logrus.Infof("get total activities:%v", len(activities))
-	if err != nil {
-		return nil, err
-	}
-
-	var watchlist []*pipeline.Activity
-	for _, activity := range activities {
-		if activity.Status == pipeline.ActivitySuccess || activity.Status == pipeline.ActivityFail {
-			continue
-		} else {
-			//logrus.Infof("add %v to watchlist", activity.Id)
-			watchlist = append(watchlist, activity)
-		}
-	}
-	logrus.Infof("got watchlist,size:%v", len(watchlist))
-	return watchlist, nil
-}
-
 func (a *Agent) RunScheduler() {
 
 	pipelines := a.Server.PipelineContext.ListPipelines()
@@ -246,12 +225,12 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 				//run only when new changes exist
 				return
 			}
-			acti, err := a.Server.PipelineContext.RunPipeline(pId)
+			_, err = a.Server.PipelineContext.RunPipeline(pId)
 			if err != nil {
 				logrus.Errorf("cron job fail,pid:%v", pId)
 				return
 			}
-			a.watchActivityC <- acti
+			//a.watchActivityC <- acti
 
 		})
 		if err != nil {

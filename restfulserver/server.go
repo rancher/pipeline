@@ -2,8 +2,11 @@ package restfulserver
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 
@@ -89,12 +92,12 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		logrus.Errorf("pipeline is not activated!")
 		return errors.New("pipeline is not activated!")
 	}
-	activity, err := s.PipelineContext.RunPipeline(id)
+	_, err = s.PipelineContext.RunPipeline(id)
 	if err != nil {
 		rw.Write([]byte("run pipeline error!"))
 		return err
 	}
-	MyAgent.watchActivityC <- activity
+	//MyAgent.watchActivityC <- activity
 	rw.Write([]byte("run pipeline success!"))
 	logrus.Infof("webhook run success")
 	return nil
@@ -304,7 +307,7 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	MyAgent.watchActivityC <- activity
+	//MyAgent.watchActivityC <- activity
 	apiContext.Write(toActivityResource(apiContext, activity))
 	return nil
 }
@@ -370,6 +373,119 @@ func (s *Server) ListEnvVars(rw http.ResponseWriter, req *http.Request) error {
 	b, err := json.Marshal(pipeline.PreservedEnvs)
 	_, err = rw.Write(b)
 	return err
+}
+
+func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
+	v := req.URL.Query()
+	activityId := v.Get("id")
+	stageOrdinal, err := strconv.Atoi(v.Get("stageOrdinal"))
+	if err != nil {
+		return err
+	}
+	stepOrdinal, err := strconv.Atoi(v.Get("stepOrdinal"))
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("get stepstart event,paras:%v,%v,%v", activityId, stageOrdinal, stepOrdinal)
+	activity, err := GetActivity(activityId, s.PipelineContext)
+	if err != nil {
+		return err
+	}
+	if stageOrdinal < 0 || stepOrdinal < 0 || stageOrdinal >= len(activity.ActivityStages) || stepOrdinal >= len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
+		return errors.New("step index invalid")
+	}
+	startStep(&activity, stageOrdinal, stepOrdinal)
+	if err = UpdateActivity(activity); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//
+func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
+	//get activityId,stageOrdinal,stepOrdinal from request
+	v := req.URL.Query()
+	activityId := v.Get("id")
+	status := v.Get("status")
+	stageOrdinal, err := strconv.Atoi(v.Get("stageOrdinal"))
+	if err != nil {
+		return err
+	}
+	stepOrdinal, err := strconv.Atoi(v.Get("stepOrdinal"))
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("get stepfinish event,paras:%v,%v,%v", activityId, stageOrdinal, stepOrdinal)
+	activity, err := GetActivity(activityId, s.PipelineContext)
+	if err != nil {
+		return err
+	}
+	if stageOrdinal < 0 || stepOrdinal < 0 || stageOrdinal >= len(activity.ActivityStages) || stepOrdinal >= len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
+		return errors.New("step index invalid")
+	}
+	if status == "SUCCESS" {
+		successStep(&activity, stageOrdinal, stepOrdinal)
+	} else if status == "FAILURE" {
+		failStep(&activity, stageOrdinal, stepOrdinal)
+	}
+	logrus.Infoln("HALF SUCCESS?")
+	if err = UpdateActivity(activity); err != nil {
+		return err
+	}
+
+	s.UpdateLastActivity(activity.Pipeline.Id)
+
+	if activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivitySuccess {
+		s.PipelineContext.Provider.OnActivityCompelte(&activity)
+	}
+
+	return nil
+}
+
+func startStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
+	curTime := time.Now().Unix()
+	stage := activity.ActivityStages[stageOrdinal]
+	step := stage.ActivitySteps[stepOrdinal]
+	step.StartTS = curTime
+	step.Status = pipeline.ActivityStepBuilding
+	stage.Status = pipeline.ActivityStageBuilding
+	activity.Status = pipeline.ActivityBuilding
+	if stepOrdinal == 0 {
+		stage.StartTS = curTime
+	}
+}
+
+func failStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
+	stage := activity.ActivityStages[stageOrdinal]
+	stage.ActivitySteps[stepOrdinal].Status = pipeline.ActivityStepFail
+	stage.Status = pipeline.ActivityStageFail
+	activity.Status = pipeline.ActivityFail
+	activity.FailMessage = fmt.Sprintf("Execution fail in '%v' stage, step %v", stage.Name, stepOrdinal+1)
+}
+
+func successStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
+	curTime := time.Now().Unix()
+	stage := activity.ActivityStages[stageOrdinal]
+	step := stage.ActivitySteps[stepOrdinal]
+	step.Status = pipeline.ActivityStepSuccess
+	step.Duration = curTime - step.StartTS
+	if stepOrdinal == len(stage.ActivitySteps)-1 {
+		stage.Status = pipeline.ActivityStageSuccess
+		stage.Duration = curTime - stage.StartTS
+		if stageOrdinal == len(activity.ActivityStages)-1 {
+			activity.Status = pipeline.ActivitySuccess
+			activity.StopTS = curTime
+		} else {
+			nextStage := activity.ActivityStages[stageOrdinal+1]
+			if nextStage.NeedApproval {
+				nextStage.Status = pipeline.ActivityStagePending
+				activity.Status = pipeline.ActivityPending
+				activity.PendingStage = stageOrdinal + 1
+			}
+		}
+	}
+
 }
 
 // GetStepLog gets running logs of a particular step

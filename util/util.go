@@ -25,7 +25,7 @@ func GetRancherClient() (*client.RancherClient, error) {
 	accessKey := apiConfig.CattleAccessKey
 	secretKey := apiConfig.CattleSecretKey
 
-	//logrus.Infof("apiconfig:%v", apiConfig)
+	logrus.Debugf("apiconfig:%v", apiConfig)
 	apiClient, err := client.NewRancherClient(&client.ClientOpts{
 		Url:       apiUrl,
 		AccessKey: accessKey,
