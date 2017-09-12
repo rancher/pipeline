@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -374,10 +375,13 @@ func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
 
 }
 
-func GetBuildRawOutput(jobname string) (string, error) {
+func GetBuildRawOutput(jobname string, startLine int) (string, error) {
 	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
 	buildRawOutputURI, _ := JenkinsConfig.Get(JenkinsBuildLogURI)
 	buildRawOutputURI = fmt.Sprintf(buildRawOutputURI, jobname)
+	if startLine > 0 {
+		buildRawOutputURI += "&startLine=" + strconv.Itoa(startLine)
+	}
 	user, _ := JenkinsConfig.Get(JenkinsUser)
 	token, _ := JenkinsConfig.Get(JenkinsToken)
 	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)

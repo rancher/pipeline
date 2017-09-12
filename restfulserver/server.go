@@ -398,7 +398,7 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 	if err = UpdateActivity(activity); err != nil {
 		return err
 	}
-
+	MyAgent.broadcast <- []byte(activity.Id)
 	return nil
 }
 
@@ -433,7 +433,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	if err = UpdateActivity(activity); err != nil {
 		return err
 	}
-
+	MyAgent.broadcast <- []byte(activity.Id)
 	s.UpdateLastActivity(activity.Pipeline.Id)
 
 	if activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivitySuccess {

@@ -194,7 +194,7 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 	}
 	preSCMStep := PreSCMBuildStepsWrapper{
 		Plugin:      "preSCMbuildstep@0.3",
-		FailOnError: true,
+		FailOnError: false,
 		Command:     fmt.Sprintf(stepStartScript, url.QueryEscape(activityId), stageOrdinal, stepOrdinal),
 	}
 
@@ -533,7 +533,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error
 
 		//logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
 		if err == nil {
-			rawOutput, err := GetBuildRawOutput(jobName)
+			rawOutput, err := GetBuildRawOutput(jobName, 0)
 			if err != nil {
 				logrus.Infof("got rawOutput:%v,err:%v", rawOutput, err)
 			}
@@ -592,27 +592,34 @@ func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
 	// logrus.Infof("clean workspace result:%v,%v", res, err)
 
 }
-func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) (string, error) {
+func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int, paras map[string]interface{}) (string, error) {
 	if stageOrdinal < 0 || stageOrdinal >= len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal >= len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
 		return "", errors.New("ordinal out of range")
 	}
 	jobName := getJobName(activity, stageOrdinal, stepOrdinal)
-	rawOutput, err := GetBuildRawOutput(jobName)
+	var logText *string
+	if val, ok := paras["prevLog"]; ok {
+		logText = val.(*string)
+	}
+	startLine := len(strings.Split(*logText, "\n")) - 1
+
+	rawOutput, err := GetBuildRawOutput(jobName, startLine)
 	if err != nil {
 		return "", err
 	}
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
-	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
-	if len(outputs) > 0 && stageOrdinal == 0 && stepOrdinal == 0 {
+	*logText = *logText + rawOutput
+	outputs := regexp.MustCompile(token).Split(*logText, -1)
+	if len(outputs) > 1 && stageOrdinal == 0 && stepOrdinal == 0 {
 		// SCM
-		return outputs[0], nil
+		return outputs[1], nil
 	}
-	if len(outputs) < stepOrdinal+2 {
+	if len(outputs) < 3 {
 		//no printed log
 		return "", nil
 	}
 	//logrus.Infof("got step log:%v", outputs[stepOrdinal+1])
-	return outputs[1], nil
+	return outputs[2], nil
 
 }
 

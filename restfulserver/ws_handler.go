@@ -98,12 +98,14 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 			var b []byte
 			var err error
 
-			stepLog, err := s.PipelineContext.Provider.GetStepLog(&activity, stageOrdinal, stepOrdinal)
+			paras := map[string]interface{}{}
+			paras["prevLog"] = &prevLog
+			stepLog, err := s.PipelineContext.Provider.GetStepLog(&activity, stageOrdinal, stepOrdinal, paras)
 			if err != nil {
 				logrus.Errorf("error get steplog,%v", err)
 				return
 			}
-			if stepLog != "" && prevLog != stepLog {
+			if stepLog != "" {
 				ws.SetWriteDeadline(time.Now().Add(writeWait))
 				logData, _ := computeLogTimestamp(activity.StartTS, stepLog)
 				response := WSMsg{
@@ -117,7 +119,6 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 				if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
 					return
 				}
-				prevLog = stepLog
 			}
 		case <-pingTicker.C:
 			ws.SetWriteDeadline(time.Now().Add(writeWait))

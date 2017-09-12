@@ -168,7 +168,7 @@ type PipelineProvider interface {
 	RunBuild(*Stage, string) error
 	RunStage(*Activity, int) error
 	SyncActivity(*Activity) (bool, error)
-	GetStepLog(*Activity, int, int) (string, error)
+	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
 	DeleteFormerBuild(*Activity) error
 	OnActivityCompelte(*Activity)
 }
