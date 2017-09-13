@@ -342,18 +342,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(" -f .Dockerfile .;")
 		}
 		if step.PushFlag {
-			sep := strings.Index(step.TargetImage, "/")
-			registry := ""
-			if sep != -1 {
-				registry = step.TargetImage[:sep]
-			}
-			stringBuilder.WriteString("docker login --username ")
-			stringBuilder.WriteString(step.UserName)
-			stringBuilder.WriteString(" --password ")
-			stringBuilder.WriteString(step.Password)
-			stringBuilder.WriteString(" ")
-			stringBuilder.WriteString(registry)
-			stringBuilder.WriteString(";docker push ")
+			stringBuilder.WriteString("\ncihelper pushimage ")
 			stringBuilder.WriteString(step.TargetImage)
 			stringBuilder.WriteString(";")
 		}
