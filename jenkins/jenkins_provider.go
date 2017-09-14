@@ -590,7 +590,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 	if val, ok := paras["prevLog"]; ok {
 		logText = val.(*string)
 	}
-	startLine := len(strings.Split(*logText, "\n")) - 1
+	startLine := len(strings.Split(*logText, "\n"))
 
 	rawOutput, err := GetBuildRawOutput(jobName, startLine)
 	if err != nil {
