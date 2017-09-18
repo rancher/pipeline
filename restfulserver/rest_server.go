@@ -33,7 +33,7 @@ func ListenAndServeExternal(pipelineContext *pipeline.PipelineContext, errChan c
 	f := HandleError
 
 	//webhook
-	router.Methods(http.MethodPost).Path("/v1/webhook/{id}").Handler(f(schemas, server.Webhook))
+	router.Methods(http.MethodPost).Path("/v1/webhook").Handler(f(schemas, server.Webhook))
 	handler := http.Handler(router)
 	handler = handlers.LoggingHandler(os.Stdout, handler)
 	handler = handlers.ProxyHeaders(handler)

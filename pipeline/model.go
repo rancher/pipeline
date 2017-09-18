@@ -44,7 +44,11 @@ var PreservedEnvs = [...]string{"CICD_GIT_COMMIT", "CICD_GIT_PREVIOUS_COMMIT", "
 
 type PipelineSetting struct {
 	client.Resource
-	HostUrl string `json:"hostUrl,omitempty" yaml:"hostUrl,omitempty"`
+	GithubHomePage     string   `jsong:"githubHomepage,omitempty" yaml:"githubHomepage,omitempty"`
+	GithubClientID     string   `json:"githubClientID,omitempty" yaml:"githubClientID,omitempty"`
+	GithubClientSecret string   `json:"githubClientSecret,omitempty" yaml:"githubClientSecret,omitempty"`
+	GithubRedirectURL  string   `json:"githubRedirectURL,omitempty" yaml:"githubRedirectURL,omitempty"`
+	GithubTokens       []string `json:"githubTokens,omitempty" yaml:"githubTokens,omitempty"`
 }
 
 type Pipeline struct {

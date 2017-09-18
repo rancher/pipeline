@@ -65,6 +65,13 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/events/stepfinish").Handler(f(schemas, s.StepFinish))
 	router.Methods(http.MethodPost).Path("/v1/events/stepstart").Handler(f(schemas, s.StepStart))
 
+	router.Methods(http.MethodPost).Path("/v1/github/login").Handler(f(schemas, s.GithubLogin))
+	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubLogin))
+
+	//debug
+	//router.Methods(http.MethodPost).Path("/v1/debug").Handler(f(schemas, s.Debug))
+	//router.Methods(http.MethodPost).Path("/v1/debug2").Handler(f(schemas, s.Debug2))
+
 	pipelineActions := map[string]http.Handler{
 		"run":        f(schemas, s.RunPipeline),
 		"update":     f(schemas, s.UpdatePipeline),

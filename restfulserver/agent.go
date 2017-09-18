@@ -62,10 +62,8 @@ func (a *Agent) handleWS() {
 	for {
 		select {
 		case h := <-a.register:
-			logrus.Infof("register a holder!")
 			a.connHolders[h] = true
 		case h := <-a.unregister:
-			logrus.Infof("unregister a holder!")
 			if _, ok := a.connHolders[h]; ok {
 				delete(a.connHolders, h)
 				close(h.send)

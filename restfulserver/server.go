@@ -1,6 +1,7 @@
 package restfulserver
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -30,6 +31,56 @@ type Server struct {
 	PipelineContext *pipeline.PipelineContext
 }
 
+func Preset() error {
+	if err := checkCIEndpoint(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func checkCIEndpoint() error {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = "webhookReceiver"
+	opt := &v2client.ListOpts{
+		Filters: filters,
+	}
+	gCollection, err := apiClient.GenericObject.List(opt)
+	if err != nil {
+		return err
+	}
+	var ciWebhook *webhook.WebhookGenericObject
+	for _, wh := range gCollection.Data {
+		whObject, err := webhook.ConvertToWebhookGenericObject(wh)
+		if err != nil {
+			logrus.Errorf("Preset get webhook endpoint error:%v", err)
+			return err
+		}
+		if whObject.Driver == webhook.CIWEBHOOKTYPE && whObject.Name == webhook.CIWEBHOOKNAME {
+			ciWebhook = &whObject
+			//get CIWebhookEndpoint
+			webhook.CIWebhookEndpoint = ciWebhook.URL
+		}
+	}
+	if ciWebhook == nil {
+		//Create a webhook for github webhook payload url
+		if err := webhook.CreateCIEndpointWebhook(); err != nil {
+			logrus.Errorf("CreateCIEndpointWebhook Error:%v", err)
+			return err
+		}
+
+	}
+	return nil
+}
+
+/*
+func getGithubWebhookPayloadUrl(apiClient *v2client.RancherClient) string {
+	v2client.
+}
+*/
 //ListPipelines query List of pipelines
 func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
@@ -42,7 +93,9 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 	var signature string
 	var event_type string
-
+	logrus.Debugln("get webhook request")
+	logrus.Debugf("get header:%v", req.Header)
+	logrus.Debugf("get url:%v", req.RequestURI)
 	if signature = req.Header.Get("X-Hub-Signature"); len(signature) == 0 {
 		return errors.New("No signature!")
 	}
@@ -59,8 +112,7 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		return errors.New("not push event")
 	}
 
-	id := mux.Vars(req)["id"]
-	logrus.Infof("webhook trigger,id:%v,event:%v,signature:%v", id, event_type, signature)
+	id := req.FormValue("pipelineId")
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		return err
@@ -69,10 +121,11 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 	r := s.PipelineContext.GetPipelineById(id)
 	if r == nil {
 		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
-		rw.WriteHeader(http.StatusNotFound)
+		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte("pipeline not found!"))
 		return err
 	}
+	logrus.Debugf("webhook trigger,id:%v,event:%v,signature:%v,body:\n%v\n%v", id, event_type, signature, body, string(body))
 	if !util.VerifyWebhookSignature([]byte(r.WebHookToken), signature, body) {
 		return errors.New("Invalid signature")
 	}
@@ -188,7 +241,8 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 
 	ppl.Id = uuid.Rand().Hex()
 	ppl.WebHookToken = uuid.Rand().Hex()
-	err = webhook.RenewWebhook(ppl, req)
+	//TODO
+	err = webhook.RenewWebhook(ppl)
 	if err != nil {
 		logrus.Errorf("fail renewWebhook")
 		return err
@@ -213,7 +267,8 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := pipeline.Validate(ppl); err != nil {
 		return err
 	}
-	err = webhook.RenewWebhook(ppl, req)
+	//TODO
+	err = webhook.RenewWebhook(ppl)
 	if err != nil && err != webhook.ErrDelWebhook {
 		//fail to create webhook.block update
 		return err
@@ -526,6 +581,7 @@ func GetCurrentUser(cookies []*http.Cookie) (string, error) {
 		logrus.Infof("Cannot connect to the rancher server. Please check the rancher server URL")
 		return "", err
 	}
+
 	//req.SetBasicAuth(config.Config.CattleAccessKey, config.Config.CattleSecretKey)
 	for _, cookie := range cookies {
 		req.AddCookie(cookie)
@@ -544,4 +600,46 @@ func GetCurrentUser(cookies []*http.Cookie) (string, error) {
 
 	}
 	return userid, nil
+}
+
+func (s *Server) Debug(rw http.ResponseWriter, req *http.Request) error {
+	logrus.Debugf("get header:%v", req.Header)
+	logrus.Debugf("get url:%v", req.RequestURI)
+	logrus.Debugf("get formvalue:%v", req.Form)
+	b, err := ioutil.ReadAll(req.Body)
+	logrus.Infof("get first:\n%v", b)
+	request, err := http.NewRequest("POST", "http://192.168.99.1:60080/v1/debug2", bytes.NewBuffer(b))
+	if err != nil {
+		logrus.Errorf("fail:%v", err)
+		return err
+	}
+	client := &http.Client{}
+	_, err = client.Do(request)
+	if err != nil {
+		logrus.Errorf("fail:%v", err)
+		return err
+	}
+	return nil
+}
+
+func (s *Server) Debug2(rw http.ResponseWriter, req *http.Request) error {
+	logrus.Debugf("get header:%v", req.Header)
+	logrus.Debugf("get url:%v", req.RequestURI)
+	b, err := ioutil.ReadAll(req.Body)
+
+	logrus.Infof("get b:\n%v", string(b))
+	var requestBody interface{}
+	err = json.Unmarshal(b, &requestBody)
+	logrus.Infof("get unmarshal:\n%v", requestBody)
+	if err != nil {
+		return fmt.Errorf("Error unmarshalling request body in Execute handler: %v", err)
+	}
+
+	payload, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("Body should be of type map[string]interface{}")
+	}
+
+	logrus.Infof("get payload:\n%v", string(payload))
+	return err
 }

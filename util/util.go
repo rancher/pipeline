@@ -40,6 +40,35 @@ func GetRancherClient() (*client.RancherClient, error) {
 	return apiClient, nil
 }
 
+func GetProjectId() (string, error) {
+
+	client := &http.Client{}
+
+	requestURL := config.Config.CattleUrl + "/accounts"
+
+	req, err := http.NewRequest("GET", requestURL, nil)
+	if err != nil {
+		logrus.Errorf("Cannot connect to the rancher server. Please check the rancher server URL")
+		return "", err
+	}
+	req.SetBasicAuth(config.Config.CattleAccessKey, config.Config.CattleSecretKey)
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Errorf("Cannot connect to the rancher server. Please check the rancher server URL")
+		return "", err
+	}
+	defer resp.Body.Close()
+	projectId := resp.Header.Get("X-Api-Account-Id")
+	if projectId == "" {
+		logrus.Errorln("Cannot get projectId")
+		err := errors.New("Forbidden")
+		return "Forbidden", err
+
+	}
+	return projectId, nil
+
+}
+
 func VerifyWebhookSignature(secret []byte, signature string, body []byte) bool {
 
 	const signaturePrefix = "sha1="

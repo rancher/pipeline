@@ -134,7 +134,7 @@ func (s *Server) ServeStatusWS(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	uid, err := GetCurrentUser(r.Cookies())
-	logrus.Infof("got currentUser,%v,%v", uid, err)
+	//logrus.Infof("got currentUser,%v,%v", uid, err)
 	if err != nil || uid == "" {
 		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
 	}

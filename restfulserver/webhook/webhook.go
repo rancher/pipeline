@@ -3,12 +3,12 @@ package webhook
 import (
 	"errors"
 	"fmt"
-	"net/http"
-	"os"
+	"net/url"
 	"regexp"
-	"strings"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/rancher/go-rancher/v2"
+	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
 )
@@ -16,7 +16,78 @@ import (
 var (
 	ErrDelWebhook    = errors.New("delete webhook fail")
 	ErrCreateWebhook = errors.New("create webhook fail")
+
+	CIWebhookEndpoint = ""
 )
+
+const CIWEBHOOKTYPE = "serviceWebhook"
+const CIWEBHOOKNAME = "CIEndpoint"
+
+type WebhookGenericObject struct {
+	ID     string
+	Name   string
+	State  string
+	Links  map[string]string
+	Driver string
+	URL    string
+	Key    string
+	Config interface{} `json:"serviceWebhookConfig"`
+}
+
+func ConvertToWebhookGenericObject(genericObject client.GenericObject) (WebhookGenericObject, error) {
+	d, ok := genericObject.ResourceData["driver"].(string)
+	if !ok {
+		return WebhookGenericObject{}, fmt.Errorf("Couldn't read webhook data. Bad driver")
+	}
+
+	url, ok := genericObject.ResourceData["url"].(string)
+	if !ok {
+		return WebhookGenericObject{}, fmt.Errorf("Couldn't read webhook data. Bad url")
+	}
+
+	config, ok := genericObject.ResourceData["config"]
+	if !ok {
+		return WebhookGenericObject{}, fmt.Errorf("Couldn't read webhook data. Bad config on resource")
+	}
+
+	return WebhookGenericObject{
+		Name:   genericObject.Name,
+		ID:     genericObject.Id,
+		State:  genericObject.State,
+		Links:  genericObject.Links,
+		Driver: d,
+		URL:    url,
+		Key:    genericObject.Key,
+		Config: config,
+	}, nil
+}
+
+func CreateCIEndpointWebhook() error {
+	projectId, err := util.GetProjectId()
+	if err != nil {
+		return err
+	}
+	wh := WebhookGenericObject{
+		Driver: CIWEBHOOKTYPE,
+		Name:   CIWEBHOOKNAME,
+		Config: map[string]string{"serviceURL": fmt.Sprintf("http://localhost:8080/r/projects/%s/pipeline-server:60081/v1/webhook", projectId)}, //"http://pipeline-server:60080/v1/webhook"},
+	}
+	apiClient, err := util.GetRancherClient()
+
+	if err != nil {
+		return err
+	}
+	u, _ := url.Parse(config.Config.CattleUrl)
+	createWebhookUrl := fmt.Sprintf("%s://%s/v1-webhooks/receivers?projectId=%s", u.Scheme, u.Host, projectId)
+	//res := model.WebhookGenericObject
+	if err = apiClient.Post(createWebhookUrl, wh, &wh); err != nil {
+		logrus.Error(err)
+		return err
+	}
+	//get CIWebhookEndpoint
+	CIWebhookEndpoint = wh.URL
+	return nil
+}
 
 func DeleteWebhook(p *pipeline.Pipeline) error {
 	logrus.Infof("deletewebhook for pipeline:%v", p.Id)
@@ -50,28 +121,8 @@ func DeleteWebhook(p *pipeline.Pipeline) error {
 	return nil
 }
 
-func GetWebhookUrl(req *http.Request, pipelineId string) string {
-	/*
-		proto := "http://"
-		if req.TLS != nil {
-			proto = "https://"
-		}*/
-	host := os.Getenv("HOST_NAME")
-	if host == "" {
-		host = "<Proto://Host:Port>"
-	}
-	host = strings.TrimRight(host, "/")
-	url := host + "/v1/webhook/" + pipelineId
-
-	//logrus.Infof("get X-API-request-url:%v", req.Header.Get("X-API-request-url"))
-	logrus.Infof("get webhook url:%v", url)
-
-	return url
-
-}
-
 func CreateWebhook(p *pipeline.Pipeline, webhookUrl string) error {
-	logrus.Infof("createwebhook for pipeline:%v", p.Id)
+	logrus.Debugf("createwebhook for pipeline:%v", p.Id)
 	if p == nil {
 		return errors.New("empty pipeline to create webhook")
 	}
@@ -92,7 +143,7 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string) error {
 			repo := match[2]
 			secret := p.WebHookToken
 			id, err := util.CreateWebhook(user, repo, token, webhookUrl, secret)
-			logrus.Infof("get:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
+			logrus.Debugf("Creating webhook:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
 			if err != nil {
 				logrus.Errorf("error delete webhook,%v", err)
 				return err
@@ -103,15 +154,14 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string) error {
 	return nil
 }
 
-func RenewWebhook(p *pipeline.Pipeline, req *http.Request) error {
+func RenewWebhook(p *pipeline.Pipeline) error {
 	//update webhook in github repo
 	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		logrus.Infof("pipelinechange,webhook:%v,%v", p.Stages[0].Steps[0].Webhook, p.WebHookId)
+		logrus.Debugf("pipelinechange,webhook:%v,%v,%v", p.Stages[0].Steps[0].Webhook, p.WebHookId)
 		if p.Stages[0].Steps[0].Webhook {
 			if p.WebHookId <= 0 {
-				webhookUrl := GetWebhookUrl(req, p.Id)
-				logrus.Infof("get webhookUrl:%v", webhookUrl)
-				err := CreateWebhook(p, webhookUrl)
+				payloadURL := fmt.Sprintf("%s&pipelineId=%s", CIWebhookEndpoint, p.Id)
+				err := CreateWebhook(p, payloadURL)
 				if err != nil {
 					return ErrCreateWebhook
 				}

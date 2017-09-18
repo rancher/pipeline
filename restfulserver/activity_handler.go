@@ -34,7 +34,6 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	}
 	var activities []*pipeline.Activity
 	uid, err := GetCurrentUser(req.Cookies())
-	logrus.Infof("got currentUser,%v,%v", uid, err)
 	if err != nil || uid == "" {
 		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
 	}
@@ -388,7 +387,6 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 	}
 	toActivityResource(apiContext, &a)
 	uid, err := GetCurrentUser(req.Cookies())
-	logrus.Infof("got currentUser,%v,%v", uid, err)
 	if err != nil || uid == "" {
 		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
 	}
