@@ -42,13 +42,25 @@ var PreservedEnvs = [...]string{"CICD_GIT_COMMIT", "CICD_GIT_PREVIOUS_COMMIT", "
 	"CICD_ACTIVITY_SEQUENCE",
 }
 
+type GithubAccount struct {
+	ID          int    `json:"id,omitempty"`
+	Login       string `json:"login,omitempty"`
+	Name        string `json:"name,omitempty"`
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	HTMLURL     string `json:"html_url,omitempty"`
+	AccessToken string `json:"accessToken,omitempty"`
+}
+
 type PipelineSetting struct {
 	client.Resource
-	GithubHomePage     string   `jsong:"githubHomepage,omitempty" yaml:"githubHomepage,omitempty"`
-	GithubClientID     string   `json:"githubClientID,omitempty" yaml:"githubClientID,omitempty"`
-	GithubClientSecret string   `json:"githubClientSecret,omitempty" yaml:"githubClientSecret,omitempty"`
-	GithubRedirectURL  string   `json:"githubRedirectURL,omitempty" yaml:"githubRedirectURL,omitempty"`
-	GithubTokens       []string `json:"githubTokens,omitempty" yaml:"githubTokens,omitempty"`
+	IsAuth             bool            `json:"isAuth,omitempty" yaml:"isAuth,omitempty"`
+	GithubHostName     string          `json:"githubHostName,omitempty" yaml:"githubHostName,omitempty"`
+	GithubSchema       string          `json:"githubSchema,omitempty" yaml:"githubSchema,omitempty"`
+	GithubHomePage     string          `json:"githubHomepage,omitempty" yaml:"githubHomepage,omitempty"`
+	GithubClientID     string          `json:"githubClientID,omitempty" yaml:"githubClientID,omitempty"`
+	GithubClientSecret string          `json:"githubClientSecret,omitempty" yaml:"githubClientSecret,omitempty"`
+	GithubRedirectURL  string          `json:"githubRedirectURL,omitempty" yaml:"githubRedirectURL,omitempty"`
+	GithubAccounts     []GithubAccount `json:"githubAccounts,omitempty" yaml:"githubAccounts,omitempty"`
 }
 
 type Pipeline struct {

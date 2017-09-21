@@ -84,6 +84,8 @@ func CreateCIEndpointWebhook() error {
 		logrus.Error(err)
 		return err
 	}
+
+	logrus.Infof("Created and Using webhook '%s' as CI Endpoint.", wh.URL)
 	//get CIWebhookEndpoint
 	CIWebhookEndpoint = wh.URL
 	return nil
@@ -121,7 +123,7 @@ func DeleteWebhook(p *pipeline.Pipeline) error {
 	return nil
 }
 
-func CreateWebhook(p *pipeline.Pipeline, webhookUrl string) error {
+func CreateWebhook(p *pipeline.Pipeline, webhookUrl string, token string) error {
 	logrus.Debugf("createwebhook for pipeline:%v", p.Id)
 	if p == nil {
 		return errors.New("empty pipeline to create webhook")
@@ -130,9 +132,9 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string) error {
 	//create webhook
 	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
 		if p.Stages[0].Steps[0].Webhook {
-			//TODO
+			//TODO CHANGETOKEN
 			repoUrl := p.Stages[0].Steps[0].Repository
-			token := p.Stages[0].Steps[0].Token
+			//token := p.Stages[0].Steps[0].Token
 			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
 			match := reg.FindStringSubmatch(repoUrl)
 			if len(match) < 3 {
@@ -154,14 +156,14 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string) error {
 	return nil
 }
 
-func RenewWebhook(p *pipeline.Pipeline) error {
+func RenewWebhook(p *pipeline.Pipeline, token string) error {
 	//update webhook in github repo
 	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
 		logrus.Debugf("pipelinechange,webhook:%v,%v,%v", p.Stages[0].Steps[0].Webhook, p.WebHookId)
 		if p.Stages[0].Steps[0].Webhook {
 			if p.WebHookId <= 0 {
 				payloadURL := fmt.Sprintf("%s&pipelineId=%s", CIWebhookEndpoint, p.Id)
-				err := CreateWebhook(p, payloadURL)
+				err := CreateWebhook(p, payloadURL, token)
 				if err != nil {
 					return ErrCreateWebhook
 				}

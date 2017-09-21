@@ -31,11 +31,10 @@ type Server struct {
 	PipelineContext *pipeline.PipelineContext
 }
 
-func Preset() error {
+func Preset() {
 	if err := checkCIEndpoint(); err != nil {
-		return err
+		logrus.Errorf("Check CI Endpoint Error:%v", err)
 	}
-	return nil
 }
 
 func checkCIEndpoint() error {
@@ -63,6 +62,7 @@ func checkCIEndpoint() error {
 			ciWebhook = &whObject
 			//get CIWebhookEndpoint
 			webhook.CIWebhookEndpoint = ciWebhook.URL
+			logrus.Infof("Using webhook '%s' as CI Endpoint.", ciWebhook.URL)
 		}
 	}
 	if ciWebhook == nil {
@@ -242,7 +242,8 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	ppl.Id = uuid.Rand().Hex()
 	ppl.WebHookToken = uuid.Rand().Hex()
 	//TODO
-	err = webhook.RenewWebhook(ppl)
+	token, err := GetSingleUserToken()
+	err = webhook.RenewWebhook(ppl, token)
 	if err != nil {
 		logrus.Errorf("fail renewWebhook")
 		return err
@@ -268,7 +269,8 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 	//TODO
-	err = webhook.RenewWebhook(ppl)
+	token, err := GetSingleUserToken()
+	err = webhook.RenewWebhook(ppl, token)
 	if err != nil && err != webhook.ErrDelWebhook {
 		//fail to create webhook.block update
 		return err
@@ -484,6 +486,12 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	} else if status == "FAILURE" {
 		failStep(&activity, stageOrdinal, stepOrdinal)
 	}
+
+	//update commitinfo for SCM step
+	if stageOrdinal == 0 && stepOrdinal == 0 {
+		activity.CommitInfo = req.FormValue("GIT_COMMIT")
+	}
+
 	logrus.Infoln("HALF SUCCESS?")
 	if err = UpdateActivity(activity); err != nil {
 		return err
@@ -499,7 +507,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 }
 
 func startStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
-	curTime := time.Now().Unix()
+	curTime := time.Now().UnixNano() / int64(time.Millisecond)
 	stage := activity.ActivityStages[stageOrdinal]
 	step := stage.ActivitySteps[stepOrdinal]
 	step.StartTS = curTime
@@ -520,7 +528,7 @@ func failStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
 }
 
 func successStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
-	curTime := time.Now().Unix()
+	curTime := time.Now().UnixNano() / int64(time.Millisecond)
 	stage := activity.ActivityStages[stageOrdinal]
 	step := stage.ActivitySteps[stepOrdinal]
 	step.Status = pipeline.ActivityStepSuccess

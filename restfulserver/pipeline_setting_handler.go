@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
+	"github.com/sluu99/uuid"
 )
 
 //Get pipelineSetting Handler
@@ -77,6 +78,9 @@ func (s *Server) UpdatePipelineSetting(rw http.ResponseWriter, req *http.Request
 func CreateOrUpdatePipelineSetting(setting *pipeline.PipelineSetting) error {
 	if setting == nil {
 		return errors.New("empty pipelinesetting to update.")
+	}
+	if setting.Id == "" {
+		setting.Id = uuid.Rand().Hex()
 	}
 	b, err := json.Marshal(setting)
 	if err != nil {

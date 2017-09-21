@@ -15,7 +15,7 @@ func NewSchema() *client.Schemas {
 	schemas.AddType("schema", client.Schema{})
 	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))
 	acitvitySchema(schemas.AddType("activity", pipeline.Activity{}))
-	pipelineSettingSchema(schemas.AddType("pipelineSetting", pipeline.PipelineSetting{}))
+	pipelineSettingSchema(schemas.AddType("pipelinesetting", pipeline.PipelineSetting{}))
 	return schemas
 }
 
@@ -78,6 +78,7 @@ func acitvitySchema(activity *client.Schema) {
 }
 
 func pipelineSettingSchema(setting *client.Schema) {
+	setting.CollectionMethods = []string{http.MethodGet, http.MethodPost}
 	setting.ResourceActions = map[string]client.Action{
 		"update": client.Action{
 			Output: "pipelineSetting",
@@ -135,7 +136,9 @@ func toPipelineSettingResource(apiContext *api.ApiContext, setting *pipeline.Pip
 		Actions: map[string]string{},
 		Links:   map[string]string{},
 	}
-	setting.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
+	setting.Actions["update"] = apiContext.UrlBuilder.Current() + "?action=update" //apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
+	setting.Actions["githuboauth"] = apiContext.UrlBuilder.Current() + "?action=githuboauth"
+	setting.Actions["getrepos"] = apiContext.UrlBuilder.Current() + "?action=getrepos"
 
 	return setting
 }

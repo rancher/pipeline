@@ -54,8 +54,10 @@ func NewRouter(s *Server) *mux.Router {
 
 	//pipeline settings
 
-	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
-	router.Methods(http.MethodPost).Path("/v1/settings").Handler(f(schemas, s.UpdatePipelineSetting))
+	router.Methods(http.MethodGet).Path("/v1/pipelinesettings").Handler(f(schemas, s.GetPipelineSetting))
+	router.Methods(http.MethodGet).Path("/v1/pipelinesettings/{id}").Handler(f(schemas, s.GetPipelineSetting))
+	//router.Methods(http.MethodPost).Path("/v1/pipelinesettings").Handler(f(schemas, s.UpdatePipelineSetting))
+	//router.Methods(http.MethodPost).Path("/v1/pipelinesettings/{id}").Handler(f(schemas, s.UpdatePipelineSetting))
 
 	//test websocket
 	router.Methods(http.MethodGet).Path("/v1/ws/log").Handler(f(schemas, s.ServeStepLog))
@@ -66,7 +68,7 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/events/stepstart").Handler(f(schemas, s.StepStart))
 
 	router.Methods(http.MethodPost).Path("/v1/github/login").Handler(f(schemas, s.GithubLogin))
-	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubLogin))
+	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubAuthorize))
 
 	//debug
 	//router.Methods(http.MethodPost).Path("/v1/debug").Handler(f(schemas, s.Debug))
@@ -92,6 +94,15 @@ func NewRouter(s *Server) *mux.Router {
 	}
 	for name, actions := range activityActions {
 		router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Queries("action", name).Handler(actions)
+	}
+
+	pipelineSettingActions := map[string]http.Handler{
+		"update":      f(schemas, s.UpdatePipelineSetting),
+		"githuboauth": f(schemas, s.GithubAuthorize),
+		"getrepos":    f(schemas, s.GithubGetRepos),
+	}
+	for name, actions := range pipelineSettingActions {
+		router.Methods(http.MethodPost).Path("/v1/pipelinesettings").Queries("action", name).Handler(actions)
 	}
 	return router
 }

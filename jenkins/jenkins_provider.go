@@ -183,6 +183,8 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 	commandBuilders := JenkinsBuilder{TaskShells: taskShells}
 
 	scm := JenkinsSCM{Class: "hudson.scm.NullSCM"}
+
+	postBuildSctipt := stepFinishScript
 	if step.Type == pipeline.StepTypeSCM {
 		scm = JenkinsSCM{
 			Class:         "hudson.plugins.git.GitSCM",
@@ -191,6 +193,7 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 			GitRepo:       step.Repository,
 			GitBranch:     step.Branch,
 		}
+		postBuildSctipt = stepSCMFinishScript
 	}
 	preSCMStep := PreSCMBuildStepsWrapper{
 		Plugin:      "preSCMbuildstep@0.3",
@@ -243,7 +246,7 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 		GroovyScript: GroovyScript{
 			Plugin:  "script-security@1.30",
 			Sandbox: false,
-			Script:  fmt.Sprintf(stepFinishScript, url.QueryEscape(activity.Id), stageOrdinal, stepOrdinal),
+			Script:  fmt.Sprintf(postBuildSctipt, url.QueryEscape(activity.Id), stageOrdinal, stepOrdinal),
 		},
 	}
 	v.Publishers = pbt
@@ -467,6 +470,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			accessKey = "$CATTLE_ACCESS_KEY"
 			secretKey = "$CATTLE_SECRET_KEY"
 		}
+		//TODO CHANGETOKEN
 		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, step.UserName, step.Password, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
 		stringBuilder.WriteString(script)
 	case pipeline.StepTypeDeploy:
