@@ -28,16 +28,13 @@ type BuildStruct struct {
 }
 
 type JenkinsProvider struct {
-	pipeline *pipeline.Pipeline
 }
 
 func (j *JenkinsProvider) Init(pipeline *pipeline.Pipeline) error {
-	j.pipeline = pipeline
 	return nil
 }
 
 func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity, error) {
-	j.Init(p)
 
 	activity, err := ToActivity(p)
 	if err != nil {
@@ -464,8 +461,69 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	return stringBuilder.String()
 }
 
+func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) error {
+	for i, actiStage := range activity.ActivityStages {
+		for j, actiStep := range actiStage.ActivitySteps {
+			if actiStep.Status == pipeline.ActivityStepFail || actiStep.Status == pipeline.ActivityStepSuccess {
+				continue
+			}
+			jobName := getJobName(activity, i, j)
+			jobInfo, err := GetJobInfo(jobName)
+			if err != nil {
+				//cannot get jobinfo
+				logrus.Debugf("got job info:%v,err:%v", jobInfo, err)
+				return err
+			}
+
+			buildInfo, err := GetBuildInfo(jobName)
+			logrus.Debugf("got build info:%v, err:%v", buildInfo, err)
+			if err != nil {
+				if actiStage.NeedApproval && j == 0 {
+					//Pending
+					actiStage.Status = pipeline.ActivityStagePending
+					activity.Status = pipeline.ActivityPending
+				}
+				break
+			}
+
+			if err == nil {
+				if buildInfo.Result == "SUCCESS" {
+					actiStep.StartTS = buildInfo.Timestamp
+					actiStep.Duration = buildInfo.Duration
+					actiStep.Status = pipeline.ActivityStepSuccess
+					if j == len(actiStage.ActivitySteps)-1 {
+						//Stage Success
+						actiStage.Status = pipeline.ActivityStageSuccess
+						actiStage.Duration = buildInfo.Timestamp + buildInfo.Duration - actiStage.StartTS
+					}
+				} else if buildInfo.Result == "FAILURE" {
+					actiStep.StartTS = buildInfo.Timestamp
+					actiStep.Duration = buildInfo.Duration
+					actiStep.Status = pipeline.ActivityStepFail
+					//Stage Fail
+					actiStage.Status = pipeline.ActivityStageFail
+					actiStage.Duration = buildInfo.Timestamp + buildInfo.Duration - actiStage.StartTS
+					//Activity Fail
+					activity.Status = pipeline.ActivityFail
+					activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
+				} else if buildInfo.Building {
+					//Building
+					actiStep.StartTS = buildInfo.Timestamp
+					actiStep.Status = pipeline.ActivityStepBuilding
+					actiStage.Status = pipeline.ActivityStageBuilding
+					activity.Status = pipeline.ActivityBuilding
+					break
+				}
+
+			}
+
+		}
+	}
+	return nil
+}
+
 //SyncActivity gets latest activity info, return true if status if changed
-func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) (bool, error) {
+func (j *JenkinsProvider) SyncActivityStale(activity *pipeline.Activity) (bool, error) {
 	p := activity.Pipeline
 	var updated bool
 

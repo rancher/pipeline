@@ -28,9 +28,27 @@ type Server struct {
 	PipelineContext *pipeline.PipelineContext
 }
 
-func Preset() {
+func Preset(pipelineContext *pipeline.PipelineContext) {
 	if err := checkCIEndpoint(); err != nil {
 		logrus.Errorf("Check CI Endpoint Error:%v", err)
+	}
+	activities, err := ListActivities(pipelineContext)
+	if err != nil {
+		logrus.Errorf("List activities Error:%v", err)
+	}
+	logrus.Debugf("get activities size:%v", len(activities))
+	//Sync status of running activities
+	for _, a := range activities {
+		if a.Status == pipeline.ActivityFail || a.Status == pipeline.ActivitySuccess {
+			continue
+		}
+		if err := pipelineContext.Provider.SyncActivity(a); err != nil {
+			logrus.Errorf("Sync activity Error:%v", err)
+			continue
+		}
+		if err := UpdateActivity(*a); err != nil {
+			logrus.Errorf("Update activity Error:%v", err)
+		}
 	}
 }
 

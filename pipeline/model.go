@@ -173,11 +173,10 @@ type Trigger struct {
 }
 
 type PipelineProvider interface {
-	Init(*Pipeline) error
 	RunPipeline(*Pipeline) (*Activity, error)
 	RerunActivity(*Activity) error
 	RunStage(*Activity, int) error
-	SyncActivity(*Activity) (bool, error)
+	SyncActivity(*Activity) error
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
 	DeleteFormerBuild(*Activity) error
 	OnActivityCompelte(*Activity)

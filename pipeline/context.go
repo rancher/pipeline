@@ -335,8 +335,7 @@ func (p *PipelineContext) SyncActivity(activity *Activity) error {
 	if activity.Status == ActivityFail || activity.Status == ActivitySuccess {
 		return nil
 	}
-	_, err := p.Provider.SyncActivity(activity)
-	return err
+	return p.Provider.SyncActivity(activity)
 }
 
 //GetServices gets run services before the step
