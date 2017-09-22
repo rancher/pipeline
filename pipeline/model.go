@@ -172,16 +172,10 @@ type Trigger struct {
 	Timezone string `json:"timezone,omitempty" yaml:"timezone,omitempty"`
 }
 
-type BuildStep struct {
-	Repository string `json:"-" yaml:"-"`
-	Branch     string `json:"-" yaml:"-"`
-}
-
 type PipelineProvider interface {
 	Init(*Pipeline) error
 	RunPipeline(*Pipeline) (*Activity, error)
 	RerunActivity(*Activity) error
-	RunBuild(*Stage, string) error
 	RunStage(*Activity, int) error
 	SyncActivity(*Activity) (bool, error)
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)

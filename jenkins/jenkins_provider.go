@@ -33,7 +33,6 @@ type JenkinsProvider struct {
 
 func (j *JenkinsProvider) Init(pipeline *pipeline.Pipeline) error {
 	j.pipeline = pipeline
-	println("get in provider")
 	return nil
 }
 
@@ -49,13 +48,13 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity,
 		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
 	}
 	for i := 0; i < len(p.Stages); i++ {
-		//logrus.Infof("creating stage:%v", p.Stages[i])
+		logrus.Debugf("creating stage:%v", p.Stages[i])
 		if err := j.CreateStage(activity, i); err != nil {
 			logrus.Error(errors.Wrapf(err, "stage <%s> fail", p.Stages[i].Name))
 			return &pipeline.Activity{}, err
 		}
 	}
-	//logrus.Infof("running stage:%v", p.Stages[0])
+	logrus.Debugf("running stage:%v", p.Stages[0])
 	if err = j.RunStage(activity, 0); err != nil {
 		return &pipeline.Activity{}, err
 	}
@@ -105,15 +104,15 @@ func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) 
 	return nil
 }
 
-//getNodeNameToRun gets a random node name to run given activity id
+//getNodeNameToRun gets a random node name to run
 func getNodeNameToRun() (string, error) {
 	nodes, err := GetActiveNodesName()
 	if err != nil || len(nodes) == 0 {
 		return "", errors.Wrapf(err, "fail to find an active node to work")
 	}
-	//hash to one of the nodes
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	index := r.Intn(len(nodes))
+	logrus.Debugf("pick %s to work", nodes[index])
 	return nodes[index], nil
 }
 
@@ -163,10 +162,6 @@ func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) err
 	if _, err := BuildJob(jobName, map[string]string{}); err != nil {
 		return err
 	}
-	return nil
-}
-
-func (j *JenkinsProvider) RunBuild(stage *pipeline.Stage, activityId string) error {
 	return nil
 }
 
@@ -292,8 +287,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		if step.IsService {
 			containerName := activity.Id + step.Alias
 			svcPara = "-d --name " + containerName
-			//stringBuilder.WriteString(fmt.Sprintf("docker run -d --env-file ${PWD}/.r_cicd.env %s --name %s %s %s %s", envVars, containerName, entrypointPara, step.Image, command))
-			//break
 		}
 
 		//add link service
@@ -350,15 +343,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(";")
 		}
 	case pipeline.StepTypeSCM:
-		//run a context container to share environment variables
-		/*volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
-		stringBuilder.WriteString("docker run --privileged --name ")
-		stringBuilder.WriteString(activity.Id + "_context ")
-		stringBuilder.WriteString("-e GIT_COMMIT=${GIT_COMMIT} ")
-		stringBuilder.WriteString("-v /var/lib/docker:/var/lib/docker -d docker:dind")
-
-		*/
-
 		//write to a env file that provides the environment variables to use throughout the activity.
 		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)\n")
 		stringBuilder.WriteString("cat>.r_cicd.env<<EOF\n")
@@ -383,6 +367,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString("\nEOF\n")
 
 	case pipeline.StepTypeUpgradeService:
+		//TODO use cihelper
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		stringBuilder.WriteString("docker run reg.cnrancher.com/rancher/rancher-upgrader:dev service")
 		if step.Tag != "" {
@@ -611,7 +596,6 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 		//no printed log
 		return "", nil
 	}
-	//logrus.Infof("got step log:%v", outputs[stepOrdinal+1])
 	return outputs[2], nil
 
 }
@@ -621,11 +605,11 @@ func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
 		return
 	}
 
-	//logrus.Infof("try to get commitInfo,action:%v", buildInfo.Actions)
+	logrus.Debugf("try to get commitInfo,action:%v", buildInfo.Actions)
 	actions := buildInfo.Actions
 	for _, action := range actions {
 
-		//logrus.Infof("lastbuiltrevision:%v", action.LastBuiltRevision.SHA1)
+		logrus.Debugf("lastbuiltrevision:%v", action.LastBuiltRevision.SHA1)
 		if action.LastBuiltRevision.SHA1 != "" {
 			activity.CommitInfo = action.LastBuiltRevision.SHA1
 		}
@@ -637,7 +621,6 @@ func parseSteps(actiStage *pipeline.ActivityStage, rawOutput string) bool {
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	lastStatus := pipeline.ActivityStepBuilding
 	var updated bool = false
-	//TODO add timestamp
 	if strings.HasSuffix(rawOutput, "  Finished: SUCCESS\n") {
 		lastStatus = pipeline.ActivityStepSuccess
 		actiStage.Status = pipeline.ActivityStageSuccess

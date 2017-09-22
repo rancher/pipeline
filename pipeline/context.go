@@ -51,7 +51,7 @@ func (p *PipelineContext) GetPipelineById(id string) *Pipeline {
 	data := goCollection.Data[0]
 	ppl := Pipeline{}
 	json.Unmarshal([]byte(data.ResourceData["data"].(string)), &ppl)
-	//logrus.Infof("get pipeline:%v", ppl)
+	logrus.Debugf("get pipeline:%v", ppl)
 	return &ppl
 }
 
@@ -81,7 +81,7 @@ func (p *PipelineContext) CreatePipeline(pipeline *Pipeline) error {
 		ResourceData: resourceData,
 		Kind:         "pipeline",
 	})
-	logrus.Infof("created pipeline:%v", pipeline)
+	logrus.Debugf("created pipeline:%v", pipeline)
 
 	return err
 }
@@ -113,7 +113,6 @@ func (p *PipelineContext) UpdatePipeline(pipeline *Pipeline) error {
 		return err
 	}
 	existing := goCollection.Data[0]
-	//logrus.Infof("existing pipeline:%v", existing)
 	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
 		Name:         pipeline.Name,
 		Key:          pipeline.Id,
@@ -123,7 +122,7 @@ func (p *PipelineContext) UpdatePipeline(pipeline *Pipeline) error {
 	if err != nil {
 		return err
 	}
-	logrus.Infof("updated pipeline")
+	logrus.Debugf("updated pipeline")
 	return nil
 }
 
@@ -151,7 +150,6 @@ func (p *PipelineContext) DeletePipeline(id string) (*Pipeline, error) {
 	if err != nil {
 		return &ppl, err
 	}
-	//first delete webhook
 	err = apiClient.GenericObject.Delete(&existing)
 	if err != nil {
 		return &Pipeline{}, err

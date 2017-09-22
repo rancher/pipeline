@@ -22,13 +22,8 @@ const JenkinsJobInfoURI = "JenkinsJobInfoURI"
 const JenkinsBuildInfoURI = "JenkinsBuildInfoURI"
 const JenkinsBuildLogURI = "JenkinsBuildLogURI"
 const JenkinsJobBuildWithParamsURI = "JenkinsJobBuildWithParamsURI"
-const JenkinsTemlpateFolder = "JenkinsTemlpateFolder"
-
-//const JenkinsBaseWorkspacePath = "JenkinsBaseWorkspacePath"
-const BuildJobStageConfigFile = "build_stage_example.xml"
 
 var ErrConfigItemNotFound = errors.New("Jenkins configuration not fount")
-var ErrJenkinsTemplateNotVaild = errors.New("Jenkins template folder path is not vaild")
 var jenkinsConfLock = &sync.RWMutex{}
 
 func (j jenkinsConfig) Set(key, value string) {
@@ -49,7 +44,7 @@ func (j jenkinsConfig) Get(key string) (string, error) {
 var JenkinsConfig = jenkinsConfig{
 	CreateJobURI:                 "/createItem",
 	UpdateJobURI:                 "/job/%s/config.xml",
-	DeleteBuildURI:               "/job/%s/lastBuild/doDelete", //purge-job-history/doPurge",
+	DeleteBuildURI:               "/job/%s/lastBuild/doDelete",
 	GetCrumbURI:                  "/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)",
 	JenkinsJobBuildURI:           "/job/%s/build",
 	JenkinsJobBuildWithParamsURI: "/job/%s/buildWithParameters",

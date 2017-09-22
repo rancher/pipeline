@@ -10,12 +10,12 @@ import (
 
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
-	schemas.AddType("error", Error{})
+	//schemas.AddType("error", Error{})
 	schemas.AddType("apiVersion", client.Resource{})
 	schemas.AddType("schema", client.Schema{})
 	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))
 	acitvitySchema(schemas.AddType("activity", pipeline.Activity{}))
-	pipelineSettingSchema(schemas.AddType("pipelinesetting", pipeline.PipelineSetting{}))
+	pipelineSettingSchema(schemas.AddType("setting", pipeline.PipelineSetting{}))
 	return schemas
 }
 
@@ -70,18 +70,19 @@ func pipelineSchema(pipeline *client.Schema) {
 	}
 
 	pipeline.CollectionMethods = []string{http.MethodGet, http.MethodPost}
-	pipeline.IncludeableLinks = []string{"activitys"}
+	pipeline.IncludeableLinks = []string{"activities"}
 }
 
 func acitvitySchema(activity *client.Schema) {
 	activity.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+	activity.PluralName = "activities"
 }
 
 func pipelineSettingSchema(setting *client.Schema) {
 	setting.CollectionMethods = []string{http.MethodGet, http.MethodPost}
 	setting.ResourceActions = map[string]client.Action{
 		"update": client.Action{
-			Output: "pipelineSetting",
+			Output: "setting",
 		},
 	}
 }
@@ -107,7 +108,7 @@ func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline)
 	pipeline.Actions["activate"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=activate"
 	pipeline.Actions["deactivate"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=deactivate"
 
-	pipeline.Links["activitys"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activitys")
+	pipeline.Links["activities"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activities")
 	return pipeline
 }
 
@@ -132,7 +133,7 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 
 func toPipelineSettingResource(apiContext *api.ApiContext, setting *pipeline.PipelineSetting) *pipeline.PipelineSetting {
 	setting.Resource = client.Resource{
-		Type:    "pipelineSetting",
+		Type:    "setting",
 		Actions: map[string]string{},
 		Links:   map[string]string{},
 	}

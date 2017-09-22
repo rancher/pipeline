@@ -152,19 +152,19 @@ func ExecScript(script string) (string, error) {
 	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
-		logrus.Infof("jenkins run script fail,response code is :%v", resp.StatusCode)
+		logrus.Errorf("jenkins run script fail,response code is :%v", resp.StatusCode)
 		logrus.Error(ErrDeleteBuildFail)
 		return string(data), ErrDeleteBuildFail
 	}
 	return string(data), nil
 }
 
-//GetActiveNodesName gets all available jenkins slaves name
+//GetActiveNodesName gets all available jenkins slaves name and the master
 func GetActiveNodesName() ([]string, error) {
 	nlist, err := ExecScript(GetActiveNodesScript)
 	nlist = strings.TrimLeft(nlist, "\n")
 	nlist = strings.TrimRight(nlist, "\n")
-	logrus.Infof("exec result:%v", nlist)
+	logrus.Debugf("exec result:%v", nlist)
 	if err != nil {
 		logrus.Errorf("get active node fail,%v", err)
 		return []string{}, err
@@ -200,7 +200,7 @@ func CreateJob(jobname string, content []byte) error {
 		logrus.Error(err)
 		return err
 	}
-	// data, _ := ioutil.ReadAll(resp.Body)
+
 	if resp.StatusCode != 200 {
 		logrus.Infof("createjob code:%v", resp.StatusCode)
 		data, _ := ioutil.ReadAll(resp.Body)
@@ -235,7 +235,6 @@ func UpdateJob(jobname string, content []byte) error {
 		logrus.Error(err)
 		return err
 	}
-	// data, _ := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		logrus.Infof("updatejob code:%v", resp.StatusCode)
 		data, _ := ioutil.ReadAll(resp.Body)

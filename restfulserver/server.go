@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	yaml "gopkg.in/yaml.v2"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -21,7 +19,6 @@ import (
 	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver/webhook"
-	"github.com/rancher/pipeline/storer"
 	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
 )
@@ -366,25 +363,6 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	}
 	//MyAgent.watchActivityC <- activity
 	apiContext.Write(toActivityResource(apiContext, activity))
-	return nil
-}
-
-func (s *Server) SavePipeline(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-	requestBytes, err := ioutil.ReadAll(req.Body)
-	ppl := pipeline.Pipeline{}
-
-	if err := json.Unmarshal(requestBytes, &ppl); err != nil {
-		return err
-	}
-	st := &storer.LocalStorer{}
-	yamlBytes, err := yaml.Marshal(ppl)
-	if err != nil {
-		return err
-	}
-	st.SavePipelineFile(ppl.Name, string(yamlBytes))
-	//Todo
-	apiContext.Write(&Empty{})
 	return nil
 }
 

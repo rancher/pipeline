@@ -28,42 +28,42 @@ func NewRouter(s *Server) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	f := HandleError
 	// API framework routes
-	router.Methods(http.MethodGet).Path("/").Handler(api.VersionsHandler(schemas, "v1"))
+	router.Methods(http.MethodGet).Path("/").Handler(api.VersionHandler(schemas, "v1"))
 	router.Methods(http.MethodGet).Path("/v1/schemas").Handler(api.SchemasHandler(schemas))
 	router.Methods(http.MethodGet).Path("/v1/schemas/{id}").Handler(api.SchemaHandler(schemas))
 	router.Methods(http.MethodGet).Path("/v1").Handler(api.VersionHandler(schemas, "v1"))
 
+	//pipelines
 	router.Methods(http.MethodGet).Path("/v1/pipelines").Handler(f(schemas, s.ListPipelines))
+	router.Methods(http.MethodGet).Path("/v1/pipeline").Handler(f(schemas, s.ListPipelines))
+	router.Methods(http.MethodPost).Path("/v1/pipelines").Handler(f(schemas, s.CreatePipeline))
 	router.Methods(http.MethodPost).Path("/v1/pipeline").Handler(f(schemas, s.CreatePipeline))
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}").Handler(f(schemas, s.ListPipeline))
-	//router.Methods(http.MethodPost).Path("/v1/pipelines/{id}").Handler(f(schemas, s.UpdatePipeline))
-	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/activitys").Handler(f(schemas, s.ListActivitiesOfPipeline))
+	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/activities").Handler(f(schemas, s.ListActivitiesOfPipeline))
 	router.Methods(http.MethodDelete).Path("/v1/pipelines/{id}").Handler(f(schemas, s.DeletePipeline))
-	router.Methods(http.MethodDelete).Path("/v1/pipeline").Handler(f(schemas, s.CleanPipelines))
+	//router.Methods(http.MethodDelete).Path("/v1/pipeline").Handler(f(schemas, s.CleanPipelines))
+
 	//activities
-	router.Methods(http.MethodGet).Path("/v1/activitys").Handler(f(schemas, s.ListActivities))
 	router.Methods(http.MethodGet).Path("/v1/activities").Handler(f(schemas, s.ListActivities))
+	router.Methods(http.MethodGet).Path("/v1/activity").Handler(f(schemas, s.ListActivities))
+	router.Methods(http.MethodPost).Path("/v1/activities").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
-	router.Methods(http.MethodGet).Path("/v1/activitys/{id}").Handler(f(schemas, s.GetActivity))
-	router.Methods(http.MethodDelete).Path("/v1/activitys/{id}").Handler(f(schemas, s.DeleteActivity))
-	//router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.UpdateActivity))
-	//router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.ActivatePipeline))
-	//router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Handler(f(schemas, s.DeActivatePipeline))
-	router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
+	router.Methods(http.MethodGet).Path("/v1/activities/{id}").Handler(f(schemas, s.GetActivity))
+	router.Methods(http.MethodDelete).Path("/v1/activities/{id}").Handler(f(schemas, s.DeleteActivity))
+	//router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
+
+	//settings
+	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
+	router.Methods(http.MethodGet).Path("/v1/setting").Handler(f(schemas, s.GetPipelineSetting))
+	//router.Methods(http.MethodPost).Path("/v1/settings").Handler(f(schemas, s.UpdatePipelineSetting))
+	//router.Methods(http.MethodPost).Path("/v1/setting").Handler(f(schemas, s.UpdatePipelineSetting))
 	router.Methods(http.MethodGet).Path("/v1/envvars").Handler(f(schemas, s.ListEnvVars))
 
-	//pipeline settings
-
-	router.Methods(http.MethodGet).Path("/v1/pipelinesettings").Handler(f(schemas, s.GetPipelineSetting))
-	router.Methods(http.MethodGet).Path("/v1/pipelinesettings/{id}").Handler(f(schemas, s.GetPipelineSetting))
-	//router.Methods(http.MethodPost).Path("/v1/pipelinesettings").Handler(f(schemas, s.UpdatePipelineSetting))
-	//router.Methods(http.MethodPost).Path("/v1/pipelinesettings/{id}").Handler(f(schemas, s.UpdatePipelineSetting))
-
-	//test websocket
+	//websockets
 	router.Methods(http.MethodGet).Path("/v1/ws/log").Handler(f(schemas, s.ServeStepLog))
 	router.Methods(http.MethodGet).Path("/v1/ws/status").Handler(f(schemas, s.ServeStatusWS))
 
-	// trigger step status update when jenkins job is done
+	//callback path for jenkins events
 	router.Methods(http.MethodPost).Path("/v1/events/stepfinish").Handler(f(schemas, s.StepFinish))
 	router.Methods(http.MethodPost).Path("/v1/events/stepstart").Handler(f(schemas, s.StepStart))
 
@@ -93,7 +93,7 @@ func NewRouter(s *Server) *mux.Router {
 		"rerun":   f(schemas, s.RerunActivity),
 	}
 	for name, actions := range activityActions {
-		router.Methods(http.MethodPost).Path("/v1/activitys/{id}").Queries("action", name).Handler(actions)
+		router.Methods(http.MethodPost).Path("/v1/activities/{id}").Queries("action", name).Handler(actions)
 	}
 
 	pipelineSettingActions := map[string]http.Handler{
@@ -102,7 +102,7 @@ func NewRouter(s *Server) *mux.Router {
 		"getrepos":    f(schemas, s.GithubGetRepos),
 	}
 	for name, actions := range pipelineSettingActions {
-		router.Methods(http.MethodPost).Path("/v1/pipelinesettings").Queries("action", name).Handler(actions)
+		router.Methods(http.MethodPost).Path("/v1/settings").Queries("action", name).Handler(actions)
 	}
 	return router
 }
