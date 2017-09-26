@@ -13,11 +13,18 @@ import (
 func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) error) http.Handler {
 	return api.ApiHandler(s, http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		if err := t(rw, req); err != nil {
-			//	apiContext := api.GetApiContext(req)
-			logrus.Errorf("fail in apihandler,%v", err)
+			logrus.Errorf("Got Error: %v", err)
+			rw.Header().Set("Content-Type", "application/json")
 			rw.WriteHeader(500)
-			rw.Write([]byte(err.Error()))
 
+			e := Error{
+				Resource: client.Resource{
+					Type: "error",
+				},
+				Status: 500,
+				Msg:    err.Error(),
+			}
+			api.GetApiContext(req).Write(&e)
 		}
 	}))
 }

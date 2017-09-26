@@ -10,7 +10,7 @@ import (
 
 func NewSchema() *client.Schemas {
 	schemas := &client.Schemas{}
-	//schemas.AddType("error", Error{})
+	schemas.AddType("error", Error{})
 	schemas.AddType("apiVersion", client.Resource{})
 	schemas.AddType("schema", client.Schema{})
 	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))

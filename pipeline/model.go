@@ -66,9 +66,9 @@ type PipelineSetting struct {
 type Pipeline struct {
 	client.Resource
 	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
-	IsActivate      bool   `json:"isActivate,omitempty" yaml:"isActivate,omitempty"`
+	IsActivate      bool   `json:"isActivate" yaml:"isActivate"`
 	VersionSequence string `json:"-" yaml:"-"`
-	RunCount        int    `json:"runCount,omitempty" yaml:"runCount,omitempty"`
+	RunCount        int    `json:"runCount" yaml:"runCount"`
 	LastRunId       string `json:"lastRunId,omitempty" yaml:"lastRunId,omitempty"`
 	LastRunStatus   string `json:"lastRunStatus,omitempty" yaml:"lastRunStatus,omitempty"`
 	LastRunTime     int64  `json:"lastRunTime,omitempty" yaml:"lastRunTime,omitempty"`

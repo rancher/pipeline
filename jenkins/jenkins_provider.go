@@ -476,7 +476,6 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) error {
 			}
 
 			buildInfo, err := GetBuildInfo(jobName)
-			logrus.Debugf("got build info:%v, err:%v", buildInfo, err)
 			if err != nil {
 				if actiStage.NeedApproval && j == 0 {
 					//Pending
