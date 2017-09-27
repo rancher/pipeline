@@ -1,6 +1,11 @@
 package restfulserver
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/url"
 	"testing"
 	"time"
 
@@ -26,6 +31,40 @@ func TestCompuTimestamp(t *testing.T) {
 
 }
 
+func TestGetUser(t *testing.T) {
+	token := "45d35661fa5fc4e03ab8959d6290a1a2819eabe3"
+	_, err := getGithubUser(token)
+	if err != nil {
+		fmt.Print(err)
+	}
+}
+
+func TestUnmarshal(t *testing.T) {
+	var obj interface{}
+	b := bytes.NewBufferString("{\"abc\":1}").Bytes()
+	logrus.Print(b)
+	json.Unmarshal(b, obj)
+	logrus.Print(b)
+	a := foo(b)
+	logrus.Print(a)
+	c := a.([]byte)
+	logrus.Print(c)
+
+	u, err := url.Parse("http://bing.com/search?q=dotnet")
+	if err != nil {
+		log.Fatal(err)
+	}
+	u.Scheme = "https"
+	u.Host = "google.com"
+	q := u.Query()
+	q.Set("qq", "golang")
+	u.RawQuery = q.Encode()
+	fmt.Println(u)
+}
+
+func foo(obj interface{}) interface{} {
+	return obj
+}
 func TestTimeParse(t *testing.T) {
 	nextRunTime := int64(0)
 	spec := "30 * * * *"

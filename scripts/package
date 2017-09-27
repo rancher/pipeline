@@ -9,10 +9,15 @@ SUFFIX=""
 
 cd $(dirname $0)/../package
 
-TAG=${TAG:-${VERSION}${SUFFIX}}
-REPO=${REPO:-rancher}
+TAG=${TAG:-dev}
+#${VERSION}${SUFFIX}}
+REPO=${REPO:-reg.cnrancher.com/rancher}
 
 cp ../bin/pipeline .
 docker build -t ${REPO}/pipeline:${TAG} .
 
 echo Built ${REPO}/pipeline:${TAG}
+
+docker login -u admin -p "Rancher@123" -e "lawrence@rancher.com" ${REPO}
+docker push ${REPO}/pipeline:${TAG}
+
