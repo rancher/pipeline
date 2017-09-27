@@ -5,5 +5,5 @@ ADD http://dev-tool.oss-cn-shenzhen.aliyuncs.com/git/tools.tar.gz /tmp/tools.tar
 RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /data/rancher-ci/templates /data/rancher-ci/jenkins /data/rancher-ci/workspace
 ENV JENKINS_HOME /data/rancher-ci/workspace
-COPY pipeline /usr/bin/
-CMD ["pipeline"]
+Add ./bin/pipeline /usr/bin/
+CMD ["/usr/bin/pipeline"]

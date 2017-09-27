@@ -1,14 +1,12 @@
 from common_fixtures import *  # NOQA
 import gdapi
 import cattle
-pytest
-CATTLE_URL = 'http://47.52.106.231:8080/v1/schemas'
-CATALOG_URL = 'http://localhost:8082/v1-catalog'
-PIPELINE_URL = 'http://localhost:60080/v1'
+import pytest
 
 DEFAULT_TIMEOUT = 180
 
 
+@pytest.fixture(scope='session')
 def rancher_client():
     # ACCESS_KEY = os.environ.get('ACCESS_KEY')
     # SECRET_KEY = os.environ.get('SECRET_KEY')
@@ -20,9 +18,51 @@ def rancher_client():
     return c
 
 
+@pytest.fixture(scope='session')
 def pipeline_client():
     PIPELINE_URL = os.environ.get('PIPELINE_URL', 'http://localhost:60080/v1')
-    return gdapi.from_env(url=PIPELINE_URL)
+    return gdapi.from_env(url=PIPELINE_URL,
+                          access_key=ACCESS_KEY,
+                          secret_key=SECRET_KEY)
+
+
+def wait_for_ready_pipeline_client(timeout=DEFAULT_TIMEOUT):
+    start = time.time()
+    while True:
+        try:
+            pipeline_client()
+        except:
+            if time.time() - start > timeout:
+                raise Exception('Fail connect pipeline server')
+            else:
+                time.sleep(10)
+        else:
+            return pipeline_client()
+
+
+def ensure_cicd_catalog():
+    if cicd_is_up() == 1:
+        return
+    else:
+        t_env = {
+            "SLAVES": 0,
+            "EXECUTORS": 2,
+            "JENKINS_PORT": 8081,
+            "VOLUME_DRIVER": "local",
+            "HOST_LABEL": ""
+        }
+        deploy_cicd(t_env)
+        wait_for_ready_pipeline_client()
+
+
+@pytest.fixture()
+def pipeline_resource(request):
+    ensure_cicd_catalog()
+
+    def cleanup():
+        cleanup_activity()
+        cleanup_pipeline()
+    request.addfinalizer(cleanup)
 
 
 def get_pipelines():
@@ -39,6 +79,16 @@ def get_pipeline(id):
     return pipeline_client().by_id_pipeline(id)
 
 
+def create_pipeline(**kw):
+    return pipeline_client().create_pipeline(**kw)
+
+
+def cleanup_pipeline():
+    pipelines = pipeline_client().list_pipeline()
+    for p in pipelines:
+        p.remove()
+
+
 def get_activities():
     return pipeline_client().list_activity()
 
@@ -47,8 +97,18 @@ def get_activity(id):
     return pipeline_client().by_id_activity(id)
 
 
-def create_pipeline(**kw):
-    return pipeline_client().create_pipeline(**kw)
+def update_setting(**kw):
+    return pipeline_client().list_setting().update(**kw)
+
+
+def cleanup_activity():
+    activities = pipeline_client().list_activity()
+    for a in activities:
+        a.remove()
+
+
+def get_setting():
+    return pipeline_client().list_setting()
 
 
 def remove_pipeline(name):
@@ -71,6 +131,26 @@ def run_pipeline(name):
             p.run()
             found = True
     assert found, 'Fail run pipeline, not found'
+
+
+def run_basic_pipeline():
+    stages = [{
+        "name": "SCM",
+        "steps": [
+                {
+                    "branch": "master",
+                    "dockerfilePath": "",
+                    "isShell": False,
+                    "repository": "https://github.com/gitlawr/sh.git",
+                    "sourceType": "git",
+                    "type": "scm"
+                }
+            ]
+    }]
+    pipeline = create_pipeline(name='hello', stages=stages)
+    assert pipeline.id is not None, 'Failed create pipeline.'
+    run_pipeline_expect('hello', 'Success')
+    remove_pipeline('hello')
 
 
 def run_pipeline_expect(name, status, timeout=DEFAULT_TIMEOUT):
@@ -97,7 +177,7 @@ def expect_activity_status(activityid, status,
         assert activity.status is not None
         if activity.status == 'Building' or activity.status == 'Running' \
            or activity.status == 'Waiting':
-            time.sleep(.5)
+            time.sleep(3)
         elif activity.status == status:
             return
         else:
@@ -111,17 +191,48 @@ def expect_activity_status(activityid, status,
                                 activity.id + ' ' + activity.status)
 
 
-def deploy_cicd():
+def deploy_and_wait_for_stack(client,
+                              dockerCompose,
+                              rancherCompose,
+                              environment,
+                              t_name,
+                              externalId,
+                              system):
+    env = client.create_stack(name=t_name,
+                              dockerCompose=dockerCompose,
+                              rancherCompose=rancherCompose,
+                              environment=environment,
+                              startOnCreate=True,
+                              externalId=externalId,
+                              system=system)
+    env = client.wait_success(env, timeout=300)
+    wait_for_condition(
+        client, env,
+        lambda x: x.healthState == "healthy",
+        lambda x: 'State is: ' + x.state,
+        timeout=600)
+    for service in env.services():
+        wait_for_condition(
+            client, service,
+            lambda x: x.state == "active",
+            lambda x: 'State is: ' + x.state,
+            timeout=600)
+        container_list = get_service_container_list(client, service,
+                                                    managed=1)
+        for container in container_list:
+            if 'io.rancher.container.start_once' not in container.labels:
+                assert container.state == "running"
+            else:
+                assert \
+                    container.state == "stopped" or \
+                    container.state == "running"
+
+
+def deploy_cicd(t_env):
     auth = (ACCESS_KEY, SECRET_KEY)
+    t_version = os.environ.get('CICD_CATALOG_VERSION', 7)
     t_name = "CICD"
-    t_version = 7
-    t_env = {
-        "SLAVES": 0,
-        "EXECUTORS": 2,
-        "JENKINS_PORT": 8081,
-        "VOLUME_DRIVER": "local",
-        "HOST_LABEL": ""
-        }
+    externalId = "catalog://CICD:infra*CICD:" + str(t_version)
     system = True
     headers = {}
     headers["X-API-Project-Id"] = PROJECT_ID
@@ -137,30 +248,28 @@ def deploy_cicd():
     r.close()
     dockerCompose = template["files"]["docker-compose.yml"]
     rancherCompose = template["files"]["rancher-compose.yml"]
-    print(t_env)
-    print(t_name)
-    print(system)
-    deploy_and_wait_for_stack_creation(rancher_client(),
-                                       dockerCompose,
-                                       rancherCompose,
-                                       t_env,
-                                       t_name,
-                                       system)
-    print 'deployed cicd catalog'
+    deploy_and_wait_for_stack(rancher_client(),
+                              dockerCompose,
+                              rancherCompose,
+                              t_env,
+                              t_name,
+                              externalId,
+                              system)
 
 
 def remove_cicd():
+    rcli = rancher_client()
     t_name = 'CICD'
-    env = rancher_client().list_stack(name=t_name)
+    env = rcli.list_stack(name=t_name)
     for i in range(len(env)):
-        delete_all(client, [env[i]])
+        delete_all(rcli, [env[i]])
     print 'removed cicd catalog'
 
 
 def cicd_is_up():
     t_name = 'CICD'
     env = rancher_client().list_stack(name=t_name)
-    assert len(env) == 1
+    return len(env) == 1
 
 
 def get_hosts():
@@ -172,7 +281,7 @@ def get_hosts():
     return
 
 
-def create_reg_cred(serverAddress, username, password):
+def create_registry(serverAddress, username, password):
     c = rancher_client()
     reg = c.create_registry(serverAddress=serverAddress)
     c.create_registryCredential(registryId=reg.id,
@@ -180,12 +289,19 @@ def create_reg_cred(serverAddress, username, password):
                                 secretValue=password)
 
 
-def remove_reg_cred(serverAddress):
-    c = rancher_client()
-    regs = c.list_registry()
+def remove_registry(serverAddress):
+    regs = rancher_client().list_registry()
     for reg in regs:
         if reg.serverAddress == serverAddress:
             reg.remove()
+
+
+def get_registry(serverAddress):
+    regs = rancher_client().list_registry()
+    for reg in regs:
+        if reg.serverAddress == serverAddress:
+            return reg
+    return None
 
 
 def get_catalog_templates():
