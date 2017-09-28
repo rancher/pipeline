@@ -11,9 +11,11 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/google/go-github/github"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/pipeline/pipeline"
-	"golang.org/x/oauth2/github"
+	"github.com/tomnomnom/linkheader"
+	ogithub "golang.org/x/oauth2/github"
 )
 
 const oauthStateString = "random"
@@ -89,7 +91,7 @@ func (s *Server) GithubAuthorize(rw http.ResponseWriter, req *http.Request) erro
 		ClientSecret: githubClientSecret,
 		Scopes: []string{"repo",
 			"admin:repo_hook"},
-		Endpoint: github.Endpoint,
+		Endpoint: ogithub.Endpoint,
 	}
 
 	token, err := githubOauthConfig.Exchange(oauth2.NoContext, code)
@@ -129,7 +131,7 @@ func getGithubOauthConfig() (*oauth2.Config, error) {
 		ClientSecret: setting.GithubClientSecret,
 		Scopes: []string{"repo",
 			"admin:repo_hook"},
-		Endpoint: github.Endpoint,
+		Endpoint: ogithub.Endpoint,
 	}
 	return githubOauthConfig, nil
 }
@@ -202,11 +204,15 @@ func (s *Server) GithubGetRepos(rw http.ResponseWriter, req *http.Request) error
 	}
 	//TODO support multiple
 	if len(setting.GithubAccounts) > 0 {
-		resp, err := getGithubRepos(setting.GithubAccounts[0].AccessToken)
+		repos, err := getGithubRepos(setting.GithubAccounts[0].AccessToken)
 		if err != nil {
 			return err
 		}
-		if _, err = rw.Write(resp); err != nil {
+		b, err := json.Marshal(repos)
+		if err != nil {
+			return err
+		}
+		if _, err = rw.Write(b); err != nil {
 			return err
 		}
 	} else {
@@ -215,31 +221,50 @@ func (s *Server) GithubGetRepos(rw http.ResponseWriter, req *http.Request) error
 	return nil
 }
 
-func getGithubRepos(githubAccessToken string) ([]byte, error) {
+func getGithubRepos(githubAccessToken string) ([]github.Repository, error) {
 	url := githubAPI + "/user/repos"
-	resp, err := getFromGithub(githubAccessToken, url)
+	var repos []github.Repository
+	responses, err := paginateGithub(githubAccessToken, url)
 	if err != nil {
-		logrus.Errorf("Github getUserRepos: GET url %v received error from github, err: %v", url, err)
-		return nil, err
+		logrus.Errorf("Github getGithubRepos: GET url %v received error from github, err: %v", url, err)
+		return repos, err
 	}
-	defer resp.Body.Close()
+	for _, response := range responses {
+		defer response.Body.Close()
+		b, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			logrus.Errorf("Github getUserRepos: error reading response, err: %v", err)
+			return nil, err
+		}
+		var reposObj []github.Repository
+		if err := json.Unmarshal(b, &reposObj); err != nil {
+			return repos, err
+		}
+		repos = append(repos, reposObj...)
+	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	return repos, nil
+}
+
+func paginateGithub(githubAccessToken string, url string) ([]*http.Response, error) {
+	var responses []*http.Response
+
+	response, err := getFromGithub(githubAccessToken, url)
 	if err != nil {
-		logrus.Errorf("Github getUserRepos: error reading response, err: %v", err)
-		return nil, err
+		return responses, err
 	}
-	/*
-		var githubAcct pipeline.GithubAccount
-			account, err := getGithubUser(githubAccessToken)
-			if err != nil {
-				logrus.Errorf("Github getUserRepos: error reading response, err: %v", err)
-				return response, err
-			}
-			response["repos"] = string(b)
-			response["user"] = account
-	*/
-	return b, nil
+	responses = append(responses, response)
+	nextURL := nextGithubPage(response)
+	for nextURL != "" {
+		response, err = getFromGithub(githubAccessToken, nextURL)
+		if err != nil {
+			return responses, err
+		}
+		responses = append(responses, response)
+		nextURL = nextGithubPage(response)
+	}
+
+	return responses, nil
 }
 
 func getFromGithub(githubAccessToken string, url string) (*http.Response, error) {
@@ -267,6 +292,21 @@ func getFromGithub(githubAccessToken string, url string) (*http.Response, error)
 			resp.StatusCode, body.Bytes())
 	}
 	return resp, nil
+}
+
+func nextGithubPage(response *http.Response) string {
+	header := response.Header.Get("link")
+
+	if header != "" {
+		links := linkheader.Parse(header)
+		for _, link := range links {
+			if link.Rel == "next" {
+				return link.URL
+			}
+		}
+	}
+
+	return ""
 }
 
 func GetUserToken(userId int) (string, error) {
