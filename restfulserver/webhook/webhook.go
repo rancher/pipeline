@@ -132,9 +132,7 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string, token string) error 
 	//create webhook
 	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
 		if p.Stages[0].Steps[0].Webhook {
-			//TODO CHANGETOKEN
 			repoUrl := p.Stages[0].Steps[0].Repository
-			//token := p.Stages[0].Steps[0].Token
 			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
 			match := reg.FindStringSubmatch(repoUrl)
 			if len(match) < 3 {

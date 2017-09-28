@@ -364,9 +364,22 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString("\nEOF\n")
 
 	case pipeline.StepTypeUpgradeService:
-		//TODO use cihelper
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
-		stringBuilder.WriteString("docker run reg.cnrancher.com/rancher/rancher-upgrader:dev service")
+		stringBuilder.WriteString("cihelper")
+		if step.DeployEnv == "others" {
+			stringBuilder.WriteString(" --envurl ")
+			stringBuilder.WriteString(step.Endpoint)
+			stringBuilder.WriteString(" --accesskey ")
+			stringBuilder.WriteString(step.Accesskey)
+			stringBuilder.WriteString(" --secretkey ")
+			stringBuilder.WriteString(step.Secretkey)
+		} else if step.DeployEnv == "local" {
+			//read from env var
+			stringBuilder.WriteString(" --envurl $CATTLE_URL")
+			stringBuilder.WriteString(" --accesskey $CATTLE_ACCESS_KEY")
+			stringBuilder.WriteString(" --secretkey $CATTLE_SECRET_KEY")
+		}
+		stringBuilder.WriteString(" upgrade service ")
 		if step.Tag != "" {
 			stringBuilder.WriteString(" --image ")
 			stringBuilder.WriteString(step.Tag)
@@ -382,19 +395,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		if step.StartFirst != false {
 			stringBuilder.WriteString(" --startfirst")
 			stringBuilder.WriteString(" true")
-		}
-		if step.DeployEnv == "others" {
-			stringBuilder.WriteString(" --envurl ")
-			stringBuilder.WriteString(step.Endpoint)
-			stringBuilder.WriteString(" --accesskey ")
-			stringBuilder.WriteString(step.Accesskey)
-			stringBuilder.WriteString(" --secretkey ")
-			stringBuilder.WriteString(step.Secretkey)
-		} else if step.DeployEnv == "local" {
-			//read from env var
-			stringBuilder.WriteString(" --envurl $CATTLE_URL")
-			stringBuilder.WriteString(" --accesskey $CATTLE_ACCESS_KEY")
-			stringBuilder.WriteString(" --secretkey $CATTLE_SECRET_KEY")
 		}
 		for k, v := range step.ServiceSelector {
 			stringBuilder.WriteString(" --selector ")
@@ -452,8 +452,10 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			accessKey = "$CATTLE_ACCESS_KEY"
 			secretKey = "$CATTLE_SECRET_KEY"
 		}
-		//TODO CHANGETOKEN
-		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, step.UserName, step.Password, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
+
+		//TODO Multiple
+		gitUserName, _ := restfulserver.GetSingleUserName()
+		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
 		stringBuilder.WriteString(script)
 	case pipeline.StepTypeDeploy:
 	}
