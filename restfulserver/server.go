@@ -256,7 +256,7 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 
 	ppl.Id = uuid.Rand().Hex()
 	ppl.WebHookToken = uuid.Rand().Hex()
-	//TODO
+	//TODO Multiple
 	token, err := GetSingleUserToken()
 	err = webhook.RenewWebhook(ppl, token)
 	if err != nil {
@@ -283,7 +283,7 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := pipeline.Validate(ppl); err != nil {
 		return err
 	}
-	//TODO
+	//TODO Multiple
 	token, err := GetSingleUserToken()
 	err = webhook.RenewWebhook(ppl, token)
 	if err != nil && err != webhook.ErrDelWebhook {

@@ -95,8 +95,8 @@ cat>new-rancher-compose.yml<<EOF
 %s
 EOF
 #merge yaml file
-mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml 
-mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml 
+cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml 
+cihelper mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml 
 #cat new-docker-compose.yml
 #cat new-rancher-compose.yml
 rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
@@ -144,7 +144,6 @@ const upgradeCatalogScript = `# upgrade catalog
 R_UPGRADECATALOG_REPO=%s
 R_UPGRADECATALOG_BRANCH=%s
 R_UPGRADECATALOG_GITUSER=%s
-R_UPGRADECATALOG_GITPASSWORD=%s
 R_UPGRADECATALOG_SYSTEMFLAG=%s
 R_UPGRADECATALOG_FOLDERNAME=%s
 R_UPGRADESTACK_FLAG=%s
@@ -164,7 +163,7 @@ cat>env_file<<EOF
 %s
 EOF
 
-rancher-upgrader --debug catalog --repourl $R_UPGRADECATALOG_REPO --branch $R_UPGRADECATALOG_BRANCH --user $R_UPGRADECATALOG_GITUSER --password $R_UPGRADECATALOG_GITPASSWORD \
+cihelper upgrade catalog --repourl $R_UPGRADECATALOG_REPO --branch $R_UPGRADECATALOG_BRANCH --user $R_UPGRADECATALOG_GITUSER \
 --cacheroot catalog --foldername $R_UPGRADECATALOG_FOLDERNAME --readme README.md $R_UPGRADECATALOG_SYSTEMFLAG
 
 if [ $? -eq 0 ]; then
@@ -183,7 +182,7 @@ R_UPGRADESTACK_ACCESSKEY=%s
 R_UPGRADESTACK_SECRETKEY=%s
 R_UPGRADESTACK_STACKNAME=%s
 
-rancher-upgrader stack --tolatest --envurl $R_UPGRADESTACK_ENDPOINT --accesskey $R_UPGRADESTACK_ACCESSKEY --secretkey $R_UPGRADESTACK_SECRETKEY --stackname $R_UPGRADESTACK_STACKNAME --env-file env_file
+cihelper --envurl $R_UPGRADESTACK_ENDPOINT --accesskey $R_UPGRADESTACK_ACCESSKEY --secretkey $R_UPGRADESTACK_SECRETKEY upgrade stack --tolatest --stackname $R_UPGRADESTACK_STACKNAME --env-file env_file
 
 rm -r ../$TEMPDIR
 `

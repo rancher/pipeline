@@ -293,3 +293,15 @@ func GetSingleUserToken() (string, error) {
 	}
 	return "", fmt.Errorf("no authorized github user found")
 }
+
+//TODO multiple user support ⬆
+func GetSingleUserName() (string, error) {
+	setting, err := GetPipelineSetting()
+	if err != nil {
+		return "", err
+	}
+	if len(setting.GithubAccounts) > 0 {
+		return setting.GithubAccounts[0].Login, nil
+	}
+	return "", fmt.Errorf("no authorized github user found")
+}
