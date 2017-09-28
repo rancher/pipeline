@@ -217,6 +217,57 @@ def test_run_pipeline_fail_script(pipeline_resource):
     remove_pipeline('tofail')
 
 
+def test_run_pipeline_cron(pipeline_resource):
+    stages = [{
+        "name": "SCM",
+        "steps": [
+            {
+                "branch": "master",
+                "dockerfilePath": "",
+                "isShell": False,
+                "repository": "https://github.com/gitlawr/sh.git",
+                "sourceType": "git",
+                "type": "scm"
+            }
+        ]
+    }]
+    pipeline = create_pipeline(name='crontest',
+                               isActivate=True,
+                               triggerSpec='*/1 * * * *',
+                               stages=stages)
+    # wait over 1 minute for cron trigger
+    time.sleep(80)
+    pipeline = get_pipeline(pipeline.id)
+    assert pipeline.runCount == 1, "Cron trigger fail"
+    wait_activity_expect(pipeline.lastRunId, 'Success')
+    remove_pipeline('crontest')
+
+
+def test_run_pipeline_cron_inactive(pipeline_resource):
+    stages = [{
+        "name": "SCM",
+        "steps": [
+            {
+                "branch": "master",
+                "dockerfilePath": "",
+                "isShell": False,
+                "repository": "https://github.com/gitlawr/sh.git",
+                "sourceType": "git",
+                "triggerSpec": "*/1 * * * *",
+                "type": "scm"
+            }
+        ]
+    }]
+    pipeline = create_pipeline(name='inactivecrontest',
+                               triggerSpec='*/1 * * * *',
+                               stages=stages)
+    # wait over 1 minute for cron trigger
+    time.sleep(80)
+    pipeline = get_pipeline(pipeline.id)
+    assert pipeline.runCount == 0, "Inactive cron but triggered"
+    remove_pipeline('inactivecrontest')
+
+
 def test_run_pipeline_pending(pipeline_resource):
     stages = [
         {
