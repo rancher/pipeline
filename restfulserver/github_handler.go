@@ -20,6 +20,7 @@ import (
 
 const oauthStateString = "random"
 const githubAPI = "https://api.github.com"
+const maxPerPage = "100"
 
 func (s *Server) GithubLogin(rw http.ResponseWriter, req *http.Request) error {
 
@@ -273,6 +274,10 @@ func getFromGithub(githubAccessToken string, url string) (*http.Response, error)
 		logrus.Error(err)
 	}
 	client := &http.Client{}
+	//set to max 100 per page to reduce query time
+	q := req.URL.Query()
+	q.Set("per_page", maxPerPage)
+	req.URL.RawQuery = q.Encode()
 	req.Header.Add("Authorization", "token "+githubAccessToken)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36)")
