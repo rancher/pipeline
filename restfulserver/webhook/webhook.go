@@ -91,7 +91,7 @@ func CreateCIEndpointWebhook() error {
 	return nil
 }
 
-func DeleteWebhook(p *pipeline.Pipeline) error {
+func DeleteWebhook(p *pipeline.Pipeline, token string) error {
 	logrus.Infof("deletewebhook for pipeline:%v", p.Id)
 	if p == nil {
 		return errors.New("empty pipeline to delete webhook")
@@ -102,7 +102,6 @@ func DeleteWebhook(p *pipeline.Pipeline) error {
 		if p.WebHookId > 0 {
 			//TODO
 			repoUrl := p.Stages[0].Steps[0].Repository
-			token := p.Stages[0].Steps[0].Token
 			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
 			match := reg.FindStringSubmatch(repoUrl)
 			if len(match) != 3 {
@@ -123,7 +122,7 @@ func DeleteWebhook(p *pipeline.Pipeline) error {
 	return nil
 }
 
-func CreateWebhook(p *pipeline.Pipeline, webhookUrl string, token string) error {
+func CreateWebhook(p *pipeline.Pipeline, token string) error {
 	logrus.Debugf("createwebhook for pipeline:%v", p.Id)
 	if p == nil {
 		return errors.New("empty pipeline to create webhook")
@@ -142,6 +141,7 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string, token string) error 
 			user := match[1]
 			repo := match[2]
 			secret := p.WebHookToken
+			webhookUrl := fmt.Sprintf("%s&pipelineId=%s", CIWebhookEndpoint, p.Id)
 			id, err := util.CreateWebhook(user, repo, token, webhookUrl, secret)
 			logrus.Debugf("Creating webhook:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
 			if err != nil {
@@ -152,30 +152,4 @@ func CreateWebhook(p *pipeline.Pipeline, webhookUrl string, token string) error 
 		}
 	}
 	return nil
-}
-
-func RenewWebhook(p *pipeline.Pipeline, token string) error {
-	//update webhook in github repo
-	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		logrus.Debugf("pipelinechange,webhook:%v,%v,%v", p.Stages[0].Steps[0].Webhook, p.WebHookId)
-		if p.Stages[0].Steps[0].Webhook {
-			if p.WebHookId <= 0 {
-				payloadURL := fmt.Sprintf("%s&pipelineId=%s", CIWebhookEndpoint, p.Id)
-				err := CreateWebhook(p, payloadURL, token)
-				if err != nil {
-					return ErrCreateWebhook
-				}
-			}
-		} else {
-			if p.WebHookId > 0 {
-				err := DeleteWebhook(p)
-				if err != nil {
-					return ErrDelWebhook
-				}
-			}
-		}
-
-	}
-	return nil
-
 }
