@@ -258,9 +258,12 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	ppl.WebHookToken = uuid.Rand().Hex()
 	//TODO Multiple
 	token, err := GetSingleUserToken()
-	err = webhook.RenewWebhook(ppl, token)
 	if err != nil {
-		logrus.Errorf("fail renewWebhook")
+		return err
+	}
+	err = webhook.CreateWebhook(ppl, token)
+	if err != nil {
+		logrus.Errorf("fail createWebhook")
 		return err
 	}
 	err = s.PipelineContext.CreatePipeline(ppl)
@@ -275,6 +278,7 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 
 func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
+	id := mux.Vars(req)["id"]
 	data, err := ioutil.ReadAll(req.Body)
 	ppl := &pipeline.Pipeline{}
 	if err := json.Unmarshal(data, ppl); err != nil {
@@ -285,10 +289,31 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	}
 	//TODO Multiple
 	token, err := GetSingleUserToken()
-	err = webhook.RenewWebhook(ppl, token)
-	if err != nil && err != webhook.ErrDelWebhook {
-		//fail to create webhook.block update
+	if err != nil {
+		logrus.Error(err)
 		return err
+	}
+	// Update webhook
+	prevPipeline := s.PipelineContext.GetPipelineById(id)
+	if prevPipeline.Stages[0].Steps[0].Webhook && !ppl.Stages[0].Steps[0].Webhook {
+		if err = webhook.DeleteWebhook(prevPipeline, token); err != nil {
+			logrus.Error(err)
+		}
+	} else if !prevPipeline.Stages[0].Steps[0].Webhook && ppl.Stages[0].Steps[0].Webhook {
+		if err = webhook.CreateWebhook(ppl, token); err != nil {
+			logrus.Error(err)
+			return err
+		}
+	} else if prevPipeline.Stages[0].Steps[0].Webhook &&
+		ppl.Stages[0].Steps[0].Webhook &&
+		(prevPipeline.Stages[0].Steps[0].Repository != ppl.Stages[0].Steps[0].Repository) {
+		if err = webhook.DeleteWebhook(prevPipeline, token); err != nil {
+			logrus.Error(err)
+		}
+		if err = webhook.CreateWebhook(ppl, token); err != nil {
+			logrus.Error(err)
+			return err
+		}
 	}
 	err = s.PipelineContext.UpdatePipeline(ppl)
 	if err != nil {
@@ -304,7 +329,9 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 	ppl := s.PipelineContext.GetPipelineById(id)
-	err := webhook.DeleteWebhook(ppl)
+	//TODO Multiple
+	token, err := GetSingleUserToken()
+	err = webhook.DeleteWebhook(ppl, token)
 	if err != nil {
 		//log delete webhook failure but not block
 		logrus.Errorf("fail to delete webhook for pipeline \"%v\",for %v", ppl.Name, err)
