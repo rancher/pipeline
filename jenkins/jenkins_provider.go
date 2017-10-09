@@ -255,7 +255,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		envVars := ""
 		if len(step.Parameters) > 0 {
 			for _, para := range step.Parameters {
-				envVars += fmt.Sprintf("-e %s ", para)
+				envVars += fmt.Sprintf("-e %s ", QuoteShell(para))
 			}
 		}
 
@@ -398,17 +398,15 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		}
 		for k, v := range step.ServiceSelector {
 			stringBuilder.WriteString(" --selector ")
-			stringBuilder.WriteString(k)
-			stringBuilder.WriteString("=")
-			stringBuilder.WriteString(v)
+			stringBuilder.WriteString(QuoteShell(fmt.Sprintf("%s=%s", k, v)))
 		}
 	case pipeline.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.DeployEnv == "local" {
-			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, step.DockerCompose, step.RancherCompose)
+			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(step.DockerCompose), EscapeShell(step.RancherCompose))
 			stringBuilder.WriteString(script)
 		} else {
-			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, step.DockerCompose, step.RancherCompose)
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(step.DockerCompose), EscapeShell(step.RancherCompose))
 			stringBuilder.WriteString(script)
 		}
 	case pipeline.StepTypeUpgradeCatalog:
@@ -810,6 +808,15 @@ func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
 	}
 	return &actiStage
 
+}
+
+func QuoteShell(script string) string {
+	//Use double quotes so variable substitution works
+
+	escaped := strings.Replace(script, "\\", "\\\\", -1)
+	escaped = strings.Replace(script, "\"", "\\\"", -1)
+	escaped = "\"" + escaped + "\""
+	return escaped
 }
 
 func EscapeShell(script string) string {
