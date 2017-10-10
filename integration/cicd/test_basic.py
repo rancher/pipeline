@@ -153,7 +153,92 @@ def test_run_pipeline_basic(pipeline_resource):
     remove_pipeline('hello')
 
 
-def test_run_pipeline_phptest(pipeline_resource):
+def test_run_pipeline_plenty_stages(pipeline_resource):
+    stages = [
+        {
+            "name": "SCM",
+            "steps": [{
+                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "repository": "https://github.com/gitlawr/php.git",
+                "sourceType": "github", "type": "scm"
+                }]
+        },
+        {
+            "name": "1",
+            "steps": [{
+                "command": "echo 1",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "2",
+            "steps": [{
+                "command": "echo 2",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "3",
+            "steps": [{
+                "command": "echo 3",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "4",
+            "steps": [{
+                "command": "echo 4",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "5",
+            "steps": [{
+                "command": "echo 5",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "6",
+            "steps": [{
+                "command": "echo 6",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "7",
+            "steps": [{
+                "command": "echo 7",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "8",
+            "steps": [{
+                "command": "echo 8",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "9",
+            "steps": [{
+                "command": "echo 9",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        },
+        {
+            "name": "10",
+            "steps": [{
+                "command": "echo 10",
+                "image": "busybox",
+                "isShell": True, "type": "task"}]
+        }]
+    create_pipeline(name='plentytest', stages=stages)
+    run_pipeline_expect('plentytest', 'Success')
+    remove_pipeline('plentytest')
+
+
+def test_run_pipeline_as_a_service(pipeline_resource):
     stages = [
         {
             "name": "SCM",
@@ -176,23 +261,13 @@ def test_run_pipeline_phptest(pipeline_resource):
         {
             "name": "test",
             "steps": [{
-                "command": ("# Install git, the php image doesn't"
-                            " have installed\napt-get update -yqq"
-                            "\napt-get install git -yqq\n\n# Ins"
-                            "tall mysql driver\ndocker-php-ext-in"
-                            "stall pdo_mysql\n\n# Install compose"
-                            "r\ncurl -sS https://getcomposer.org/i"
-                            "nstaller | php\n\n# Install all projec"
-                            "t dependencies\nphp composer.phar inst"
-                            "all\nvendor/bin/phpunit --configuration"
-                            " phpunit_mysql.xml --coverage-text"),
-                "dockerfilePath": "", "image": "php:5.6",
+                "command": ("mysql -h mysql -proot -e \"show databases;\""),
+                "dockerfilePath": "", "image": "mysql:5.6",
                 "isShell": True, "type": "task"}]
         }]
-    pipeline = create_pipeline(name='phptest', stages=stages)
-    assert pipeline.id is not None, 'Failed create pipeline.'
-    run_pipeline_expect('phptest', 'Success', 600)
-    remove_pipeline('phptest')
+    create_pipeline(name='svctest', stages=stages)
+    run_pipeline_expect('svctest', 'Success')
+    remove_pipeline('svctest')
 
 
 def test_run_pipeline_fail_script(pipeline_resource):
@@ -238,7 +313,7 @@ def test_run_pipeline_cron(pipeline_resource):
     # wait over 1 minute for cron trigger
     time.sleep(80)
     pipeline = get_pipeline(pipeline.id)
-    assert pipeline.runCount == 1, "Cron trigger fail"
+    assert pipeline.runCount >= 1, "Cron trigger fail"
     wait_activity_expect(pipeline.lastRunId, 'Success')
     remove_pipeline('crontest')
 
