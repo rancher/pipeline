@@ -53,7 +53,7 @@ type Host struct {
 
 	EngineStorageDriver string `json:"engineStorageDriver,omitempty" yaml:"engine_storage_driver,omitempty"`
 
-	ExtractedConfig string `json:"extractedConfig,omitempty" yaml:"extracted_config,omitempty"`
+	HostTemplateId string `json:"hostTemplateId,omitempty" yaml:"host_template_id,omitempty"`
 
 	Hostname string `json:"hostname,omitempty" yaml:"hostname,omitempty"`
 
@@ -82,6 +82,8 @@ type Host struct {
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
 	Removed string `json:"removed,omitempty" yaml:"removed,omitempty"`
+
+	StackId string `json:"stackId,omitempty" yaml:"stack_id,omitempty"`
 
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
@@ -121,13 +123,13 @@ type HostOperations interface {
 
 	ActionError(*Host) (*Host, error)
 
+	ActionEvacuate(*Host) (*Host, error)
+
 	ActionProvision(*Host) (*Host, error)
 
 	ActionPurge(*Host) (*Host, error)
 
 	ActionRemove(*Host) (*Host, error)
-
-	ActionRestore(*Host) (*Host, error)
 
 	ActionUpdate(*Host) (*Host, error)
 }
@@ -227,6 +229,15 @@ func (c *HostClient) ActionError(resource *Host) (*Host, error) {
 	return resp, err
 }
 
+func (c *HostClient) ActionEvacuate(resource *Host) (*Host, error) {
+
+	resp := &Host{}
+
+	err := c.rancherClient.doAction(HOST_TYPE, "evacuate", &resource.Resource, nil, resp)
+
+	return resp, err
+}
+
 func (c *HostClient) ActionProvision(resource *Host) (*Host, error) {
 
 	resp := &Host{}
@@ -250,15 +261,6 @@ func (c *HostClient) ActionRemove(resource *Host) (*Host, error) {
 	resp := &Host{}
 
 	err := c.rancherClient.doAction(HOST_TYPE, "remove", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *HostClient) ActionRestore(resource *Host) (*Host, error) {
-
-	resp := &Host{}
-
-	err := c.rancherClient.doAction(HOST_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

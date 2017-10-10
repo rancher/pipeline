@@ -37,6 +37,10 @@ type Container struct {
 
 	CpuQuota int64 `json:"cpuQuota,omitempty" yaml:"cpu_quota,omitempty"`
 
+	CpuRealtimePeriod int64 `json:"cpuRealtimePeriod,omitempty" yaml:"cpu_realtime_period,omitempty"`
+
+	CpuRealtimeRuntime int64 `json:"cpuRealtimeRuntime,omitempty" yaml:"cpu_realtime_runtime,omitempty"`
+
 	CpuSet string `json:"cpuSet,omitempty" yaml:"cpu_set,omitempty"`
 
 	CpuSetMems string `json:"cpuSetMems,omitempty" yaml:"cpu_set_mems,omitempty"`
@@ -183,11 +187,19 @@ type Container struct {
 
 	RestartPolicy *RestartPolicy `json:"restartPolicy,omitempty" yaml:"restart_policy,omitempty"`
 
+	RunInit bool `json:"runInit,omitempty" yaml:"run_init,omitempty"`
+
+	Secrets []SecretReference `json:"secrets,omitempty" yaml:"secrets,omitempty"`
+
 	SecurityOpt []string `json:"securityOpt,omitempty" yaml:"security_opt,omitempty"`
+
+	ServiceId string `json:"serviceId,omitempty" yaml:"service_id,omitempty"`
 
 	ServiceIds []string `json:"serviceIds,omitempty" yaml:"service_ids,omitempty"`
 
 	ShmSize int64 `json:"shmSize,omitempty" yaml:"shm_size,omitempty"`
+
+	StackId string `json:"stackId,omitempty" yaml:"stack_id,omitempty"`
 
 	StartCount int64 `json:"startCount,omitempty" yaml:"start_count,omitempty"`
 
@@ -198,6 +210,8 @@ type Container struct {
 	StdinOpen bool `json:"stdinOpen,omitempty" yaml:"stdin_open,omitempty"`
 
 	StopSignal string `json:"stopSignal,omitempty" yaml:"stop_signal,omitempty"`
+
+	StopTimeout int64 `json:"stopTimeout,omitempty" yaml:"stop_timeout,omitempty"`
 
 	StorageOpt map[string]interface{} `json:"storageOpt,omitempty" yaml:"storage_opt,omitempty"`
 
@@ -220,6 +234,8 @@ type Container struct {
 	Ulimits []Ulimit `json:"ulimits,omitempty" yaml:"ulimits,omitempty"`
 
 	User string `json:"user,omitempty" yaml:"user,omitempty"`
+
+	UserPorts []string `json:"userPorts,omitempty" yaml:"user_ports,omitempty"`
 
 	UsernsMode string `json:"usernsMode,omitempty" yaml:"userns_mode,omitempty"`
 
@@ -274,8 +290,6 @@ type ContainerOperations interface {
 	ActionRemove(*Container) (*Instance, error)
 
 	ActionRestart(*Container) (*Instance, error)
-
-	ActionRestore(*Container) (*Instance, error)
 
 	ActionStart(*Container) (*Instance, error)
 
@@ -444,15 +458,6 @@ func (c *ContainerClient) ActionRestart(resource *Container) (*Instance, error) 
 	resp := &Instance{}
 
 	err := c.rancherClient.doAction(CONTAINER_TYPE, "restart", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *ContainerClient) ActionRestore(resource *Container) (*Instance, error) {
-
-	resp := &Instance{}
-
-	err := c.rancherClient.doAction(CONTAINER_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }

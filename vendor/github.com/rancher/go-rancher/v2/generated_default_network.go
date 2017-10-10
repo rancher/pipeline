@@ -13,6 +13,8 @@ type DefaultNetwork struct {
 
 	Data map[string]interface{} `json:"data,omitempty" yaml:"data,omitempty"`
 
+	DefaultPolicyAction string `json:"defaultPolicyAction,omitempty" yaml:"default_policy_action,omitempty"`
+
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
 	Dns []string `json:"dns,omitempty" yaml:"dns,omitempty"`
@@ -26,6 +28,8 @@ type DefaultNetwork struct {
 	Metadata map[string]interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
 
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+
+	Policy []NetworkPolicyRule `json:"policy,omitempty" yaml:"policy,omitempty"`
 
 	RemoveTime string `json:"removeTime,omitempty" yaml:"remove_time,omitempty"`
 
@@ -70,8 +74,6 @@ type DefaultNetworkOperations interface {
 	ActionPurge(*DefaultNetwork) (*Network, error)
 
 	ActionRemove(*DefaultNetwork) (*Network, error)
-
-	ActionRestore(*DefaultNetwork) (*Network, error)
 
 	ActionUpdate(*DefaultNetwork) (*Network, error)
 }
@@ -167,15 +169,6 @@ func (c *DefaultNetworkClient) ActionRemove(resource *DefaultNetwork) (*Network,
 	resp := &Network{}
 
 	err := c.rancherClient.doAction(DEFAULT_NETWORK_TYPE, "remove", &resource.Resource, nil, resp)
-
-	return resp, err
-}
-
-func (c *DefaultNetworkClient) ActionRestore(resource *DefaultNetwork) (*Network, error) {
-
-	resp := &Network{}
-
-	err := c.rancherClient.doAction(DEFAULT_NETWORK_TYPE, "restore", &resource.Resource, nil, resp)
 
 	return resp, err
 }
