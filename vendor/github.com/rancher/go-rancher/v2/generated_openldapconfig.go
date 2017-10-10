@@ -9,6 +9,8 @@ type Openldapconfig struct {
 
 	AccessMode string `json:"accessMode,omitempty" yaml:"access_mode,omitempty"`
 
+	AllowedIdentities []Identity `json:"allowedIdentities,omitempty" yaml:"allowed_identities,omitempty"`
+
 	ConnectionTimeout int64 `json:"connectionTimeout,omitempty" yaml:"connection_timeout,omitempty"`
 
 	Domain string `json:"domain,omitempty" yaml:"domain,omitempty"`
@@ -24,6 +26,8 @@ type Openldapconfig struct {
 	GroupNameField string `json:"groupNameField,omitempty" yaml:"group_name_field,omitempty"`
 
 	GroupObjectClass string `json:"groupObjectClass,omitempty" yaml:"group_object_class,omitempty"`
+
+	GroupSearchDomain string `json:"groupSearchDomain,omitempty" yaml:"group_search_domain,omitempty"`
 
 	GroupSearchField string `json:"groupSearchField,omitempty" yaml:"group_search_field,omitempty"`
 

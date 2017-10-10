@@ -5,7 +5,7 @@ const (
 )
 
 type Ldapconfig struct {
-	Resource
+	Resource `yaml:"-"`
 
 	AccessMode string `json:"accessMode,omitempty" yaml:"access_mode,omitempty"`
 
@@ -22,6 +22,8 @@ type Ldapconfig struct {
 	GroupNameField string `json:"groupNameField,omitempty" yaml:"group_name_field,omitempty"`
 
 	GroupObjectClass string `json:"groupObjectClass,omitempty" yaml:"group_object_class,omitempty"`
+
+	GroupSearchDomain string `json:"groupSearchDomain,omitempty" yaml:"group_search_domain,omitempty"`
 
 	GroupSearchField string `json:"groupSearchField,omitempty" yaml:"group_search_field,omitempty"`
 
