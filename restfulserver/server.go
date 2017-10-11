@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
-	v2client "github.com/rancher/go-rancher/v2"
+	v3client "github.com/rancher/go-rancher/v3"
 	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver/webhook"
@@ -61,7 +61,7 @@ func checkCIEndpoint() error {
 	}
 	filters := make(map[string]interface{})
 	filters["kind"] = "webhookReceiver"
-	opt := &v2client.ListOpts{
+	opt := &v3client.ListOpts{
 		Filters: filters,
 	}
 	gCollection, err := apiClient.GenericObject.List(opt)
@@ -93,11 +93,6 @@ func checkCIEndpoint() error {
 	return nil
 }
 
-/*
-func getGithubWebhookPayloadUrl(apiClient *v2client.RancherClient) string {
-	v2client.
-}
-*/
 //ListPipelines query List of pipelines
 func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
@@ -472,7 +467,7 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 	pId := mux.Vars(req)["id"]
 	filters := make(map[string]interface{})
 	filters["kind"] = "activity"
-	goCollection, err := apiClient.GenericObject.List(&v2client.ListOpts{
+	goCollection, err := apiClient.GenericObject.List(&v3client.ListOpts{
 		Filters: filters,
 	})
 

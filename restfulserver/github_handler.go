@@ -278,6 +278,7 @@ func getFromGithub(githubAccessToken string, url string) (*http.Response, error)
 	q := req.URL.Query()
 	q.Set("per_page", maxPerPage)
 	req.URL.RawQuery = q.Encode()
+
 	req.Header.Add("Authorization", "token "+githubAccessToken)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("user-agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36)")
