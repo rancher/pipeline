@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"time"
 
+	yaml "gopkg.in/yaml.v2"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/google/go-github/github"
 	"github.com/gorilla/mux"
@@ -250,6 +252,24 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, ppl); err != nil {
 		return err
 	}
+	//for pipelinefile import
+	if ppl.Templates != nil && len(ppl.Templates) > 0 {
+		templateContent := ""
+		//TODO batch import
+		for _, v := range ppl.Templates {
+			templateContent = v
+			break
+		}
+		if templateContent == "" {
+			return fmt.Errorf("got empty pipeline file")
+		}
+		if err := yaml.Unmarshal([]byte(templateContent), &ppl.PipelineContent); err != nil {
+			return err
+		}
+		pipeline.Clean(ppl)
+		logrus.Debugf("got imported pipeline:\n%v", ppl)
+	}
+
 	if err := pipeline.Validate(ppl); err != nil {
 		return err
 	}
@@ -379,6 +399,38 @@ func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) e
 	}
 	MyAgent.onPipelineDeActivate(r)
 	apiContext.Write(toPipelineResource(apiContext, r))
+	return nil
+}
+
+func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
+	id := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineById(id)
+	if r == nil {
+		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
+		rw.WriteHeader(http.StatusNotFound)
+		apiContext.Write(&Error{
+			Resource: client.Resource{
+				Id:      uuid.Rand().Hex(),
+				Type:    "error",
+				Links:   map[string]string{},
+				Actions: map[string]string{},
+			},
+			Status: http.StatusNotFound,
+			Msg:    err.Error(),
+			Code:   err.Error(),
+		})
+		return err
+	}
+	pipeline.Clean(r)
+	content, err := yaml.Marshal(r.PipelineContent)
+	if err != nil {
+		return err
+	}
+	logrus.Debugf("get pipeline file:\n%s", string(content))
+	fileName := fmt.Sprintf("pipeline-%s.yaml", r.Name)
+	rw.Header().Add("Content-Disposition", "attachment; filename="+fileName)
+	http.ServeContent(rw, req, fileName, time.Now(), bytes.NewReader(content))
 	return nil
 }
 

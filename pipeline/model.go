@@ -1,8 +1,6 @@
 package pipeline
 
 import (
-	"time"
-
 	"github.com/rancher/go-rancher/client"
 )
 
@@ -68,10 +66,14 @@ type PipelineSetting struct {
 
 type Pipeline struct {
 	client.Resource
+	PipelineContent
+}
+
+type PipelineContent struct {
 	Name            string `json:"name,omitempty" yaml:"name,omitempty"`
 	IsActivate      bool   `json:"isActivate" yaml:"isActivate"`
 	VersionSequence string `json:"-" yaml:"-"`
-	RunCount        int    `json:"runCount" yaml:"runCount"`
+	RunCount        int    `json:"runCount" yaml:"runCount,omitempty"`
 	LastRunId       string `json:"lastRunId,omitempty" yaml:"lastRunId,omitempty"`
 	LastRunStatus   string `json:"lastRunStatus,omitempty" yaml:"lastRunStatus,omitempty"`
 	LastRunTime     int64  `json:"lastRunTime,omitempty" yaml:"lastRunTime,omitempty"`
@@ -80,99 +82,75 @@ type Pipeline struct {
 	Repository      string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch          string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	TargetImage     string `json:"targetImage,omitempty" yaml:"target-image,omitempty"`
-	File            string `json:"file"`
+	File            string `json:"file,omitempty" yaml:"file,omitempty"`
 	WebHookId       int    `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 	WebHookToken    string `json:"webhookToken,omitempty" yaml:"webhookToken,omitempty"`
+	//for import
+	Templates map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	//trigger
-	TriggerType     string `json:"triggerType,omitempty" yaml:"triggerType,omitempty"`
-	TriggerOnUpdate bool   `json:"triggerOnUpdate,omitempty" yaml:"triggerOnUpdate,omitempty"`
-	TriggerSpec     string `json:"triggerSpec" yaml:"triggerSpec,omitempty"`
-	TriggerTimezone string `json:"triggerTimezone,omitempty" yaml:"triggerTimezone,omitempty"`
+	CronTrigger *CronTrigger `json:"cronTrigger,omitempty" yaml:"cronTrigger,omitempty"`
+	Stages      []*Stage     `json:"stages,omitempty" yaml:"stages,omitempty"`
+}
 
-	Stages []*Stage `json:"stages,omitempty" yaml:"stages,omitempty"`
+type CronTrigger struct {
+	TriggerOnUpdate bool   `json:"triggerOnUpdate,omitempty" yaml:"triggerOnUpdate,omitempty"`
+	Spec            string `json:"spec,omitempty" yaml:"spec,omitempty"`
+	Timezone        string `json:"timezone,omitempty" yaml:"timezone,omitempty"`
 }
 
 type Stage struct {
 	Name        string   `json:"name,omitempty" yaml:"name,omitempty"`
-	Ordinal     int      `json:"ordinal,omitempty" yaml:"ordinal,omitempty"`
 	NeedApprove bool     `json:"needApprove,omitempty" yaml:"need-approve,omitempty"`
-	Approvers   []string `json:"approvers,omitempty"`
+	Approvers   []string `json:"approvers,omitempty" yaml:"approvers,omitempty"`
 	Steps       []*Step  `json:"steps,omitempty" yaml:"steps,omitempty"`
 }
 
 type Step struct {
-	Name    string `json:"name,omitempty" yaml:"name,omitempty"`
-	Type    string `json:"type,omitempty" yaml:"type,omitempty"`
-	Ordinal int    `json:"ordinal,omitempty" yaml:"ordinal,omitempty"`
+	Name string `json:"name,omitempty" yaml:"name,omitempty"`
+	Type string `json:"type,omitempty" yaml:"type,omitempty"`
 	//---SCM step
+	SCMType    string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	Webhook    bool   `json:"webhook,omitempty" yaml:"webhook,omitempty"`
-	Token      string `json:"token,omitempty" yaml:"token,omitempty"`
 	//---Build step
-	SourceType     string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
-	Dockerfile     string `json:"file,omitempty" yaml:"file,omitempty"`
-	DockerfilePath string `json:"dockerfilePath,omittempty" yaml:"dockerfilePath,omitempty"`
+	Dockerfile     string `json:"dockerFileContent,omitempty" yaml:"dockerFileContent,omitempty"`
+	DockerfilePath string `json:"dockerFilePath,omittempty" yaml:"dockerFilePath,omitempty"`
 	TargetImage    string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
 	PushFlag       bool   `json:"push,omitempty" yaml:"push,omitempty"`
-	UserName       string `json:"username,omitempty" yaml:"username,omitempty"`
-	Password       string `json:"password,omitempty" yaml:"password,omitempty"`
 
 	//---task step
-	Command    string       `json:"command,omitempty" yaml:"command,omitempty"`
-	Image      string       `json:"image,omitempty" yaml:"image,omitempty"`
-	Parameters []string     `json:"parameters,omitempty" yaml:"parameters,omitempty"`
-	Entrypoint string       `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
-	Args       string       `json:"args,omitempty" yaml:"args,omitempty"`
-	Alias      string       `json:"alias,omitempty" yaml:"alias,omitempty"`
-	IsService  bool         `json:"isService,omitempty"`
-	IsShell    bool         `json:"isShell"`
-	Services   []*CIService `json:"services,omitempty"`
+	Image       string       `json:"image,omitempty" yaml:"image,omitempty"`
+	IsService   bool         `json:"isService,omitempty" yaml:"isService,omitempty"`
+	Alias       string       `json:"alias,omitempty" yaml:"alias,omitempty"`
+	ShellScript string       `json:"shellScript,omitempty" yaml:"shellScript,omitempty"`
+	Entrypoint  string       `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
+	Args        string       `json:"args,omitempty" yaml:"args,omitempty"`
+	Env         []string     `json:"env,omitempty" yaml:"env,omitempty"`
+	Services    []*CIService `json:"services,omitempty" yaml:"services,omitempty"`
 
-	//---upgradeStack step
-	//Endpoint,Accesskey,Secretkey
-	StackType      string `json:"stackType,omitempty" yaml:"stackType,omitempty"` //catalog or custom
-	StackName      string `json:"stackName,omitempty" yaml:"stackType,omitempty"`
-	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"docker-compose,omitempty"`
-	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancher-compose,omitempty"`
-
-	//---deploy step
-	DeployName        string `json:"deployName,omitempty" yaml:"deploy-name,omitempty"`
-	DeployEnvironment string `json:"deployEnvironment,omitempty" yaml:"deploy-environment,omitempty"`
-	Count             int    `json:"count,omitempty" yaml:"count,omitempty"`
 	//---upgradeService step
-	Tag             string            `json:"tag,omitempty" yaml:"tag,omitempty"`
+	ImageTag        string            `json:"imageTag,omitempty" yaml:"imageTag,omitempty"`
 	ServiceSelector map[string]string `json:"serviceSelector,omitempty" yaml:"serviceSelector,omitempty"`
 	BatchSize       int               `json:"batchSize,omitempty" yaml:"batchSize,omitempty"`
 	Interval        int               `json:"interval,omitempty" yaml:"interval,omitempty"`
 	StartFirst      bool              `json:"startFirst,omitempty" yaml:"startFirst,omitempty"`
-	DeployEnv       string            `json:"deployEnv,omitempty" yaml:"deployEnv,omitempty"`
-	EnvironmentId   string            `json:"environmentId,omitempty" yaml:"environmentId,omitempty"`
 	Endpoint        string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	Accesskey       string            `json:"accesskey,omitempty" yaml:"accesskey,omitempty"`
 	Secretkey       string            `json:"secretkey,omitempty" yaml:"secretkey,omitempty"`
 
+	//---upgradeStack step
+	//Endpoint,Accesskey,Secretkey
+	StackName      string `json:"stackName,omitempty" yaml:"stackName,omitempty"`
+	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"dockerCompose,omitempty"`
+	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancherCompose,omitempty"`
+
 	//---upgradeCatalog step
 	//Endpoint,Accesskey,Secretkey,StackName,
-	//Repository,Branch,Username,Password,DeployEnv
-	DeployFlag bool        `json:"deploy,omitempty" yaml:"deploy,omitempty"`
-	ExternalId string      `json:"externalId,omitempty" yaml:"externalId,omitempty"`
-	FilesArray []PlainFile `json:"filesAry,omitempty" yaml:"filesAry,omitempty"`
-	Readme     string      `json:"readme,omitempty" yaml:"readme,omitempty"`
-	Answers    string      `json:"answerString,omitempty" yaml:"answerString,omitempty"`
-}
-
-type PlainFile struct {
-	Name string `json:"name,omitempty" yaml:"name,omitempty"`
-	Body string `json:"body,omitempty" yaml:"body,omitempty"`
-}
-
-type Trigger struct {
-	Type string `json:"type,omitempty" yaml:"type,omitempty"`
-
-	// cron trigger
-	Spec     string `json:"spec" yaml:"spec,omitempty"`
-	Timezone string `json:"timezone,omitempty" yaml:"timezone,omitempty"`
+	ExternalId string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
+	DeployFlag bool              `json:"deploy,omitempty" yaml:"deploy,omitempty"`
+	Templates  map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
+	Answers    string            `json:"answerString,omitempty" yaml:"answerString,omitempty"`
 }
 
 type PipelineProvider interface {
@@ -229,34 +207,4 @@ type CIService struct {
 	Image         string `json:"image,omitempty"`
 	Entrypoint    string `json:"entrypoint,omitempty"`
 	Command       string `json:"command,omitempty"`
-}
-
-func ToDemoActivity() *Activity {
-	startTS := (time.Now().Unix() - 30) * 1000
-	stopTS := time.Now().Unix()
-	r := Activity{
-		Id:              "test",
-		PipelineName:    "test1",
-		PipelineVersion: "0",
-		Status:          ActivitySuccess,
-		StartTS:         startTS,
-		StopTS:          stopTS,
-		ActivityStages: []*ActivityStage{
-			&ActivityStage{
-				Name:         "build",
-				NeedApproval: false,
-				StartTS:      startTS,
-				Status:       ActivityStageSuccess,
-				RawOutput:    "",
-				ActivitySteps: []*ActivityStep{
-					&ActivityStep{
-						Name:    "build",
-						Message: "",
-						Status:  ActivityStageSuccess,
-					},
-				},
-			},
-		},
-	}
-	return &r
 }

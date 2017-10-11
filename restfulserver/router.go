@@ -48,6 +48,8 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}").Handler(f(schemas, s.ListPipeline))
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/activities").Handler(f(schemas, s.ListActivitiesOfPipeline))
 	router.Methods(http.MethodDelete).Path("/v1/pipelines/{id}").Handler(f(schemas, s.DeletePipeline))
+	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/exportconfig").Handler(f(schemas, s.ExportPipeline))
+
 	//router.Methods(http.MethodDelete).Path("/v1/pipeline").Handler(f(schemas, s.CleanPipelines))
 
 	//activities
@@ -87,6 +89,7 @@ func NewRouter(s *Server) *mux.Router {
 		"activate":   f(schemas, s.ActivatePipeline),
 		"deactivate": f(schemas, s.DeActivatePipeline),
 		"remove":     f(schemas, s.DeletePipeline),
+		"export":     f(schemas, s.ExportPipeline),
 	}
 	for name, actions := range pipelineActions {
 		router.Methods(http.MethodPost).Path("/v1/pipelines/{id}").Queries("action", name).Handler(actions)
