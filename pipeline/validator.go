@@ -8,6 +8,24 @@ import (
 	"github.com/robfig/cron"
 )
 
+func Clean(p *Pipeline) {
+	p.VersionSequence = ""
+	p.RunCount = 0
+	p.LastRunId = ""
+	p.LastRunStatus = ""
+	p.LastRunTime = 0
+	p.NextRunTime = 0
+	p.CommitInfo = ""
+	p.Repository = ""
+	p.Branch = ""
+	p.TargetImage = ""
+	p.File = ""
+	p.Templates = nil
+	p.WebHookId = 0
+	p.WebHookToken = ""
+
+}
+
 func Validate(p *Pipeline) error {
 	if p.Name == "" {
 		return errors.New("Pipeline name should not be null!")
@@ -18,10 +36,11 @@ func Validate(p *Pipeline) error {
 		return errors.New("SCM type should be the first step")
 	}
 
-	if err := checkCronSpec(p.TriggerSpec); err != nil {
-		return err
+	if p.CronTrigger != nil {
+		if err := checkCronSpec(p.CronTrigger.Spec); err != nil {
+			return err
+		}
 	}
-
 	if err := checkStageName(p.Stages); err != nil {
 		return err
 	}
@@ -58,7 +77,7 @@ func validateStep(step *Step) error {
 			return errors.New("Target Image field should not be null for build step")
 		}
 	case StepTypeUpgradeService:
-		if step.Tag == "" {
+		if step.ImageTag == "" {
 			return errors.New("Image field should not be null for upgradeService step")
 		}
 		if len(step.ServiceSelector) == 0 {

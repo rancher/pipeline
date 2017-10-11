@@ -253,8 +253,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	case pipeline.StepTypeTask:
 
 		envVars := ""
-		if len(step.Parameters) > 0 {
-			for _, para := range step.Parameters {
+		if len(step.Env) > 0 {
+			for _, para := range step.Env {
 				envVars += fmt.Sprintf("-e %s ", QuoteShell(para))
 			}
 		}
@@ -262,13 +262,13 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		entrypointPara := ""
 		argsPara := ""
 		svcPara := ""
-		if step.IsShell {
+		if step.ShellScript != "" {
 			entrypointPara = "--entrypoint /bin/sh"
 			argsPara = ".r_cicd_entrypoint.sh"
 
 			//write to a sh file,then docker run it
 			stringBuilder.WriteString("cat>.r_cicd_entrypoint.sh<<EOF\n")
-			cmd := strings.Replace(step.Command, "\\", "\\\\", -1)
+			cmd := strings.Replace(step.ShellScript, "\\", "\\\\", -1)
 			cmd = strings.Replace(cmd, "$", "\\$", -1)
 			stringBuilder.WriteString(cmd)
 			stringBuilder.WriteString("\nEOF\n")
@@ -316,7 +316,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString(argsPara)
 	case pipeline.StepTypeBuild:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
-		if step.SourceType == "sc" {
+		if step.Dockerfile == "" {
 			buildPath := "."
 			if step.DockerfilePath != "" {
 				buildPath = step.DockerfilePath
@@ -326,7 +326,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(" ")
 			stringBuilder.WriteString(buildPath)
 			stringBuilder.WriteString(";")
-		} else if step.SourceType == "file" {
+		} else {
 			stringBuilder.WriteString("echo \"")
 			stringBuilder.WriteString(strings.Replace(step.Dockerfile, "\"", "\\\"", -1))
 			stringBuilder.WriteString("\">.Dockerfile;")
@@ -366,23 +366,23 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	case pipeline.StepTypeUpgradeService:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		stringBuilder.WriteString("cihelper")
-		if step.DeployEnv == "others" {
+		if step.Endpoint != "" {
 			stringBuilder.WriteString(" --envurl ")
-			stringBuilder.WriteString(step.Endpoint)
+			stringBuilder.WriteString(QuoteShell(step.Endpoint))
 			stringBuilder.WriteString(" --accesskey ")
-			stringBuilder.WriteString(step.Accesskey)
+			stringBuilder.WriteString(QuoteShell(step.Accesskey))
 			stringBuilder.WriteString(" --secretkey ")
-			stringBuilder.WriteString(step.Secretkey)
-		} else if step.DeployEnv == "local" {
+			stringBuilder.WriteString(QuoteShell(step.Secretkey))
+		} else {
 			//read from env var
 			stringBuilder.WriteString(" --envurl $CATTLE_URL")
 			stringBuilder.WriteString(" --accesskey $CATTLE_ACCESS_KEY")
 			stringBuilder.WriteString(" --secretkey $CATTLE_SECRET_KEY")
 		}
 		stringBuilder.WriteString(" upgrade service ")
-		if step.Tag != "" {
+		if step.ImageTag != "" {
 			stringBuilder.WriteString(" --image ")
-			stringBuilder.WriteString(step.Tag)
+			stringBuilder.WriteString(step.ImageTag)
 		}
 		if step.BatchSize > 0 {
 			stringBuilder.WriteString(" --batchsize ")
@@ -402,7 +402,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		}
 	case pipeline.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
-		if step.DeployEnv == "local" {
+		if step.Endpoint == "" {
 			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(step.DockerCompose), EscapeShell(step.RancherCompose))
 			stringBuilder.WriteString(script)
 		} else {
@@ -426,13 +426,13 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		dockerCompose := ""
 		rancherCompose := ""
 		readme := ""
-		for _, pf := range step.FilesArray {
-			if strings.HasPrefix(pf.Name, "docker-compose") {
-				dockerCompose = pf.Body
-			} else if strings.HasPrefix(pf.Name, "rancher-compose") {
-				rancherCompose = pf.Body
-			} else if pf.Name == "README.md" {
-				readme = pf.Body
+		for k, v := range step.Templates {
+			if strings.HasPrefix(k, "docker-compose") {
+				dockerCompose = v
+			} else if strings.HasPrefix(k, "rancher-compose") {
+				rancherCompose = v
+			} else if k == "README.md" {
+				readme = v
 			}
 
 		}
@@ -445,7 +445,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		accessKey := step.Accesskey
 		secretKey := step.Secretkey
 
-		if step.DeployFlag && step.DeployEnv == "local" {
+		if endpoint == "" {
 			endpoint = "$CATTLE_URL"
 			accessKey = "$CATTLE_ACCESS_KEY"
 			secretKey = "$CATTLE_SECRET_KEY"

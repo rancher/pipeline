@@ -63,8 +63,10 @@ func pipelineSchema(pipeline *client.Schema) {
 		"deactivate": client.Action{
 			Output: "pipeline",
 		},
-
 		"remove": client.Action{
+			Output: "pipeline",
+		},
+		"export": client.Action{
 			Output: "pipeline",
 		},
 	}
@@ -107,8 +109,10 @@ func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline)
 	pipeline.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=remove"
 	pipeline.Actions["activate"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=activate"
 	pipeline.Actions["deactivate"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=deactivate"
+	pipeline.Actions["export"] = apiContext.UrlBuilder.ReferenceLink(pipeline.Resource) + "?action=export"
 
 	pipeline.Links["activities"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activities")
+	pipeline.Links["exportConfig"] = apiContext.UrlBuilder.Link(pipeline.Resource, "exportConfig")
 	return pipeline
 }
 

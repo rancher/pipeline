@@ -74,8 +74,8 @@ func (a *Agent) RunScheduler() {
 
 	pipelines := a.Server.PipelineContext.ListPipelines()
 	for _, pipeline := range pipelines {
-		if pipeline.IsActivate && pipeline.TriggerSpec != "" {
-			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.TriggerSpec, pipeline.TriggerTimezone)
+		if pipeline.IsActivate && pipeline.CronTrigger != nil && pipeline.CronTrigger.Spec != "" {
+			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.CronTrigger.Spec, pipeline.CronTrigger.Timezone)
 			a.registerCronRunner(cr)
 		}
 	}
@@ -100,9 +100,9 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 		a.unregisterCronRunnerC <- pId
 	}
 
-	if p.IsActivate {
-		spec = p.TriggerSpec
-		timezone = p.TriggerTimezone
+	if p.IsActivate && p.CronTrigger != nil && p.CronTrigger.Spec != "" {
+		spec = p.CronTrigger.Spec
+		timezone = p.CronTrigger.Timezone
 		cr := scheduler.NewCronRunner(pId, spec, timezone)
 		a.registerCronRunnerC <- cr
 	}
@@ -118,11 +118,13 @@ func (a *Agent) onPipelineDelete(p *pipeline.Pipeline) {
 	}
 }
 func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
-	pId := p.Id
-	spec := p.TriggerSpec
-	timezone := p.TriggerTimezone
-	cr := scheduler.NewCronRunner(pId, spec, timezone)
-	a.registerCronRunnerC <- cr
+	if p.CronTrigger != nil && p.CronTrigger.Spec != "" {
+		pId := p.Id
+		spec := p.CronTrigger.Spec
+		timezone := p.CronTrigger.Timezone
+		cr := scheduler.NewCronRunner(pId, spec, timezone)
+		a.registerCronRunnerC <- cr
+	}
 }
 
 func (a *Agent) onPipelineDeActivate(p *pipeline.Pipeline) {
@@ -143,7 +145,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 				logrus.Errorf("cron job fail,Error:%v", err)
 				return
 			}
-			if ppl.TriggerOnUpdate && latestCommit == ppl.CommitInfo {
+			if ppl.CronTrigger.TriggerOnUpdate && latestCommit == ppl.CommitInfo {
 				//run only when new changes exist
 				return
 			}

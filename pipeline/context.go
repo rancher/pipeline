@@ -313,8 +313,12 @@ func GetNextRunTime(pipeline *Pipeline) int64 {
 	if !pipeline.IsActivate {
 		return nextRunTime
 	}
-	spec := pipeline.TriggerSpec
-	if pipeline.TriggerSpec == "" {
+	trigger := pipeline.CronTrigger
+	if trigger == nil {
+		return nextRunTime
+	}
+	spec := trigger.Spec
+	if spec == "" {
 		return nextRunTime
 	}
 	schedule, err := cron.ParseStandard(spec)
@@ -352,8 +356,6 @@ func GetServices(activity *Activity, stageOrdinal int, stepOrdinal int) []*CISer
 					ContainerName: activity.Id + step.Alias,
 					Name:          step.Alias,
 					Image:         step.Image,
-					Entrypoint:    step.Entrypoint,
-					Command:       step.Command,
 				}
 				services = append(services, service)
 			}
