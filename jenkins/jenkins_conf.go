@@ -95,18 +95,17 @@ cat>new-rancher-compose.yml<<EOF
 %s
 EOF
 #merge yaml file
-cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml 
-cihelper mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml 
+cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml compose.yml 
 #cat new-docker-compose.yml
 #cat new-rancher-compose.yml
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
+rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --file new-docker-compose.yml --file new-rancher-compose.yml -d
 
 rm -r ../../$TEMPDIR
 
 #check stack upgrade
 checkSvc()
 {
-	SvcStatus=$(rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}")
+	SvcStatus=$(rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}"|awk '$2 == "$R_UPGRADESTACK_STACKNAME" {print}')
 	if [ $? -ne 0 ]; then
 		echo "upgrade stack $R_UPGRADESTACK_STACKNAME fail: $SvcStatus"
 		exit 1
@@ -136,7 +135,7 @@ do
 	fi
 done
 
-echo "upgrade stack $R_UPGRADESTACK_STACKNAME time out."
+echo "upgrade stack $R_UPGRADESTACK_STACKNAME time out(180s)."
 exit 1
 `
 

@@ -7,7 +7,7 @@ import (
 	"regexp"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/rancher/go-rancher/v2"
+	"github.com/rancher/go-rancher/v3"
 	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"

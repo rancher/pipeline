@@ -9,7 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/go-rancher/api"
-	"github.com/rancher/go-rancher/v2"
+	"github.com/rancher/go-rancher/v3"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
