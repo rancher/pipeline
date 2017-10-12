@@ -16,10 +16,7 @@ def test_get_pipeline(pipeline_resource):
         "steps": [
                 {
                     "branch": "master",
-                    "dockerfilePath": "",
-                    "isShell": False,
                     "repository": "https://github.com/gitlawr/sh.git",
-                    "sourceType": "git",
                     "type": "scm"
                 }
             ]
@@ -36,10 +33,7 @@ def test_create_pipeline_basic(pipeline_resource):
         "steps": [
                 {
                     "branch": "master",
-                    "dockerfilePath": "",
-                    "isShell": False,
                     "repository": "https://github.com/gitlawr/sh.git",
-                    "sourceType": "git",
                     "type": "scm"
                 }
             ]
@@ -55,10 +49,7 @@ def test_activate_pipeline(pipeline_resource):
         "steps": [
                 {
                     "branch": "master",
-                    "dockerfilePath": "",
-                    "isShell": False,
                     "repository": "https://github.com/gitlawr/sh.git",
-                    "sourceType": "git",
                     "type": "scm"
                 }
             ]
@@ -80,10 +71,7 @@ def test_create_pipeline_fail_no_scm(pipeline_resource):
             "steps": [
                     {
                         "branch": "master",
-                        "dockerfilePath": "",
-                        "isShell": False,
                         "repository": "https://github.com/gitlawr/sh.git",
-                        "sourceType": "git",
                         "type": "task"
                     }
                 ]
@@ -97,17 +85,17 @@ def test_create_pipeline_phptest(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/php.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "service",
             "steps": [{
-                "alias": "mysql", "dockerfilePath": "",
+                "alias": "mysql",
                 "image": "mysql:5.6", "isService": True,
-                "isShell": False, "parameters": [
+                "env": [
                     "MYSQL_DATABASE=hello_world_test",
                     "MYSQL_ROOT_PASSWORD=root"],
                 "type": "task"}]
@@ -115,19 +103,19 @@ def test_create_pipeline_phptest(pipeline_resource):
         {
             "name": "test",
             "steps": [{
-                "command": ("# Install git, the php image doe"
-                            "sn't have installed\napt-get upd"
-                            "ate -yqq\napt-get install git -y"
-                            "qq\n\n# Install mysql driver\ndo"
-                            "cker-php-ext-install pdo_mysql\n\n"
-                            "# Install composer\ncurl -sS https"
-                            "://getcomposer.org/installer | php"
-                            "\n\n# Install all project dependen"
-                            "cies\nphp composer.phar install\ve"
-                            "ndor/bin/phpunit --configuration ph"
-                            "punit_mysql.xml --coverage-text"),
-                "dockerfilePath": "", "image": "php:5.6",
-                "isShell": True, "type": "task"}]
+                "shellScript": ("# Install git, the php image doe"
+                                "sn't have installed\napt-get upd"
+                                "ate -yqq\napt-get install git -y"
+                                "qq\n\n# Install mysql driver\ndo"
+                                "cker-php-ext-install pdo_mysql\n\n"
+                                "# Install composer\ncurl -sS https"
+                                "://getcomposer.org/installer | php"
+                                "\n\n# Install all project dependen"
+                                "cies\nphp composer.phar install\ve"
+                                "ndor/bin/phpunit --configuration ph"
+                                "punit_mysql.xml --coverage-text"),
+                "image": "php:5.6",
+                "type": "task"}]
         }]
     create_pipeline(name='phptest', stages=stages)
     remove_pipeline('phptest')
@@ -139,10 +127,7 @@ def test_run_pipeline_basic(pipeline_resource):
         "steps": [
                 {
                     "branch": "master",
-                    "dockerfilePath": "",
-                    "isShell": False,
                     "repository": "https://github.com/gitlawr/sh.git",
-                    "sourceType": "git",
                     "type": "scm"
                 }
             ]
@@ -158,80 +143,80 @@ def test_run_pipeline_plenty_stages(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/php.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "1",
             "steps": [{
-                "command": "echo 1",
+                "shellScript": "echo 1",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "2",
             "steps": [{
-                "command": "echo 2",
+                "shellScript": "echo 2",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "3",
             "steps": [{
-                "command": "echo 3",
+                "shellScript": "echo 3",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "4",
             "steps": [{
-                "command": "echo 4",
+                "shellScript": "echo 4",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "5",
             "steps": [{
-                "command": "echo 5",
+                "shellScript": "echo 5",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "6",
             "steps": [{
-                "command": "echo 6",
+                "shellScript": "echo 6",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "7",
             "steps": [{
-                "command": "echo 7",
+                "shellScript": "echo 7",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "8",
             "steps": [{
-                "command": "echo 8",
+                "shellScript": "echo 8",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "9",
             "steps": [{
-                "command": "echo 9",
+                "shellScript": "echo 9",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         },
         {
             "name": "10",
             "steps": [{
-                "command": "echo 10",
+                "shellScript": "echo 10",
                 "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "type": "task"}]
         }]
     create_pipeline(name='plentytest', stages=stages)
     run_pipeline_expect('plentytest', 'Success')
@@ -243,17 +228,18 @@ def test_run_pipeline_as_a_service(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/php.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "service",
             "steps": [{
-                "alias": "mysql", "dockerfilePath": "",
-                "image": "mysql:5.6", "isService": True,
-                "isShell": False, "parameters": [
+                "alias": "mysql",
+                "image": "mysql:5.6",
+                "isService": True,
+                "env": [
                     "MYSQL_DATABASE=hello_world_test",
                     "MYSQL_ROOT_PASSWORD=root"],
                 "type": "task"}]
@@ -261,9 +247,10 @@ def test_run_pipeline_as_a_service(pipeline_resource):
         {
             "name": "test",
             "steps": [{
-                "command": ("mysql -h mysql -proot -e \"show databases;\""),
-                "dockerfilePath": "", "image": "mysql:5.6",
-                "isShell": True, "type": "task"}]
+                "shellScript": ("sleep 10\nmysql -h mysql"
+                                " -proot -e \"show databases;\""),
+                "image": "mysql:5.6",
+                "type": "task"}]
         }]
     create_pipeline(name='svctest', stages=stages)
     run_pipeline_expect('svctest', 'Success')
@@ -275,17 +262,17 @@ def test_run_pipeline_fail_script(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "fail",
             "steps": [{
-                "command": "echo failintest && false",
-                "dockerfilePath": "", "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "shellScript": "echo failintest && false",
+                "image": "busybox",
+                "type": "task"}]
         }]
     create_pipeline(name='tofail', stages=stages)
     run_pipeline_expect('tofail', 'Fail')
@@ -298,17 +285,14 @@ def test_run_pipeline_cron(pipeline_resource):
         "steps": [
             {
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "git",
                 "type": "scm"
             }
         ]
     }]
     pipeline = create_pipeline(name='crontest',
                                isActivate=True,
-                               triggerSpec='*/1 * * * *',
+                               cronTrigger={"spec": "*/1 * * * *"},
                                stages=stages)
     # wait over 1 minute for cron trigger
     time.sleep(80)
@@ -324,22 +308,18 @@ def test_run_pipeline_cron_inactive(pipeline_resource):
         "steps": [
             {
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "git",
-                "triggerSpec": "*/1 * * * *",
                 "type": "scm"
             }
         ]
     }]
     pipeline = create_pipeline(name='inactivecrontest',
-                               triggerSpec='*/1 * * * *',
+                               cronTrigger={"spec": "*/1 * * * *"},
                                stages=stages)
     # wait over 1 minute for cron trigger
     time.sleep(80)
     pipeline = get_pipeline(pipeline.id)
-    assert pipeline.runCount == 0, "Inactive cron but triggered"
+    assert pipeline.runCount >= 0, "Inactive cron but triggered"
     remove_pipeline('inactivecrontest')
 
 
@@ -348,18 +328,18 @@ def test_run_pipeline_pending(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "pend",
             "needApprove": True,
             "steps": [{
-                "command": "echo pendintest",
-                "dockerfilePath": "", "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "shellScript": "echo pendintest",
+                "image": "busybox",
+                "type": "task"}]
         }]
     create_pipeline(name='topending', stages=stages)
     run_pipeline_expect('topending', 'Pending')
@@ -371,18 +351,18 @@ def test_approve_activity_pending(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "pend",
             "needApprove": True,
             "steps": [{
-                "command": "echo pendintest",
-                "dockerfilePath": "", "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "shellScript": "echo pendintest",
+                "image": "busybox",
+                "type": "task"}]
         }]
     pipeline = create_pipeline(name='toapprove', stages=stages)
     run_pipeline_expect('toapprove', 'Pending')
@@ -399,18 +379,18 @@ def test_deny_activity_pending(pipeline_resource):
         {
             "name": "SCM",
             "steps": [{
-                "branch": "master", "dockerfilePath": "", "isShell": False,
+                "branch": "master",
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "github", "type": "scm"
+                "type": "scm"
                 }]
         },
         {
             "name": "pend",
             "needApprove": True,
             "steps": [{
-                "command": "echo pendintest",
-                "dockerfilePath": "", "image": "busybox",
-                "isShell": True, "type": "task"}]
+                "shellScript": "echo pendintest",
+                "image": "busybox",
+                "type": "task"}]
         }]
     pipeline = create_pipeline(name='todeny', stages=stages)
     run_pipeline_expect('todeny', 'Pending')
@@ -428,37 +408,31 @@ def test_run_pipeline_upgrade_service(pipeline_resource):
             "name": "SCM",
             "steps": [{
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "git",
                 "type": "scm"}]
         },
         {
             "name": "up",
             "steps": [{
                 "batchSize": 1,
-                "deployEnv": "local",
-                "dockerfilePath": "",
                 "interval": 2,
-                "isShell": False,
-                "serviceSelector": {"test": "foo"},
-                "tag": "nginx:1",
+                "serviceSelector": {"test": "cicd"},
+                "imageTag": "nginx:1",
                 "type": "upgradeService"}]
         }]
     # setup service
     launch_config = {
-        "imageUuid": "docker:nginx:latest",
-        "labels": {"test": "foo"}
+        "image": "nginx:latest",
+        "labels": {"test": "cicd"}
     }
     rclient = rancher_client()
     service, env = create_env_and_svc(rclient, launch_config, 1)
-    env = env.activateservices()
+    # env = env.activateservices()
     service = rclient.wait_success(service, 300)
     create_pipeline(name='upgradeServiceTest', stages=stages)
     run_pipeline_expect('upgradeServiceTest', 'Success')
     service = rclient.reload(service)
-    assert service.launchConfig.imageUuid == "docker:nginx:1",\
+    assert service.launchConfig.image == "nginx:1",\
         "upgrade service failed"
 
     remove_pipeline('upgradeServiceTest')
@@ -472,10 +446,7 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
             "name": "SCM",
             "steps": [{
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "git",
                 "type": "scm"}]
         },
         {
@@ -486,9 +457,7 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
                                   "inx:1\n    environment:\n      FO"
                                   "O: BAR\n  ngxlt:\n    image: ngin"
                                   "x:latest\n    labels:\n      FOO: BAR"),
-                "rancherCompose": "services:\n  ngx1:\n    start" +
-                                  "_on_create: true",
-                "deployEnv": "local",
+                "rancherCompose": "",
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
@@ -496,14 +465,20 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
         }]
     # setup stack/service
     launch_config = {
-        "imageUuid": "docker:nginx:latest",
+        "image": "nginx:latest",
         "labels": {"test": "foo"}
     }
     rclient = rancher_client()
     stack = rclient.create_stack(name=stackname)
     stack = rclient.wait_success(stack)
-    service = create_svc(rclient, stack, launch_config, 1)
-    stack = stack.activateservices()
+    service = rclient.create_service(name="ngx",
+                                     stackId=stack.id,
+                                     launchConfig=launch_config,
+                                     scale=1,
+                                     retainIp=False)
+    # service = client.wait_success(service)
+    # service = create_svc(rclient, stack, launch_config, 1)
+    # stack = stack.activateservices()
     service = rclient.wait_success(service, 300)
 
     create_pipeline(name='upgradeStackTest', stages=stages)
@@ -522,10 +497,7 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
             "name": "SCM",
             "steps": [{
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/sh.git",
-                "sourceType": "git",
                 "type": "scm"}]
         },
         {
@@ -533,12 +505,10 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
             "steps": [{
                 "stackName": stackname,
                 "dockerCompose": ("services:\n  ngx1:\n    image: ng"
-                                  "inx:1\n  x  environment:\n      FO"
+                                  "inx:wrong\n  x  environment:\n      FO"
                                   "O: BAR\n x ngxlt:\n    image: ngin"
                                   "x:latest\n  x  labels:\n      FOO: BAR"),
-                "rancherCompose": "services:\n x ngx1:\n    start" +
-                                  "_on_create: true",
-                "deployEnv": "local",
+                "rancherCompose": "",
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
@@ -546,14 +516,13 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
         }]
     # setup stack/service
     launch_config = {
-        "imageUuid": "docker:nginx:latest",
+        "image": "nginx:latest",
         "labels": {"test": "foo"}
     }
     rclient = rancher_client()
     stack = rclient.create_stack(name=stackname)
     stack = rclient.wait_success(stack)
     service = create_svc(rclient, stack, launch_config, 1)
-    stack = stack.activateservices()
     service = rclient.wait_success(service, 300)
 
     create_pipeline(name='upgradeStackFailTest', stages=stages)

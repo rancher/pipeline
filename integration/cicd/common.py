@@ -4,6 +4,7 @@ import cattle
 import pytest
 
 DEFAULT_TIMEOUT = 180
+api_version = "v3"
 
 
 @pytest.fixture(scope='session')
@@ -38,6 +39,15 @@ def wait_for_ready_pipeline_client(timeout=DEFAULT_TIMEOUT):
                 time.sleep(10)
         else:
             return pipeline_client()
+
+
+def cattle_url(project_id=None):
+    default_url = 'http://localhost:8080'
+    server_url = os.environ.get('CATTLE_TEST_URL', default_url)
+    server_url = server_url + "/" + api_version
+    if project_id is not None:
+        server_url += "/projects/"+project_id
+    return server_url
 
 
 def ensure_cicd_catalog():
@@ -139,10 +149,7 @@ def run_basic_pipeline():
         "steps": [
                 {
                     "branch": "master",
-                    "dockerfilePath": "",
-                    "isShell": False,
                     "repository": "https://github.com/gitlawr/sh.git",
-                    "sourceType": "git",
                     "type": "scm"
                 }
             ]

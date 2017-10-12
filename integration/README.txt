@@ -1,5 +1,6 @@
 Validation test scripts for Rancher CICD catalog and pipeline server APIs
 Usage: tox
+Before running tests, set following variables.
 Environment Variables:
 PIPELINE_URL=
 CATTLE_TEST_URL=

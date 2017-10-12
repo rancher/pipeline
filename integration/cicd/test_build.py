@@ -27,10 +27,7 @@ def test_run_build(pipeline_resource):
             "name": "SCM",
             "steps": [{
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/php.git",
-                "sourceType": "github",
                 "type": "scm"}]
         },
         {
@@ -38,8 +35,6 @@ def test_run_build(pipeline_resource):
             "steps": [
                 {
                     "dockerfilePath": "./",
-                    "isShell": False,
-                    "sourceType": "sc",
                     "targetImage": test_build_image,
                     "type": "build"}]
         },
@@ -48,8 +43,6 @@ def test_run_build(pipeline_resource):
             "steps": [{
                 "dockerfilePath": "./",
                 "file": "FROM alpine\n\nRUN echo test \u003e /myfile",
-                "isShell": False,
-                "sourceType": "file",
                 "targetImage": test_build_image,
                 "type": "build"}]
         },
@@ -57,9 +50,7 @@ def test_run_build(pipeline_resource):
             "name": "push",
             "steps": [{
                 "dockerfilePath": "./",
-                "isShell": False,
                 "push": True,
-                "sourceType": "sc",
                 "targetImage": test_build_image,
                 "type": "build"}]
         }]
@@ -75,10 +66,7 @@ def test_run_pipeline_build_fail_no_credential(pipeline_resource):
             "name": "SCM",
             "steps": [{
                 "branch": "master",
-                "dockerfilePath": "",
-                "isShell": False,
                 "repository": "https://github.com/gitlawr/php.git",
-                "sourceType": "github",
                 "type": "scm"}]
         },
         {
@@ -86,9 +74,7 @@ def test_run_pipeline_build_fail_no_credential(pipeline_resource):
             "steps": [
                 {
                     "dockerfilePath": "./",
-                    "isShell": False,
                     "push": True,
-                    "sourceType": "sc",
                     "targetImage": "nonexist.com/myimage:mytag",
                     "type": "build"}]
         }]
