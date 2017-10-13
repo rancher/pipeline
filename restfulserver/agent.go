@@ -1,10 +1,13 @@
 package restfulserver
 
 import (
+	"sync"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/pipeline/git"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/scheduler"
+	"golang.org/x/sync/syncmap"
 )
 
 //Component to hold schedulers and connholders
@@ -23,6 +26,8 @@ type Agent struct {
 	cronRunners           map[string]*scheduler.CronRunner
 	registerCronRunnerC   chan *scheduler.CronRunner
 	unregisterCronRunnerC chan string
+
+	activityLocks syncmap.Map
 }
 
 var MyAgent *Agent
@@ -37,6 +42,7 @@ func InitAgent(s *Server) {
 		cronRunners:           make(map[string]*scheduler.CronRunner),
 		registerCronRunnerC:   make(chan *scheduler.CronRunner),
 		unregisterCronRunnerC: make(chan string),
+		activityLocks:         syncmap.Map{},
 	}
 	logrus.Debugf("inited myagent:%v", MyAgent)
 	go MyAgent.handleWS()
@@ -192,4 +198,15 @@ func (a *Agent) unregisterCronRunner(pipelineId string) {
 		existing.Stop()
 	}
 	delete(a.cronRunners, pipelineId)
+}
+
+func (a *Agent) getActivityLock(activityId string) *sync.Mutex {
+	lock, _ := a.activityLocks.Load(activityId)
+	if lock == nil {
+		mutex := &sync.Mutex{}
+		a.activityLocks.Store(activityId, mutex)
+		return mutex
+	} else {
+		return lock.(*sync.Mutex)
+	}
 }
