@@ -41,17 +41,21 @@ type JenkinsSCM struct {
 }
 
 type JenkinsTrigger struct {
-	BuildTrigger JenkinsBuildTrigger `xml:"jenkins.triggers.ReverseBuildTrigger,omitempty"`
-	CronTrigger  JenkinsCronTrigger  `xml:"hudson.triggers.TimerTrigger,omitempty"`
+	//BuildTrigger             JenkinsBuildTrigger `xml:"jenkins.triggers.ReverseBuildTrigger,omitempty"`
+	//CronTrigger              JenkinsCronTrigger  `xml:"hudson.triggers.TimerTrigger,omitempty"`
+	FanInReverseBuildTrigger JenkinsBuildTrigger `xml:"org.lonkar.jobfanin.FanInReverseBuildTrigger,omitempty"`
 }
 
 type JenkinsBuildTrigger struct {
-	Spec                   string `xml:"spec"`
-	UpstreamProjects       string `xml:"upstreamProjects"`
-	ThresholdName          string `xml:"threshold>name"`
-	ThresholdOrdinal       int    `xml:"threshold>ordinal"`
-	ThresholdColor         string `xml:"threshold>color"`
-	ThresholdCompleteBuild bool   `xml:"threshold>completeBuild"`
+	Spec                     string `xml:"spec"`
+	Plugin                   string `xml:"plugin,attr"`
+	UpstreamProjects         string `xml:"upstreamProjects"`
+	UpsteamProjects          string `xml:"upsteamProjects"`
+	WatchUpstreamRecursively bool   `xml:"watchUpstreamRecursively"`
+	ThresholdName            string `xml:"threshold>name"`
+	ThresholdOrdinal         int    `xml:"threshold>ordinal"`
+	ThresholdColor           string `xml:"threshold>color"`
+	ThresholdCompleteBuild   bool   `xml:"threshold>completeBuild"`
 }
 
 type JenkinsCronTrigger struct {

@@ -10,14 +10,30 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/google/go-github/github"
 	"github.com/rancher/go-rancher/v3"
 	"github.com/rancher/pipeline/config"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
+
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func RandStringRunes(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
+}
 
 func GetRancherClient() (*client.RancherClient, error) {
 	apiConfig := config.Config

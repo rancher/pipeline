@@ -513,6 +513,11 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
+
+	mutex := MyAgent.getActivityLock(activityId)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	logrus.Debugf("get stepstart event,paras:%v,%v,%v", activityId, stageOrdinal, stepOrdinal)
 	activity, err := GetActivity(activityId, s.PipelineContext)
 	if err != nil {
@@ -531,6 +536,7 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 
 //
 func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
+
 	//get activityId,stageOrdinal,stepOrdinal from request
 	v := req.URL.Query()
 	activityId := v.Get("id")
@@ -543,6 +549,10 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
+	mutex := MyAgent.getActivityLock(activityId)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	logrus.Debugf("get stepfinish event,paras:%v,%v,%v", activityId, stageOrdinal, stepOrdinal)
 	activity, err := GetActivity(activityId, s.PipelineContext)
 	if err != nil {
@@ -562,7 +572,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 		activity.CommitInfo = req.FormValue("GIT_COMMIT")
 	}
 
-	logrus.Infoln("HALF SUCCESS?")
+	logrus.Debugln("HALF SUCCESS?")
 	if err = UpdateActivity(activity); err != nil {
 		return err
 	}
@@ -603,7 +613,11 @@ func successStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int)
 	step := stage.ActivitySteps[stepOrdinal]
 	step.Status = pipeline.ActivityStepSuccess
 	step.Duration = curTime - step.StartTS
-	if stepOrdinal == len(stage.ActivitySteps)-1 {
+	if stage.Status == pipeline.ActivityStageFail {
+		return
+	}
+
+	if IsStageSuccess(stage) {
 		stage.Status = pipeline.ActivityStageSuccess
 		stage.Duration = curTime - stage.StartTS
 		if stageOrdinal == len(activity.ActivityStages)-1 {
@@ -619,6 +633,23 @@ func successStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int)
 		}
 	}
 
+}
+
+func IsStageSuccess(stage *pipeline.ActivityStage) bool {
+	if stage == nil {
+		return false
+	}
+
+	if stage.Status == pipeline.ActivityStageFail || stage.Status == pipeline.ActivityStageDenied {
+		return false
+	}
+	successSteps := 0
+	for _, step := range stage.ActivitySteps {
+		if step.Status == pipeline.ActivityStepSuccess {
+			successSteps += 1
+		}
+	}
+	return successSteps == len(stage.ActivitySteps)
 }
 
 // GetStepLog gets running logs of a particular step

@@ -153,6 +153,11 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 
 func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["id"]
+
+	mutex := MyAgent.getActivityLock(id)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	r, err := GetActivity(id, s.PipelineContext)
 	if err != nil {
 		logrus.Errorf("fail getting activity with id:%v", id)
@@ -178,6 +183,11 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) error {
 	logrus.Infof("start approve activity")
 	id := mux.Vars(req)["id"]
+
+	mutex := MyAgent.getActivityLock(id)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	r, err := GetActivity(id, s.PipelineContext)
 	if err != nil {
 		logrus.Errorf("fail getting activity with id:%v", id)
@@ -203,6 +213,11 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 	logrus.Infof("start deny activity")
 	id := mux.Vars(req)["id"]
+
+	mutex := MyAgent.getActivityLock(id)
+	mutex.Lock()
+	defer mutex.Unlock()
+
 	r, err := GetActivity(id, s.PipelineContext)
 	if err != nil {
 		logrus.Errorf("fail getting activity with id:%v", id)

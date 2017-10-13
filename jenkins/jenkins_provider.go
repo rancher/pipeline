@@ -17,6 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver"
+	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
 )
 
@@ -155,9 +156,13 @@ func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
 func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
 	logrus.Info("run stage")
 	logrus.Debugf("paras:%v,%v,%v,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
-	jobName := getJobName(activity, ordinal, 0)
-	if _, err := BuildJob(jobName, map[string]string{}); err != nil {
-		return err
+	//Trigger all step jobs in the stage.
+	for i := 0; i < len(activity.ActivityStages[ordinal].ActivitySteps); i++ {
+		jobName := getJobName(activity, ordinal, i)
+		if _, err := BuildJob(jobName, map[string]string{}); err != nil {
+			logrus.Errorf("run %s error:%v", jobName, err)
+			return err
+		}
 	}
 	return nil
 }
@@ -205,28 +210,30 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 		TimeStampWrapper:                 TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
 		PreSCMBuildStepsWrapper:          preSCMStep,
 	}
-	if stepOrdinal == 0 && stageOrdinal > 0 && !stage.NeedApprove {
-		prevStage := activity.ActivityStages[stageOrdinal-1]
-		prevJobName := getJobName(activity, stageOrdinal-1, len(prevStage.ActivitySteps)-1)
+	if stageOrdinal > 0 && !stage.NeedApprove {
+		prevJobsName := getStageJobsName(activity, stageOrdinal-1)
+		//TODO if trigger next stage by any success step
+		/*
+			v.Triggers = JenkinsTrigger{
+				BuildTrigger: JenkinsBuildTrigger{
+					UpstreamProjects:       prevJobsName,
+					ThresholdName:          "SUCCESS",
+					ThresholdOrdinal:       0,
+					ThresholdColor:         "BLUE",
+					ThresholdCompleteBuild: true,
+				},
+			}
+		*/
+		//trigger when all steps in prev stage success
 		v.Triggers = JenkinsTrigger{
-			BuildTrigger: JenkinsBuildTrigger{
-				UpstreamProjects:       prevJobName,
-				ThresholdName:          "SUCCESS",
-				ThresholdOrdinal:       0,
-				ThresholdColor:         "BLUE",
-				ThresholdCompleteBuild: true,
-			},
-		}
-	} else if stepOrdinal > 0 {
-		//Add build trigger
-		prevJobName := getJobName(activity, stageOrdinal, stepOrdinal-1)
-		v.Triggers = JenkinsTrigger{
-			BuildTrigger: JenkinsBuildTrigger{
-				UpstreamProjects:       prevJobName,
-				ThresholdName:          "SUCCESS",
-				ThresholdOrdinal:       0,
-				ThresholdColor:         "BLUE",
-				ThresholdCompleteBuild: true,
+			FanInReverseBuildTrigger: JenkinsBuildTrigger{
+				UpstreamProjects: prevJobsName,
+				Plugin:           "job-fan-in@1.1.3",
+				WatchUpstreamRecursively: false,
+				ThresholdName:            "SUCCESS",
+				ThresholdOrdinal:         0,
+				ThresholdColor:           "BLUE",
+				ThresholdCompleteBuild:   true,
 			},
 		}
 	}
@@ -264,10 +271,12 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		svcPara := ""
 		if step.ShellScript != "" {
 			entrypointPara = "--entrypoint /bin/sh"
-			argsPara = ".r_cicd_entrypoint.sh"
+			entryFileName := fmt.Sprintf(".r_cicd_entrypoint_%s.sh", util.RandStringRunes(4))
+			argsPara = entryFileName
 
 			//write to a sh file,then docker run it
-			stringBuilder.WriteString("cat>.r_cicd_entrypoint.sh<<EOF\n")
+			stringBuilder.WriteString(fmt.Sprintf("cat>%s<<EOF\n", entryFileName))
+			stringBuilder.WriteString("set -xe\n")
 			cmd := strings.Replace(step.ShellScript, "\\", "\\\\", -1)
 			cmd = strings.Replace(cmd, "$", "\\$", -1)
 			stringBuilder.WriteString(cmd)
@@ -296,7 +305,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 
 		}
 
-		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
+		//volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
+		volumeInfo := "-v /var/jenkins_home/workspace:/var/jenkins_home/workspace -w ${PWD}"
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
@@ -876,4 +886,14 @@ func getJobName(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) 
 	stage := activity.ActivityStages[stageOrdinal]
 	jobName := strings.Join([]string{activity.Pipeline.Name, activity.Id, stage.Name, strconv.Itoa(stepOrdinal)}, "_")
 	return jobName
+}
+
+func getStageJobsName(activity *pipeline.Activity, stageOrdinal int) string {
+	stage := activity.ActivityStages[stageOrdinal]
+	jobsName := []string{}
+	for i := 0; i < len(stage.ActivitySteps); i++ {
+		stepJobName := getJobName(activity, stageOrdinal, i)
+		jobsName = append(jobsName, stepJobName)
+	}
+	return strings.Join(jobsName, ",")
 }
