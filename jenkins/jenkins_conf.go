@@ -88,17 +88,12 @@ R_UPGRADESTACK_STACKNAME=%s
 rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY export $R_UPGRADESTACK_STACKNAME
 
 cd $R_UPGRADESTACK_STACKNAME
-cat>new-docker-compose.yml<<EOF
-%s
-EOF
-cat>new-rancher-compose.yml<<EOF
+cat>new-compose.yml<<EOF
 %s
 EOF
 #merge yaml file
-cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml compose.yml 
-#cat new-docker-compose.yml
-#cat new-rancher-compose.yml
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --file new-docker-compose.yml --file new-rancher-compose.yml -d
+cihelper mergeyaml -o new-compose.yml new-compose.yml compose.yml 
+rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --file new-compose.yml -d
 
 rm -r ../../$TEMPDIR
 

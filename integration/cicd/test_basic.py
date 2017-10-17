@@ -453,11 +453,10 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
             "name": "up",
             "steps": [{
                 "stackName": stackname,
-                "dockerCompose": ("services:\n  ngx1:\n    image: ng"
+                "compose": ("services:\n  ngx1:\n    image: ng"
                                   "inx:1\n    environment:\n      FO"
                                   "O: BAR\n  ngxlt:\n    image: ngin"
                                   "x:latest\n    labels:\n      FOO: BAR"),
-                "rancherCompose": "",
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
@@ -504,11 +503,10 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
             "name": "up",
             "steps": [{
                 "stackName": stackname,
-                "dockerCompose": ("services:\n  ngx1:\n    image: ng"
+                "compose": ("services:\n  ngx1:\n    image: ng"
                                   "inx:wrong\n  x  environment:\n      FO"
                                   "O: BAR\n x ngxlt:\n    image: ngin"
                                   "x:latest\n  x  labels:\n      FOO: BAR"),
-                "rancherCompose": "",
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
