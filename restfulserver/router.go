@@ -42,20 +42,15 @@ func NewRouter(s *Server) *mux.Router {
 
 	//pipelines
 	router.Methods(http.MethodGet).Path("/v1/pipelines").Handler(f(schemas, s.ListPipelines))
-	router.Methods(http.MethodGet).Path("/v1/pipeline").Handler(f(schemas, s.ListPipelines))
-	router.Methods(http.MethodPost).Path("/v1/pipelines").Handler(f(schemas, s.CreatePipeline))
 	router.Methods(http.MethodPost).Path("/v1/pipeline").Handler(f(schemas, s.CreatePipeline))
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}").Handler(f(schemas, s.ListPipeline))
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/activities").Handler(f(schemas, s.ListActivitiesOfPipeline))
 	router.Methods(http.MethodDelete).Path("/v1/pipelines/{id}").Handler(f(schemas, s.DeletePipeline))
 	router.Methods(http.MethodGet).Path("/v1/pipelines/{id}/exportconfig").Handler(f(schemas, s.ExportPipeline))
-
 	//router.Methods(http.MethodDelete).Path("/v1/pipeline").Handler(f(schemas, s.CleanPipelines))
 
 	//activities
 	router.Methods(http.MethodGet).Path("/v1/activities").Handler(f(schemas, s.ListActivities))
-	router.Methods(http.MethodGet).Path("/v1/activity").Handler(f(schemas, s.ListActivities))
-	router.Methods(http.MethodPost).Path("/v1/activities").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodGet).Path("/v1/activities/{id}").Handler(f(schemas, s.GetActivity))
 	router.Methods(http.MethodDelete).Path("/v1/activities/{id}").Handler(f(schemas, s.DeleteActivity))
@@ -63,9 +58,7 @@ func NewRouter(s *Server) *mux.Router {
 
 	//settings
 	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
-	router.Methods(http.MethodGet).Path("/v1/setting").Handler(f(schemas, s.GetPipelineSetting))
-	//router.Methods(http.MethodPost).Path("/v1/settings").Handler(f(schemas, s.UpdatePipelineSetting))
-	//router.Methods(http.MethodPost).Path("/v1/setting").Handler(f(schemas, s.UpdatePipelineSetting))
+
 	router.Methods(http.MethodGet).Path("/v1/envvars").Handler(f(schemas, s.ListEnvVars))
 
 	//websockets
@@ -78,10 +71,6 @@ func NewRouter(s *Server) *mux.Router {
 
 	router.Methods(http.MethodPost).Path("/v1/github/login").Handler(f(schemas, s.GithubLogin))
 	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubAuthorize))
-
-	//debug
-	//router.Methods(http.MethodPost).Path("/v1/debug").Handler(f(schemas, s.Debug))
-	//router.Methods(http.MethodPost).Path("/v1/debug2").Handler(f(schemas, s.Debug2))
 
 	pipelineActions := map[string]http.Handler{
 		"run":        f(schemas, s.RunPipeline),
