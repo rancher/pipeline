@@ -35,12 +35,13 @@ func (j *JenkinsProvider) Init(pipeline *pipeline.Pipeline) error {
 	return nil
 }
 
-func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline) (*pipeline.Activity, error) {
+func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline, triggerType string) (*pipeline.Activity, error) {
 
 	activity, err := ToActivity(p)
 	if err != nil {
 		return &pipeline.Activity{}, err
 	}
+	initActivityEnvvars(activity, triggerType)
 
 	if len(p.Stages) == 0 {
 		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
@@ -83,6 +84,7 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	logrus.Infof("rerunpipeline,get nodeName:%v", nodeName)
 	a.RunSequence = a.Pipeline.RunCount + 1
 	a.StartTS = time.Now().UnixNano() / int64(time.Millisecond)
+	initActivityEnvvars(a, "manual")
 	err = j.RunStage(a, 0)
 	return err
 }
@@ -860,7 +862,23 @@ func ToActivity(p *pipeline.Pipeline) (*pipeline.Activity, error) {
 	for _, stage := range p.Stages {
 		activity.ActivityStages = append(activity.ActivityStages, ToActivityStage(stage))
 	}
+
 	return activity, nil
+}
+
+func initActivityEnvvars(activity *pipeline.Activity, triggerType string) {
+	p := activity.Pipeline
+	vars := map[string]interface{}{}
+	vars["CICD_PIPELINE_NAME"] = p.Name
+	vars["CICD_PIPELINE_ID"] = p.Id
+	vars["CICD_NODE_NAME"] = activity.NodeName
+	vars["CICD_ACTIVITY_ID"] = activity.Id
+	vars["CICD_ACTIVITY_SEQUENCE"] = activity.RunSequence
+	vars["CICD_GIT_URL"] = p.Stages[0].Steps[0].Repository
+	vars["CICD_GIT_BRANCH"] = p.Stages[0].Steps[0].Branch
+	vars["CICD_GIT_COMMIT"] = activity.CommitInfo
+	vars["CICD_TRIGGER_TYPE"] = triggerType
+	activity.EnvVars = vars
 }
 
 func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {

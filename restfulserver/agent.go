@@ -155,7 +155,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 				//run only when new changes exist
 				return
 			}
-			_, err = a.Server.PipelineContext.RunPipeline(pId)
+			_, err = a.Server.PipelineContext.RunPipeline(pId, pipeline.TriggerTypeCron)
 			if err != nil {
 				logrus.Errorf("cron job fail,pid:%v", pId)
 				return
@@ -176,7 +176,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 			existing.Stop()
 			delete(a.cronRunners, pId)
 			if cr.Spec != "" {
-				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId) })
+				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId, pipeline.TriggerTypeCron) })
 				if err != nil {
 					logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
 					return

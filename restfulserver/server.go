@@ -157,7 +157,7 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 		logrus.Errorf("pipeline is not activated!")
 		return errors.New("pipeline is not activated!")
 	}
-	_, err = s.PipelineContext.RunPipeline(id)
+	_, err = s.PipelineContext.RunPipeline(id, pipeline.TriggerTypeWebhook)
 	if err != nil {
 		rw.Write([]byte("run pipeline error!"))
 		return err
@@ -449,7 +449,7 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 		})
 		return err
 	}
-	activity, err := s.PipelineContext.RunPipeline(id)
+	activity, err := s.PipelineContext.RunPipeline(id, pipeline.TriggerTypeManual)
 	if err != nil {
 		return err
 	}
@@ -570,6 +570,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	//update commitinfo for SCM step
 	if stageOrdinal == 0 && stepOrdinal == 0 {
 		activity.CommitInfo = req.FormValue("GIT_COMMIT")
+		activity.EnvVars["CICD_GIT_COMMIT"] = activity.CommitInfo
 	}
 
 	logrus.Debugln("HALF SUCCESS?")

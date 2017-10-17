@@ -225,13 +225,13 @@ func getLatestVersionPipelineFile(pipelinePath string) *Pipeline {
 	return toPipeline(pipelinePath, strconv.Itoa(max))
 }
 
-func (p *PipelineContext) RunPipeline(id string) (*Activity, error) {
+func (p *PipelineContext) RunPipeline(id string, triggerType string) (*Activity, error) {
 	pp := p.GetPipelineById(id)
 	if pp == nil {
 		return &Activity{}, ErrPipelineNotFound
 	}
 
-	activity, err := p.Provider.RunPipeline(pp)
+	activity, err := p.Provider.RunPipeline(pp, triggerType)
 	if err != nil {
 		return &Activity{}, err
 	}
