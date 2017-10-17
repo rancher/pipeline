@@ -141,9 +141,8 @@ type Step struct {
 
 	//---upgradeStack step
 	//Endpoint,Accesskey,Secretkey
-	StackName      string `json:"stackName,omitempty" yaml:"stackName,omitempty"`
-	DockerCompose  string `json:"dockerCompose,omitempty" yaml:"dockerCompose,omitempty"`
-	RancherCompose string `json:"rancherCompose,omitempty" yaml:"rancherCompose,omitempty"`
+	StackName string `json:"stackName,omitempty" yaml:"stackName,omitempty"`
+	Compose   string `json:"compose,omitempty" yaml:"compose,omitempty"`
 
 	//---upgradeCatalog step
 	//Endpoint,Accesskey,Secretkey,StackName,
