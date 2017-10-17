@@ -12,6 +12,9 @@ const StepTypeService = "service"
 const StepTypeUpgradeService = "upgradeService"
 const StepTypeUpgradeStack = "upgradeStack"
 const StepTypeUpgradeCatalog = "upgradeCatalog"
+const TriggerTypeCron = "cron"
+const TriggerTypeManual = "manual"
+const TriggerTypeWebhook = "webhook"
 const (
 	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
@@ -154,7 +157,7 @@ type Step struct {
 }
 
 type PipelineProvider interface {
-	RunPipeline(*Pipeline) (*Activity, error)
+	RunPipeline(*Pipeline, string) (*Activity, error)
 	RerunActivity(*Activity) error
 	RunStage(*Activity, int) error
 	SyncActivity(*Activity) error
@@ -165,20 +168,20 @@ type PipelineProvider interface {
 
 type Activity struct {
 	client.Resource
-	Id              string            `json:"id,omitempty"`
-	Pipeline        Pipeline          `json:"pipelineSource,omitempty"`
-	PipelineName    string            `json:"pipelineName,omitempty"`
-	PipelineVersion string            `json:"pipelineVersion,omitempty"`
-	RunSequence     int               `json:"runSequence,omitempty"`
-	CommitInfo      string            `json:"commitInfo,omitempty"`
-	Status          string            `json:"status,omitempty"`
-	FailMessage     string            `json:"failMessage,omitempty"`
-	PendingStage    int               `json:"pendingStage,omitempty"`
-	StartTS         int64             `json:"start_ts,omitempty"`
-	StopTS          int64             `json:"stop_ts,omitempty"`
-	NodeName        string            `json:"nodename,omitempty"`
-	ActivityStages  []*ActivityStage  `json:"activity_stages,omitempty"`
-	EnvVars         map[string]string `json:"envVars,omitempty"`
+	Id              string                 `json:"id,omitempty"`
+	Pipeline        Pipeline               `json:"pipelineSource,omitempty"`
+	PipelineName    string                 `json:"pipelineName,omitempty"`
+	PipelineVersion string                 `json:"pipelineVersion,omitempty"`
+	RunSequence     int                    `json:"runSequence,omitempty"`
+	CommitInfo      string                 `json:"commitInfo,omitempty"`
+	Status          string                 `json:"status,omitempty"`
+	FailMessage     string                 `json:"failMessage,omitempty"`
+	PendingStage    int                    `json:"pendingStage,omitempty"`
+	StartTS         int64                  `json:"start_ts,omitempty"`
+	StopTS          int64                  `json:"stop_ts,omitempty"`
+	NodeName        string                 `json:"nodename,omitempty"`
+	ActivityStages  []*ActivityStage       `json:"activity_stages,omitempty"`
+	EnvVars         map[string]interface{} `json:"envVars,omitempty"`
 }
 
 type ActivityStage struct {
