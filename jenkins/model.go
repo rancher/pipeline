@@ -41,9 +41,9 @@ type JenkinsSCM struct {
 }
 
 type JenkinsTrigger struct {
-	//BuildTrigger             JenkinsBuildTrigger `xml:"jenkins.triggers.ReverseBuildTrigger,omitempty"`
+	BuildTrigger *JenkinsBuildTrigger `xml:"jenkins.triggers.ReverseBuildTrigger,omitempty"`
 	//CronTrigger              JenkinsCronTrigger  `xml:"hudson.triggers.TimerTrigger,omitempty"`
-	FanInReverseBuildTrigger JenkinsBuildTrigger `xml:"org.lonkar.jobfanin.FanInReverseBuildTrigger,omitempty"`
+	FanInReverseBuildTrigger *JenkinsBuildTrigger `xml:"org.lonkar.jobfanin.FanInReverseBuildTrigger,omitempty"`
 }
 
 type JenkinsBuildTrigger struct {

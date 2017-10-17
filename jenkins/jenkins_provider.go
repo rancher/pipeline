@@ -154,16 +154,46 @@ func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
 }
 
 func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
-	logrus.Info("run stage")
+	if len(activity.ActivityStages) <= ordinal {
+		return fmt.Errorf("error run stage,stage index out of range")
+	}
+	stage := activity.ActivityStages[ordinal]
+	logrus.Infof("run stage:%s", stage.Name)
 	logrus.Debugf("paras:%v,%v,%v,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
 	//Trigger all step jobs in the stage.
-	for i := 0; i < len(activity.ActivityStages[ordinal].ActivitySteps); i++ {
-		jobName := getJobName(activity, ordinal, i)
+	if activity.Pipeline.Stages[ordinal].Parallel {
+		for i := 0; i < len(stage.ActivitySteps); i++ {
+			jobName := getJobName(activity, ordinal, i)
+			if _, err := BuildJob(jobName, map[string]string{}); err != nil {
+				logrus.Errorf("run %s error:%v", jobName, err)
+				return err
+			}
+		}
+	} else {
+		//Trigger first to run sequentially
+		jobName := getJobName(activity, ordinal, 0)
 		if _, err := BuildJob(jobName, map[string]string{}); err != nil {
 			logrus.Errorf("run %s error:%v", jobName, err)
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (j *JenkinsProvider) RunStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) error {
+	if len(activity.ActivityStages) <= stageOrdinal ||
+		len(activity.ActivityStages[stageOrdinal].ActivitySteps) >= stepOrdinal ||
+		stageOrdinal < 0 || stepOrdinal < 0 {
+		return fmt.Errorf("error run stage,stage index out of range")
+	}
+	logrus.Debugf("Run step:%s,%d,%d", activity.Pipeline.Name, stageOrdinal, stepOrdinal)
+	jobName := getJobName(activity, stageOrdinal, stepOrdinal)
+	if _, err := BuildJob(jobName, map[string]string{}); err != nil {
+		logrus.Errorf("run %s error:%v", jobName, err)
+		return err
+	}
+
 	return nil
 }
 
@@ -210,31 +240,62 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 		TimeStampWrapper:                 TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
 		PreSCMBuildStepsWrapper:          preSCMStep,
 	}
-	if stageOrdinal > 0 && !stage.NeedApprove {
-		prevJobsName := getStageJobsName(activity, stageOrdinal-1)
-		//TODO if trigger next stage by any success step
-		/*
+	if stage.Parallel {
+		if stageOrdinal > 0 && !stage.NeedApprove {
+			prevJobsName := getStageJobsName(activity, stageOrdinal-1)
+			//TODO if trigger next stage by any success step
+			/*
+				v.Triggers = JenkinsTrigger{
+					BuildTrigger: JenkinsBuildTrigger{
+						UpstreamProjects:       prevJobsName,
+						ThresholdName:          "SUCCESS",
+						ThresholdOrdinal:       0,
+						ThresholdColor:         "BLUE",
+						ThresholdCompleteBuild: true,
+					},
+				}
+			*/
+			//trigger when all steps in prev stage success
 			v.Triggers = JenkinsTrigger{
-				BuildTrigger: JenkinsBuildTrigger{
-					UpstreamProjects:       prevJobsName,
+				FanInReverseBuildTrigger: &JenkinsBuildTrigger{
+					UpstreamProjects: prevJobsName,
+					Plugin:           "job-fan-in@1.1.3",
+					WatchUpstreamRecursively: false,
+					ThresholdName:            "SUCCESS",
+					ThresholdOrdinal:         0,
+					ThresholdColor:           "BLUE",
+					ThresholdCompleteBuild:   true,
+				},
+			}
+		}
+	} else {
+		//sequential steps
+		if stageOrdinal > 0 && stepOrdinal == 0 && !stage.NeedApprove {
+			prevJobsName := getStageJobsName(activity, stageOrdinal-1)
+			//trigger when all steps in prev stage success
+			v.Triggers = JenkinsTrigger{
+				FanInReverseBuildTrigger: &JenkinsBuildTrigger{
+					UpstreamProjects: prevJobsName,
+					Plugin:           "job-fan-in@1.1.3",
+					WatchUpstreamRecursively: false,
+					ThresholdName:            "SUCCESS",
+					ThresholdOrdinal:         0,
+					ThresholdColor:           "BLUE",
+					ThresholdCompleteBuild:   true,
+				},
+			}
+		} else if stepOrdinal > 0 {
+			prevJobName := getJobName(activity, stageOrdinal, stepOrdinal-1)
+			v.Triggers = JenkinsTrigger{
+				BuildTrigger: &JenkinsBuildTrigger{
+					UpstreamProjects:       prevJobName,
 					ThresholdName:          "SUCCESS",
 					ThresholdOrdinal:       0,
 					ThresholdColor:         "BLUE",
 					ThresholdCompleteBuild: true,
 				},
 			}
-		*/
-		//trigger when all steps in prev stage success
-		v.Triggers = JenkinsTrigger{
-			FanInReverseBuildTrigger: JenkinsBuildTrigger{
-				UpstreamProjects: prevJobsName,
-				Plugin:           "job-fan-in@1.1.3",
-				WatchUpstreamRecursively: false,
-				ThresholdName:            "SUCCESS",
-				ThresholdOrdinal:         0,
-				ThresholdColor:           "BLUE",
-				ThresholdCompleteBuild:   true,
-			},
+
 		}
 	}
 	//post task to notify pipelineserver

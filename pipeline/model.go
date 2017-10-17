@@ -100,7 +100,8 @@ type CronTrigger struct {
 
 type Stage struct {
 	Name        string   `json:"name,omitempty" yaml:"name,omitempty"`
-	NeedApprove bool     `json:"needApprove,omitempty" yaml:"need-approve,omitempty"`
+	NeedApprove bool     `json:"needApprove,omitempty" yaml:"needApprove,omitempty"`
+	Parallel    bool     `json:"parallel,omitempty" yaml:"parallel,omitempty"`
 	Approvers   []string `json:"approvers,omitempty" yaml:"approvers,omitempty"`
 	Steps       []*Step  `json:"steps,omitempty" yaml:"steps,omitempty"`
 }
