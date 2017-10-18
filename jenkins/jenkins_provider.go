@@ -155,27 +155,123 @@ func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
 	return nil
 }
 
+func EvaluateConditions(activity *pipeline.Activity, condition *pipeline.PipelineConditions) (bool, error) {
+	if condition == nil || (len(condition.All) == 0 && len(condition.Any) == 0) {
+		return false, fmt.Errorf("Nil condition")
+	}
+	if len(condition.All) > 0 {
+		for _, c := range condition.All {
+			resCond, err := EvaluateCondition(activity, c)
+			if err != nil {
+				return false, err
+			}
+			if !resCond {
+				return false, nil
+			}
+		}
+		return true, nil
+	}
+
+	for _, c := range condition.Any {
+		resCond, err := EvaluateCondition(activity, c)
+		if err != nil {
+			return false, err
+		}
+		if resCond {
+			return true, nil
+		}
+	}
+	return false, nil
+	/*
+		expression, err := govaluate.NewEvaluableExpression(condition)
+		if err != nil {
+			return false, err
+		}
+		paraMap := map[string]interface{}{}
+		for k, v := range activity.EnvVars {
+			paraMap[k] = v
+		}
+		paraMap["activity"] = *activity
+		result, err := expression.Evaluate(activity.EnvVars)
+		logrus.Debugf("evaluate condition,got:\n%v\n%v", result, err)
+		if err != nil {
+			return false, err
+		}
+		flag, ok := result.(bool)
+		if ok {
+			return flag, nil
+		}
+		logrus.Errorf("expeted bool result of condition but got:%T", result)
+		return false, fmt.Errorf("expeted bool result of condition but got:%T", result)
+	*/
+}
+
+//valid format:     xxx=xxx; xxx!=xxx
+func EvaluateCondition(activity *pipeline.Activity, condition string) (bool, error) {
+	m := util.GetParams(`(?P<Key>.*?)!=(?P<Value>.*)`, condition)
+	if m["Key"] != "" && m["Value"] != "" {
+		envVal := activity.EnvVars[m["Key"]]
+		if envVal != m["Value"] {
+			return true, nil
+		}
+		return false, nil
+	}
+
+	m = util.GetParams(`(?P<Key>.*?)=(?P<Value>.*)`, condition)
+	if m["Key"] != "" && m["Value"] != "" {
+		envVal := activity.EnvVars[m["Key"]]
+		if envVal == m["Value"] {
+			return true, nil
+		}
+		return false, nil
+	}
+	return false, fmt.Errorf("cannot parse condition:%s", condition)
+}
+
 func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
 	if len(activity.ActivityStages) <= ordinal {
 		return fmt.Errorf("error run stage,stage index out of range")
 	}
-	stage := activity.ActivityStages[ordinal]
+	stage := activity.Pipeline.Stages[ordinal]
 	logrus.Infof("run stage:%s", stage.Name)
 	logrus.Debugf("paras:%v,%v,%v,%v", activity.Pipeline, activity, len(activity.Pipeline.Stages), ordinal)
+	condFlag := true
+	curTime := time.Now().UnixNano() / int64(time.Millisecond)
+	var err error
+	if pipeline.HasStageCondition(stage) {
+		condFlag, err = EvaluateConditions(activity, stage.Conditions)
+		if err != nil {
+			logrus.Errorf("Evaluate condition '%v' got error:%v", stage.Conditions, err)
+			return err
+		}
+	}
+	if !condFlag {
+		activity.ActivityStages[ordinal].Status = pipeline.ActivityStageSkip
+		if ordinal == len(activity.ActivityStages)-1 {
+			//skip last stage and success activity
+			activity.Status = pipeline.ActivitySuccess
+			activity.StopTS = curTime
+			j.OnActivityCompelte(activity)
+		} else {
+			//skip the stage then run next one.
+			err = j.RunStage(activity, ordinal+1)
+		}
+		return err
+	}
+
+	activity.ActivityStages[ordinal].StartTS = curTime
 	//Trigger all step jobs in the stage.
-	if activity.Pipeline.Stages[ordinal].Parallel {
-		for i := 0; i < len(stage.ActivitySteps); i++ {
-			jobName := getJobName(activity, ordinal, i)
-			if _, err := BuildJob(jobName, map[string]string{}); err != nil {
-				logrus.Errorf("run %s error:%v", jobName, err)
+	if stage.Parallel {
+		for i := 0; i < len(stage.Steps); i++ {
+			if err := j.RunStep(activity, ordinal, i); err != nil {
+				logrus.Errorf("run step error:%v", err)
 				return err
 			}
 		}
 	} else {
 		//Trigger first to run sequentially
-		jobName := getJobName(activity, ordinal, 0)
-		if _, err := BuildJob(jobName, map[string]string{}); err != nil {
-			logrus.Errorf("run %s error:%v", jobName, err)
+		if err := j.RunStep(activity, ordinal, 0); err != nil {
+			logrus.Errorf("run step error:%v", err)
 			return err
 		}
 	}
@@ -185,9 +281,43 @@ func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) err
 
 func (j *JenkinsProvider) RunStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) error {
 	if len(activity.ActivityStages) <= stageOrdinal ||
-		len(activity.ActivityStages[stageOrdinal].ActivitySteps) >= stepOrdinal ||
+		len(activity.ActivityStages[stageOrdinal].ActivitySteps) <= stepOrdinal ||
 		stageOrdinal < 0 || stepOrdinal < 0 {
 		return fmt.Errorf("error run stage,stage index out of range")
+	}
+	stage := activity.Pipeline.Stages[stageOrdinal]
+	step := stage.Steps[stepOrdinal]
+	condFlag := true
+	var err error
+	if pipeline.HasStepCondition(step) {
+		condFlag, err = EvaluateConditions(activity, step.Conditions)
+		if err != nil {
+			logrus.Errorf("Evaluate condition '%v' got error:%v", step.Conditions, err)
+			return err
+		}
+	}
+	if !condFlag {
+		activity.ActivityStages[stageOrdinal].ActivitySteps[stepOrdinal].Status = pipeline.ActivityStepSkip
+		actiStage := activity.ActivityStages[stageOrdinal]
+		curTime := time.Now().UnixNano() / int64(time.Millisecond)
+		if restfulserver.IsStageSuccess(actiStage) {
+			//if skipped and stage success
+			actiStage.Status = pipeline.ActivityStageSuccess
+			actiStage.Duration = curTime - actiStage.StartTS
+			if stageOrdinal == len(activity.ActivityStages)-1 {
+				//last stage success and success activity
+				activity.Status = pipeline.ActivitySuccess
+				activity.StopTS = curTime
+				j.OnActivityCompelte(activity)
+			} else {
+				//success the stage then run next one.
+				err = j.RunStage(activity, stageOrdinal+1)
+			}
+		} else if !stage.Parallel {
+			//sequential, skipped current step then run next step
+			err = j.RunStep(activity, stageOrdinal, stepOrdinal+1)
+		}
+		return err
 	}
 	logrus.Debugf("Run step:%s,%d,%d", activity.Pipeline.Name, stageOrdinal, stepOrdinal)
 	jobName := getJobName(activity, stageOrdinal, stepOrdinal)
@@ -241,64 +371,6 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 		Builders:                         commandBuilders,
 		TimeStampWrapper:                 TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
 		PreSCMBuildStepsWrapper:          preSCMStep,
-	}
-	if stage.Parallel {
-		if stageOrdinal > 0 && !stage.NeedApprove {
-			prevJobsName := getStageJobsName(activity, stageOrdinal-1)
-			//TODO if trigger next stage by any success step
-			/*
-				v.Triggers = JenkinsTrigger{
-					BuildTrigger: JenkinsBuildTrigger{
-						UpstreamProjects:       prevJobsName,
-						ThresholdName:          "SUCCESS",
-						ThresholdOrdinal:       0,
-						ThresholdColor:         "BLUE",
-						ThresholdCompleteBuild: true,
-					},
-				}
-			*/
-			//trigger when all steps in prev stage success
-			v.Triggers = JenkinsTrigger{
-				FanInReverseBuildTrigger: &JenkinsBuildTrigger{
-					UpstreamProjects: prevJobsName,
-					Plugin:           "job-fan-in@1.1.3",
-					WatchUpstreamRecursively: false,
-					ThresholdName:            "SUCCESS",
-					ThresholdOrdinal:         0,
-					ThresholdColor:           "BLUE",
-					ThresholdCompleteBuild:   true,
-				},
-			}
-		}
-	} else {
-		//sequential steps
-		if stageOrdinal > 0 && stepOrdinal == 0 && !stage.NeedApprove {
-			prevJobsName := getStageJobsName(activity, stageOrdinal-1)
-			//trigger when all steps in prev stage success
-			v.Triggers = JenkinsTrigger{
-				FanInReverseBuildTrigger: &JenkinsBuildTrigger{
-					UpstreamProjects: prevJobsName,
-					Plugin:           "job-fan-in@1.1.3",
-					WatchUpstreamRecursively: false,
-					ThresholdName:            "SUCCESS",
-					ThresholdOrdinal:         0,
-					ThresholdColor:           "BLUE",
-					ThresholdCompleteBuild:   true,
-				},
-			}
-		} else if stepOrdinal > 0 {
-			prevJobName := getJobName(activity, stageOrdinal, stepOrdinal-1)
-			v.Triggers = JenkinsTrigger{
-				BuildTrigger: &JenkinsBuildTrigger{
-					UpstreamProjects:       prevJobName,
-					ThresholdName:          "SUCCESS",
-					ThresholdOrdinal:       0,
-					ThresholdColor:         "BLUE",
-					ThresholdCompleteBuild: true,
-				},
-			}
-
-		}
 	}
 	//post task to notify pipelineserver
 	pbt := PostBuildTask{
@@ -868,12 +940,12 @@ func ToActivity(p *pipeline.Pipeline) (*pipeline.Activity, error) {
 
 func initActivityEnvvars(activity *pipeline.Activity, triggerType string) {
 	p := activity.Pipeline
-	vars := map[string]interface{}{}
+	vars := map[string]string{}
 	vars["CICD_PIPELINE_NAME"] = p.Name
 	vars["CICD_PIPELINE_ID"] = p.Id
 	vars["CICD_NODE_NAME"] = activity.NodeName
 	vars["CICD_ACTIVITY_ID"] = activity.Id
-	vars["CICD_ACTIVITY_SEQUENCE"] = activity.RunSequence
+	vars["CICD_ACTIVITY_SEQUENCE"] = strconv.Itoa(activity.RunSequence)
 	vars["CICD_GIT_URL"] = p.Stages[0].Steps[0].Repository
 	vars["CICD_GIT_BRANCH"] = p.Stages[0].Steps[0].Branch
 	vars["CICD_GIT_COMMIT"] = activity.CommitInfo

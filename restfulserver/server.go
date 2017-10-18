@@ -563,6 +563,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	}
 	if status == "SUCCESS" {
 		successStep(&activity, stageOrdinal, stepOrdinal)
+		triggernext(&activity, stageOrdinal, stepOrdinal)
 	} else if status == "FAILURE" {
 		failStep(&activity, stageOrdinal, stepOrdinal)
 	}
@@ -631,9 +632,46 @@ func successStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int)
 				activity.Status = pipeline.ActivityPending
 				activity.PendingStage = stageOrdinal + 1
 			}
+			/*
+				else if pipeline.HasStageCondition(nextStage) {
+					if err := MyAgent.Server.PipelineContext.Provider.RunStage(activity, stageOrdinal+1); err != nil {
+						logrus.Errorf("run conditional stage '%s' got error:%v", nextStage.Name, err)
+						//activity.Status = Error
+						activity.FailMessage = fmt.Sprintf("run conditional stage '%s' got error:%v", nextStage.Name, err)
+					}
+				}
+			*/
 		}
 	}
 
+}
+
+func triggernext(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
+	logrus.Debugf("triggering next:%d,%d", stageOrdinal, stepOrdinal)
+	if activity.Status == pipeline.ActivitySuccess ||
+		activity.Status == pipeline.ActivityFail ||
+		activity.Status == pipeline.ActivityPending ||
+		activity.Status == pipeline.ActivityDenied {
+		return
+	}
+	stage := activity.ActivityStages[stageOrdinal]
+	if IsStageSuccess(stage) && stageOrdinal+1 < len(activity.ActivityStages) {
+		nextStage := activity.ActivityStages[stageOrdinal+1]
+		if err := MyAgent.Server.PipelineContext.Provider.RunStage(activity, stageOrdinal+1); err != nil {
+			logrus.Errorf("trigger next stage '%s' got error:%v", nextStage.Name, err)
+			//activity.Status = Error
+			activity.FailMessage = fmt.Sprintf("trigger next stage '%s' got error:%v", nextStage.Name, err)
+		}
+		return
+	}
+
+	if !activity.Pipeline.Stages[stageOrdinal].Parallel {
+		if err := MyAgent.Server.PipelineContext.Provider.RunStep(activity, stageOrdinal, stepOrdinal+1); err != nil {
+			logrus.Errorf("trigger step #%d of '%s' got error:%v", stepOrdinal+2, stage.Name, err)
+			//activity.Status = Error
+			activity.FailMessage = fmt.Sprintf("trigger step #%d of '%s' got error:%v", stepOrdinal+2, stage.Name, err)
+		}
+	}
 }
 
 func IsStageSuccess(stage *pipeline.ActivityStage) bool {
@@ -646,8 +684,8 @@ func IsStageSuccess(stage *pipeline.ActivityStage) bool {
 	}
 	successSteps := 0
 	for _, step := range stage.ActivitySteps {
-		if step.Status == pipeline.ActivityStepSuccess {
-			successSteps += 1
+		if step.Status == pipeline.ActivityStepSuccess || step.Status == pipeline.ActivityStepSkip {
+			successSteps++
 		}
 	}
 	return successSteps == len(stage.ActivitySteps)

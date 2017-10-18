@@ -20,6 +20,7 @@ const (
 	ActivityStepBuilding = "Building"
 	ActivityStepSuccess  = "Success"
 	ActivityStepFail     = "Fail"
+	ActivityStepSkip     = "Skipped"
 
 	ActivityStageWaiting  = "Waiting"
 	ActivityStagePending  = "Pending"
@@ -27,6 +28,7 @@ const (
 	ActivityStageSuccess  = "Success"
 	ActivityStageFail     = "Fail"
 	ActivityStageDenied   = "Denied"
+	ActivityStageSkip     = "Skipped"
 
 	ActivityWaiting  = "Waiting"
 	ActivityPending  = "Pending"
@@ -102,16 +104,20 @@ type CronTrigger struct {
 }
 
 type Stage struct {
-	Name        string   `json:"name,omitempty" yaml:"name,omitempty"`
-	NeedApprove bool     `json:"needApprove,omitempty" yaml:"needApprove,omitempty"`
-	Parallel    bool     `json:"parallel,omitempty" yaml:"parallel,omitempty"`
-	Approvers   []string `json:"approvers,omitempty" yaml:"approvers,omitempty"`
-	Steps       []*Step  `json:"steps,omitempty" yaml:"steps,omitempty"`
+	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
+	NeedApprove bool   `json:"needApprove,omitempty" yaml:"needApprove,omitempty"`
+	Parallel    bool   `json:"parallel,omitempty" yaml:"parallel,omitempty"`
+	//Condition   string             `json:"condition,omitempty" yaml:"condition,omitempty"`
+	Conditions *PipelineConditions `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	Approvers  []string            `json:"approvers,omitempty" yaml:"approvers,omitempty"`
+	Steps      []*Step             `json:"steps,omitempty" yaml:"steps,omitempty"`
 }
 
 type Step struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	//Condition  string             `json:"condition,omitempty" yaml:"condition,omitempty"`
+	Conditions *PipelineConditions `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	//---SCM step
 	SCMType    string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
@@ -160,28 +166,34 @@ type PipelineProvider interface {
 	RunPipeline(*Pipeline, string) (*Activity, error)
 	RerunActivity(*Activity) error
 	RunStage(*Activity, int) error
+	RunStep(*Activity, int, int) error
 	SyncActivity(*Activity) error
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
 	DeleteFormerBuild(*Activity) error
 	OnActivityCompelte(*Activity)
 }
 
+type PipelineConditions struct {
+	All []string `json:"all,omitempty" yaml:"all,omitempty"`
+	Any []string `json:"any,omitempty" yaml:"any,omitempty"`
+}
+
 type Activity struct {
 	client.Resource
-	Id              string                 `json:"id,omitempty"`
-	Pipeline        Pipeline               `json:"pipelineSource,omitempty"`
-	PipelineName    string                 `json:"pipelineName,omitempty"`
-	PipelineVersion string                 `json:"pipelineVersion,omitempty"`
-	RunSequence     int                    `json:"runSequence,omitempty"`
-	CommitInfo      string                 `json:"commitInfo,omitempty"`
-	Status          string                 `json:"status,omitempty"`
-	FailMessage     string                 `json:"failMessage,omitempty"`
-	PendingStage    int                    `json:"pendingStage,omitempty"`
-	StartTS         int64                  `json:"start_ts,omitempty"`
-	StopTS          int64                  `json:"stop_ts,omitempty"`
-	NodeName        string                 `json:"nodename,omitempty"`
-	ActivityStages  []*ActivityStage       `json:"activity_stages,omitempty"`
-	EnvVars         map[string]interface{} `json:"envVars,omitempty"`
+	Id              string            `json:"id,omitempty"`
+	Pipeline        Pipeline          `json:"pipelineSource,omitempty"`
+	PipelineName    string            `json:"pipelineName,omitempty"`
+	PipelineVersion string            `json:"pipelineVersion,omitempty"`
+	RunSequence     int               `json:"runSequence,omitempty"`
+	CommitInfo      string            `json:"commitInfo,omitempty"`
+	Status          string            `json:"status,omitempty"`
+	FailMessage     string            `json:"failMessage,omitempty"`
+	PendingStage    int               `json:"pendingStage,omitempty"`
+	StartTS         int64             `json:"start_ts,omitempty"`
+	StopTS          int64             `json:"stop_ts,omitempty"`
+	NodeName        string            `json:"nodename,omitempty"`
+	ActivityStages  []*ActivityStage  `json:"activity_stages,omitempty"`
+	EnvVars         map[string]string `json:"envVars,omitempty"`
 }
 
 type ActivityStage struct {
