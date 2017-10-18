@@ -376,3 +376,13 @@ func GetAllServices(activity *Activity) []*CIService {
 	}
 	return GetServices(activity, lastStageOrdinal, lastStepOrdinal)
 }
+
+func HasStepCondition(s *Step) bool {
+	//return s.Condition != ""
+	return s.Conditions != nil && (len(s.Conditions.All) > 0 || len(s.Conditions.Any) > 0)
+}
+
+func HasStageCondition(s *Stage) bool {
+	//return s.Condition != ""
+	return s.Conditions != nil && (len(s.Conditions.All) > 0 || len(s.Conditions.Any) > 0)
+}
