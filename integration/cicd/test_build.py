@@ -55,7 +55,7 @@ def test_run_build(pipeline_resource):
                 "type": "build"}]
         }]
     create_pipeline(name='buildtest', stages=stages)
-    run_pipeline_expect('buildtest', 'Success')
+    run_pipeline_expect('buildtest', 'Success', 300)
     remove_pipeline('buildtest')
 
 

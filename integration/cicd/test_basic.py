@@ -454,9 +454,9 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
             "steps": [{
                 "stackName": stackname,
                 "compose": ("services:\n  ngx1:\n    image: ng"
-                                  "inx:1\n    environment:\n      FO"
-                                  "O: BAR\n  ngxlt:\n    image: ngin"
-                                  "x:latest\n    labels:\n      FOO: BAR"),
+                            "inx:1\n    environment:\n      FO"
+                            "O: BAR\n  ngxlt:\n    image: ngin"
+                            "x:latest\n    labels:\n      FOO: BAR"),
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
@@ -504,9 +504,9 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
             "steps": [{
                 "stackName": stackname,
                 "compose": ("services:\n  ngx1:\n    image: ng"
-                                  "inx:wrong\n  x  environment:\n      FO"
-                                  "O: BAR\n x ngxlt:\n    image: ngin"
-                                  "x:latest\n  x  labels:\n      FOO: BAR"),
+                            "inx:wrong\n  x  environment:\n      FO"
+                            "O: BAR\n x ngxlt:\n    image: ngin"
+                            "x:latest\n  x  labels:\n      FOO: BAR"),
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
