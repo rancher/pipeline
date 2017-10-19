@@ -98,15 +98,15 @@ type PipelineContent struct {
 }
 
 type CronTrigger struct {
-	TriggerOnUpdate bool   `json:"triggerOnUpdate,omitempty" yaml:"triggerOnUpdate,omitempty"`
+	TriggerOnUpdate bool   `json:"triggerOnUpdate" yaml:"triggerOnUpdate,omitempty"`
 	Spec            string `json:"spec,omitempty" yaml:"spec,omitempty"`
 	Timezone        string `json:"timezone,omitempty" yaml:"timezone,omitempty"`
 }
 
 type Stage struct {
 	Name        string `json:"name,omitempty" yaml:"name,omitempty"`
-	NeedApprove bool   `json:"needApprove,omitempty" yaml:"needApprove,omitempty"`
-	Parallel    bool   `json:"parallel,omitempty" yaml:"parallel,omitempty"`
+	NeedApprove bool   `json:"needApprove" yaml:"needApprove,omitempty"`
+	Parallel    bool   `json:"parallel" yaml:"parallel,omitempty"`
 	//Condition   string             `json:"condition,omitempty" yaml:"condition,omitempty"`
 	Conditions *PipelineConditions `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	Approvers  []string            `json:"approvers,omitempty" yaml:"approvers,omitempty"`
@@ -122,16 +122,16 @@ type Step struct {
 	SCMType    string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
-	Webhook    bool   `json:"webhook,omitempty" yaml:"webhook,omitempty"`
+	Webhook    bool   `json:"webhook" yaml:"webhook,omitempty"`
 	//---Build step
 	Dockerfile     string `json:"dockerFileContent,omitempty" yaml:"dockerFileContent,omitempty"`
 	DockerfilePath string `json:"dockerFilePath,omittempty" yaml:"dockerFilePath,omitempty"`
 	TargetImage    string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
-	PushFlag       bool   `json:"push,omitempty" yaml:"push,omitempty"`
+	PushFlag       bool   `json:"push" yaml:"push,omitempty"`
 
 	//---task step
 	Image       string       `json:"image,omitempty" yaml:"image,omitempty"`
-	IsService   bool         `json:"isService,omitempty" yaml:"isService,omitempty"`
+	IsService   bool         `json:"isService" yaml:"isService,omitempty"`
 	Alias       string       `json:"alias,omitempty" yaml:"alias,omitempty"`
 	ShellScript string       `json:"shellScript,omitempty" yaml:"shellScript,omitempty"`
 	Entrypoint  string       `json:"entrypoint,omitempty" yaml:"enrtypoint,omitempty"`
@@ -144,7 +144,7 @@ type Step struct {
 	ServiceSelector map[string]string `json:"serviceSelector,omitempty" yaml:"serviceSelector,omitempty"`
 	BatchSize       int               `json:"batchSize,omitempty" yaml:"batchSize,omitempty"`
 	Interval        int               `json:"interval,omitempty" yaml:"interval,omitempty"`
-	StartFirst      bool              `json:"startFirst,omitempty" yaml:"startFirst,omitempty"`
+	StartFirst      bool              `json:"startFirst" yaml:"startFirst,omitempty"`
 	Endpoint        string            `json:"endpoint,omitempty" yaml:"endpoint,omitempty"`
 	Accesskey       string            `json:"accesskey,omitempty" yaml:"accesskey,omitempty"`
 	Secretkey       string            `json:"secretkey,omitempty" yaml:"secretkey,omitempty"`
@@ -157,7 +157,7 @@ type Step struct {
 	//---upgradeCatalog step
 	//Endpoint,Accesskey,Secretkey,StackName,
 	ExternalId string            `json:"externalId,omitempty" yaml:"externalId,omitempty"`
-	DeployFlag bool              `json:"deploy,omitempty" yaml:"deploy,omitempty"`
+	DeployFlag bool              `json:"deploy" yaml:"deploy,omitempty"`
 	Templates  map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	Answers    string            `json:"answerString,omitempty" yaml:"answerString,omitempty"`
 }
