@@ -70,7 +70,11 @@ func CreateCIEndpointWebhook() error {
 	wh := WebhookGenericObject{
 		Driver: CIWEBHOOKTYPE,
 		Name:   CIWEBHOOKNAME,
-		Config: map[string]string{"serviceURL": fmt.Sprintf("http://localhost:8080/r/projects/%s/pipeline-server:60081/v1/webhook", projectId)}, //"http://pipeline-server:60080/v1/webhook"},
+		Config: map[string]string{
+			"serviceName": "pipeline-server",
+			"port":        "60081",
+			"path":        "/v1/webhook",
+		},
 	}
 	apiClient, err := util.GetRancherClient()
 
@@ -79,7 +83,6 @@ func CreateCIEndpointWebhook() error {
 	}
 	u, _ := url.Parse(config.Config.CattleUrl)
 	createWebhookUrl := fmt.Sprintf("%s://%s/v1-webhooks/receivers?projectId=%s", u.Scheme, u.Host, projectId)
-	//res := model.WebhookGenericObject
 	if err = apiClient.Post(createWebhookUrl, wh, &wh); err != nil {
 		logrus.Error(err)
 		return err

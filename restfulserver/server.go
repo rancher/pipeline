@@ -108,6 +108,7 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 	logrus.Debugln("get webhook request")
 	logrus.Debugf("get header:%v", req.Header)
 	logrus.Debugf("get url:%v", req.RequestURI)
+
 	if signature = req.Header.Get("X-Hub-Signature"); len(signature) == 0 {
 		return errors.New("No signature!")
 	}
