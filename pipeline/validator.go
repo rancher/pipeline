@@ -24,6 +24,18 @@ func Clean(p *Pipeline) {
 	p.WebHookId = 0
 	p.WebHookToken = ""
 
+	//set condition to nil if empty, for cleaner serialization
+	for _, stage := range p.Stages {
+		if stage.Conditions != nil && len(stage.Conditions.All) == 0 && len(stage.Conditions.Any) == 0 {
+			stage.Conditions = nil
+		}
+		for _, step := range stage.Steps {
+			if step.Conditions != nil && len(step.Conditions.All) == 0 && len(step.Conditions.Any) == 0 {
+				step.Conditions = nil
+			}
+		}
+	}
+
 }
 
 func Validate(p *Pipeline) error {
