@@ -119,6 +119,10 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 				if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
 					return
 				}
+				if strings.HasSuffix(stepLog, "\n  Finished: SUCCESS\n") || strings.HasSuffix(stepLog, "\n  Finished: FAILURE\n") {
+					//finish
+					return
+				}
 			}
 		case <-pingTicker.C:
 			ws.SetWriteDeadline(time.Now().Add(writeWait))

@@ -389,7 +389,7 @@ func GetBuildRawOutput(jobname string, startLine int) (string, error) {
 	var targetURL *url.URL
 	var err error
 	targetURL, err = url.Parse(sah + buildRawOutputURI)
-	//logrus.Infof("targetURL is :%v", targetURL)
+	logrus.Debugf("getting log from: %s", targetURL)
 	if err != nil {
 		logrus.Error(err)
 		return "", err
