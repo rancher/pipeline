@@ -363,6 +363,7 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 
 func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	stringBuilder := new(bytes.Buffer)
+	stringBuilder.WriteString("set +x \n")
 	switch step.Type {
 	case pipeline.StepTypeTask:
 
@@ -388,7 +389,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			cmd = strings.Replace(cmd, "$", "\\$", -1)
 			stringBuilder.WriteString(cmd)
 			stringBuilder.WriteString("\nR_CICD_EOF\n")
-			stringBuilder.WriteString("set -xe\n")
 		} else {
 			stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 			argsPara = step.Args
@@ -414,6 +414,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 
 		//volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
 		volumeInfo := "-v /var/jenkins_home/workspace:/var/jenkins_home/workspace -w ${PWD}"
+		stringBuilder.WriteString("set -xe\n")
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
@@ -438,15 +439,15 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			if step.DockerfilePath != "" {
 				buildPath = step.DockerfilePath
 			}
+			stringBuilder.WriteString("set -xe\n")
 			stringBuilder.WriteString("docker build --tag ")
 			stringBuilder.WriteString(step.TargetImage)
 			stringBuilder.WriteString(" ")
 			stringBuilder.WriteString(buildPath)
 			stringBuilder.WriteString(";")
 		} else {
-			stringBuilder.WriteString("echo \"")
-			stringBuilder.WriteString(strings.Replace(step.Dockerfile, "\"", "\\\"", -1))
-			stringBuilder.WriteString("\">.Dockerfile;")
+			stringBuilder.WriteString("echo " + QuoteShell(step.Dockerfile) + ">.Dockerfile;\n")
+			stringBuilder.WriteString("set -xe\n")
 			stringBuilder.WriteString("docker build --tag ")
 			stringBuilder.WriteString(step.TargetImage)
 			stringBuilder.WriteString(" -f .Dockerfile .;")
@@ -481,6 +482,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 
 	case pipeline.StepTypeUpgradeService:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
+		stringBuilder.WriteString("set -xe\n")
 		stringBuilder.WriteString("cihelper")
 		if step.Endpoint != "" {
 			stringBuilder.WriteString(" --envurl ")

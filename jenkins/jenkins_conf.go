@@ -135,6 +135,7 @@ exit 1
 `
 
 const upgradeCatalogScript = `# upgrade catalog
+set +x
 R_UPGRADECATALOG_REPO=%s
 R_UPGRADECATALOG_BRANCH=%s
 R_UPGRADECATALOG_GITUSER=%s
