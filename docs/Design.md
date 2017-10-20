@@ -14,7 +14,7 @@ The CICD system consists of three parts, Rancher server, Pipeline server and Jen
 
 The CICD system is dependent on Rancher server and leverage its functionalities. Rancher server keeps persistence of CICD job configurations( known as `Pipelines`) and execution records (known as `activities`). These data is stored as generic objects in Rancher server. Rancher server also works as the gateway to receieve user requests and github webhooks and proxy them to Pipeline server.
 
-###`Pipeline Server`
+### `Pipeline Server`
 
 Pipeline server is the API server in CICD system. It provides API to handle Pipeline CRUD operations and other actions such as run, activate, etc. It does not do the actual CICD tasks but distribute them to Jenkins. Pipeline server is in charge of mapping a pipeline definition to Jenkins jobs, scheduling and running Jenkins jobs according to various CICD workflow, such as parallel or conditional tasks.
 
@@ -92,7 +92,7 @@ For continuous deployment we provide different step type to interact with Ranche
 
 SCM Authorization is useful for: webhook automated operations, pull/push accessibility for upgradeCatalog or others. Currently Github Oauth is supported. It can be done following guides that is similar to Rancher Github Auth. After authorization, CICD gets the user token and also stores it in generic objects.
 
-###6. Webhook 
+### 6. Webhook 
 
 At the start of pipeline server, it will check or create a `service_webhook` type Rancher webhook. It is used to receieve external systems' notifications, such as github webhooks without Rancher credentials. The webhook is a singleton and it can proxy to pipeline server and trigger all pipelines to run according to requests payload and headers. When a pipeline is created and `webhook` option is set, pipeline server will create a github webhook directing to this Rancher webhook. It containers pipelineId, environmentId, secret token generated for each pipeline, and is triggered whenever a new push event occurs. Pipeline server will validate the request payload and the secret token then run the pipeline if it is valid. Currently only Github webhook is available, integration of other system like Gitlab can be done in similar way.
 
