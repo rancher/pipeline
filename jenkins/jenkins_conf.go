@@ -88,9 +88,9 @@ R_UPGRADESTACK_STACKNAME=%s
 rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY export $R_UPGRADESTACK_STACKNAME
 
 cd $R_UPGRADESTACK_STACKNAME
-cat>new-compose.yml<<EOF
+cat>new-compose.yml<<R_CICD_EOF
 %s
-EOF
+R_CICD_EOF
 #merge yaml file
 cihelper mergeyaml -o new-compose.yml new-compose.yml compose.yml 
 rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --file new-compose.yml -d
@@ -144,18 +144,18 @@ R_UPGRADESTACK_FLAG=%s
 
 TEMPDIR=$(mktemp -d .r_cicd_catalog.XXXX) && cd $TEMPDIR && mkdir catalog
 
-cat>docker-compose.yml<<EOF
+cat>docker-compose.yml<<R_CICD_EOF
 %s
-EOF
-cat>rancher-compose.yml<<EOF
+R_CICD_EOF
+cat>rancher-compose.yml<<R_CICD_EOF
 %s
-EOF
-cat>README.md<<EOF
+R_CICD_EOF
+cat>README.md<<R_CICD_EOF
 %s
-EOF
-cat>env_file<<EOF
+R_CICD_EOF
+cat>env_file<<R_CICD_EOF
 %s
-EOF
+R_CICD_EOF
 
 cihelper upgrade catalog --repourl $R_UPGRADECATALOG_REPO --branch $R_UPGRADECATALOG_BRANCH --user $R_UPGRADECATALOG_GITUSER \
 --cacheroot catalog --foldername $R_UPGRADECATALOG_FOLDERNAME --readme README.md $R_UPGRADECATALOG_SYSTEMFLAG

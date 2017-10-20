@@ -90,6 +90,8 @@ type PipelineContent struct {
 	File            string `json:"file,omitempty" yaml:"file,omitempty"`
 	WebHookId       int    `json:"webhookId,omitempty" yaml:"webhookId,omitempty"`
 	WebHookToken    string `json:"webhookToken,omitempty" yaml:"webhookToken,omitempty"`
+	//user defined environment variables
+	Parameters []string `json:"parameters,omitempty" yaml:"parameters,omitempty"`
 	//for import
 	Templates map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	//trigger
@@ -194,6 +196,7 @@ type Activity struct {
 	NodeName        string            `json:"nodename,omitempty"`
 	ActivityStages  []*ActivityStage  `json:"activity_stages,omitempty"`
 	EnvVars         map[string]string `json:"envVars,omitempty"`
+	TriggerType     string            `json:"triggerType,omitempty"`
 }
 
 type ActivityStage struct {

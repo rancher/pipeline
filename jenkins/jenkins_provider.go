@@ -34,7 +34,8 @@ func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline, triggerType string) 
 	if err != nil {
 		return &pipeline.Activity{}, err
 	}
-	initActivityEnvvars(activity, triggerType)
+	activity.TriggerType = triggerType
+	initActivityEnvvars(activity)
 
 	if len(p.Stages) == 0 {
 		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
@@ -77,7 +78,7 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	logrus.Infof("rerunpipeline,get nodeName:%v", nodeName)
 	a.RunSequence = a.Pipeline.RunCount + 1
 	a.StartTS = time.Now().UnixNano() / int64(time.Millisecond)
-	initActivityEnvvars(a, "manual")
+	initActivityEnvvars(a)
 	err = j.RunStage(a, 0)
 	return err
 }
@@ -381,12 +382,12 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			argsPara = entryFileName
 
 			//write to a sh file,then docker run it
-			stringBuilder.WriteString(fmt.Sprintf("cat>%s<<EOF\n", entryFileName))
+			stringBuilder.WriteString(fmt.Sprintf("cat>%s<<R_CICD_EOF\n", entryFileName))
 			stringBuilder.WriteString("set -xe\n")
 			cmd := strings.Replace(step.ShellScript, "\\", "\\\\", -1)
 			cmd = strings.Replace(cmd, "$", "\\$", -1)
 			stringBuilder.WriteString(cmd)
-			stringBuilder.WriteString("\nEOF\n")
+			stringBuilder.WriteString("\nR_CICD_EOF\n")
 			stringBuilder.WriteString("set -xe\n")
 		} else {
 			stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
@@ -458,26 +459,25 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	case pipeline.StepTypeSCM:
 		//write to a env file that provides the environment variables to use throughout the activity.
 		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)\n")
-		stringBuilder.WriteString("cat>.r_cicd.env<<EOF\n")
+		stringBuilder.WriteString("cat>.r_cicd.env<<R_CICD_EOF\n")
 		stringBuilder.WriteString("CICD_GIT_COMMIT=$GIT_COMMIT\n")
-		stringBuilder.WriteString("CICD_GIT_PREVIOUS_COMMIT=$GIT_PREVIOUS_COMMIT\n")
-		stringBuilder.WriteString("CICD_GIT_PREVIOUS_SUCCESSFUL_COMMIT=$GIT_PREVIOUS_SUCCESSFUL_COMMIT\n")
 		stringBuilder.WriteString("CICD_GIT_BRANCH=$GIT_BRANCH\n")
-		stringBuilder.WriteString("CICD_GIT_LOCAL_BRANCH=$GIT_LOCAL_BRANCH\n")
 		stringBuilder.WriteString("CICD_GIT_URL=$GIT_URL\n")
-		stringBuilder.WriteString("CICD_GIT_COMMITTER_NAME=$GIT_COMMITTER_NAME\n")
-		stringBuilder.WriteString("CICD_GIT_AUTHOR_NAME=$GIT_AUTHOR_NAME\n")
-		stringBuilder.WriteString("CICD_GIT_COMMITTER_EMAIL=$GIT_COMMITTER_EMAIL\n")
-		stringBuilder.WriteString("CICD_GIT_AUTHOR_EMAIL=$GIT_AUTHOR_EMAIL\n")
-		stringBuilder.WriteString("CICD_SVN_REVISION=$SVN_REVISION\n")
-		stringBuilder.WriteString("CICD_SVN_URL=$SVN_URL\n")
 		stringBuilder.WriteString("CICD_PIPELINE_NAME=" + activity.Pipeline.Name + "\n")
 		stringBuilder.WriteString("CICD_PIPELINE_ID=" + activity.Pipeline.Id + "\n")
-		stringBuilder.WriteString("CICD_TRIGGER_TYPE=\n")
+		stringBuilder.WriteString("CICD_TRIGGER_TYPE=" + activity.TriggerType + "\n")
 		stringBuilder.WriteString("CICD_NODE_NAME=" + activity.NodeName + "\n")
 		stringBuilder.WriteString("CICD_ACTIVITY_ID=" + activity.Id + "\n")
 		stringBuilder.WriteString("CICD_ACTIVITY_SEQUENCE=" + strconv.Itoa(activity.RunSequence) + "\n")
-		stringBuilder.WriteString("\nEOF\n")
+		//user defined env vars
+		for _, envvar := range activity.Pipeline.Parameters {
+			splits := strings.SplitN(envvar, "=", 2)
+			if len(splits) != 2 {
+				continue
+			}
+			stringBuilder.WriteString(fmt.Sprintf("%s=%s\n", splits[0], QuoteShell(splits[1])))
+		}
+		stringBuilder.WriteString("\nR_CICD_EOF\n")
 
 	case pipeline.StepTypeUpgradeService:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
@@ -758,6 +758,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 	if err != nil {
 		return "", err
 	}
+	logrus.Debugf("got log:\n%s\n\n%s\n\n%d", *logText, rawOutput, startLine)
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	*logText = *logText + rawOutput
 	outputs := regexp.MustCompile(token).Split(*logText, -1)
@@ -906,7 +907,7 @@ func ToActivity(p *pipeline.Pipeline) (*pipeline.Activity, error) {
 	return activity, nil
 }
 
-func initActivityEnvvars(activity *pipeline.Activity, triggerType string) {
+func initActivityEnvvars(activity *pipeline.Activity) {
 	p := activity.Pipeline
 	vars := map[string]string{}
 	vars["CICD_PIPELINE_NAME"] = p.Name
@@ -917,7 +918,7 @@ func initActivityEnvvars(activity *pipeline.Activity, triggerType string) {
 	vars["CICD_GIT_URL"] = p.Stages[0].Steps[0].Repository
 	vars["CICD_GIT_BRANCH"] = p.Stages[0].Steps[0].Branch
 	vars["CICD_GIT_COMMIT"] = activity.CommitInfo
-	vars["CICD_TRIGGER_TYPE"] = triggerType
+	vars["CICD_TRIGGER_TYPE"] = activity.TriggerType
 	activity.EnvVars = vars
 }
 
