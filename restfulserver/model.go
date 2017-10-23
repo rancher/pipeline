@@ -126,7 +126,9 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 	a.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=update"
 	a.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=remove"
 	//TODO if a.Iscomplete()
-	if a.Status != pipeline.ActivityWaiting && a.Status != pipeline.ActivityBuilding {
+	if a.Status != pipeline.ActivityWaiting &&
+		a.Status != pipeline.ActivityBuilding &&
+		a.Status != pipeline.ActivityPending {
 		a.Actions["rerun"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=rerun"
 	}
 
