@@ -390,9 +390,9 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(cmd)
 			stringBuilder.WriteString("\nR_CICD_EOF\n")
 		} else {
-			stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 			argsPara = step.Args
 		}
+		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Entrypoint != "" {
 			entrypointPara = "--entrypoint " + step.Entrypoint
 		}
@@ -521,10 +521,10 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	case pipeline.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Endpoint == "" {
-			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(step.Compose))
+			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(activity, step.Compose))
 			stringBuilder.WriteString(script)
 		} else {
-			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(step.Compose))
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(activity, step.Compose))
 			stringBuilder.WriteString(script)
 		}
 	case pipeline.StepTypeUpgradeCatalog:
@@ -554,10 +554,10 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			}
 
 		}
-		dockerCompose = EscapeShell(dockerCompose)
-		rancherCompose = EscapeShell(rancherCompose)
-		readme = EscapeShell(readme)
-		answers := step.Answers
+		dockerCompose = EscapeShell(activity, dockerCompose)
+		rancherCompose = EscapeShell(activity, rancherCompose)
+		readme = EscapeShell(activity, readme)
+		answers := EscapeShell(activity, step.Answers)
 
 		endpoint := step.Endpoint
 		accessKey := step.Accesskey
@@ -921,6 +921,14 @@ func initActivityEnvvars(activity *pipeline.Activity) {
 	vars["CICD_GIT_BRANCH"] = p.Stages[0].Steps[0].Branch
 	vars["CICD_GIT_COMMIT"] = activity.CommitInfo
 	vars["CICD_TRIGGER_TYPE"] = activity.TriggerType
+	//user defined env vars
+	for _, envvar := range activity.Pipeline.Parameters {
+		splits := strings.SplitN(envvar, "=", 2)
+		if len(splits) != 2 {
+			continue
+		}
+		vars[splits[0]] = splits[1]
+	}
 	activity.EnvVars = vars
 }
 
@@ -951,15 +959,14 @@ func QuoteShell(script string) string {
 	return escaped
 }
 
-func EscapeShell(script string) string {
+func EscapeShell(activity *pipeline.Activity, script string) string {
 	escaped := strings.Replace(script, "\\", "\\\\", -1)
 	escaped = strings.Replace(escaped, "$", "\\$", -1)
 
-	//TODO preserve a pattern
-	for _, str := range pipeline.PreservedEnvs {
-		escaped = strings.Replace(escaped, "\\$"+str+" ", "$"+str+" ", -1)
-		escaped = strings.Replace(escaped, "\\$"+str+"\n", "$"+str+"\n", -1)
-		escaped = strings.Replace(escaped, "\\${"+str+"}", "${"+str+"}", -1)
+	for k, v := range activity.EnvVars {
+		escaped = strings.Replace(escaped, "\\$"+k+" ", v, -1)
+		escaped = strings.Replace(escaped, "\\$"+k+"\n", v, -1)
+		escaped = strings.Replace(escaped, "\\${"+k+"}", v, -1)
 
 	}
 	return escaped
