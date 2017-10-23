@@ -48,11 +48,10 @@ func Validate(p *Pipeline) error {
 		return errors.New("SCM type should be the first step")
 	}
 
-	if p.CronTrigger != nil {
-		if err := checkCronSpec(p.CronTrigger.Spec); err != nil {
-			return err
-		}
+	if err := checkCronSpec(p.CronTrigger.Spec); err != nil {
+		return err
 	}
+
 	if err := checkStageName(p.Stages); err != nil {
 		return err
 	}

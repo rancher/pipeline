@@ -305,9 +305,6 @@ func GetNextRunTime(pipeline *Pipeline) int64 {
 		return nextRunTime
 	}
 	trigger := pipeline.CronTrigger
-	if trigger == nil {
-		return nextRunTime
-	}
 	spec := trigger.Spec
 	if spec == "" {
 		return nextRunTime

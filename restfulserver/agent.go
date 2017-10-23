@@ -80,7 +80,7 @@ func (a *Agent) RunScheduler() {
 
 	pipelines := a.Server.PipelineContext.ListPipelines()
 	for _, pipeline := range pipelines {
-		if pipeline.IsActivate && pipeline.CronTrigger != nil && pipeline.CronTrigger.Spec != "" {
+		if pipeline.IsActivate && pipeline.CronTrigger.Spec != "" {
 			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.CronTrigger.Spec, pipeline.CronTrigger.Timezone)
 			a.registerCronRunner(cr)
 		}
@@ -106,7 +106,7 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 		a.unregisterCronRunnerC <- pId
 	}
 
-	if p.IsActivate && p.CronTrigger != nil && p.CronTrigger.Spec != "" {
+	if p.IsActivate && p.CronTrigger.Spec != "" {
 		spec = p.CronTrigger.Spec
 		timezone = p.CronTrigger.Timezone
 		cr := scheduler.NewCronRunner(pId, spec, timezone)
@@ -124,7 +124,7 @@ func (a *Agent) onPipelineDelete(p *pipeline.Pipeline) {
 	}
 }
 func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
-	if p.CronTrigger != nil && p.CronTrigger.Spec != "" {
+	if p.CronTrigger.Spec != "" {
 		pId := p.Id
 		spec := p.CronTrigger.Spec
 		timezone := p.CronTrigger.Timezone
