@@ -502,6 +502,10 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(" --image ")
 			stringBuilder.WriteString(step.ImageTag)
 		}
+		for k, v := range step.ServiceSelector {
+			stringBuilder.WriteString(" --selector ")
+			stringBuilder.WriteString(QuoteShell(fmt.Sprintf("%s=%s", k, v)))
+		}
 		if step.BatchSize > 0 {
 			stringBuilder.WriteString(" --batchsize ")
 			stringBuilder.WriteString(strconv.Itoa(step.BatchSize))
@@ -513,10 +517,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		if step.StartFirst != false {
 			stringBuilder.WriteString(" --startfirst")
 			stringBuilder.WriteString(" true")
-		}
-		for k, v := range step.ServiceSelector {
-			stringBuilder.WriteString(" --selector ")
-			stringBuilder.WriteString(QuoteShell(fmt.Sprintf("%s=%s", k, v)))
 		}
 	case pipeline.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
