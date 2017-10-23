@@ -41,7 +41,10 @@ func Preset(pipelineContext *pipeline.PipelineContext) {
 	logrus.Debugf("get activities size:%v", len(activities))
 	//Sync status of running activities
 	for _, a := range activities {
-		if a.Status == pipeline.ActivityFail || a.Status == pipeline.ActivitySuccess {
+		if a.Status == pipeline.ActivityFail ||
+			a.Status == pipeline.ActivitySuccess ||
+			a.Status == pipeline.ActivityDenied ||
+			a.Status == pipeline.ActivityPending {
 			continue
 		}
 		if err := pipelineContext.Provider.SyncActivity(a); err != nil {
