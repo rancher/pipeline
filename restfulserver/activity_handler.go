@@ -19,26 +19,18 @@ import (
 func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error {
 
 	apiContext := api.GetApiContext(req)
-	apiClient, err := util.GetRancherClient()
-	logrus.Infof("req2:%v", req.URL.Path)
+	geObjList, err := pipeline.PaginateGenericObjects("activity")
 	if err != nil {
-		return err
-	}
-	filters := make(map[string]interface{})
-	filters["kind"] = "activity"
-	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
-		Filters: filters,
-	})
-	if err != nil {
+		logrus.Errorf("fail to list activity,err:%v", err)
 		return err
 	}
 	var activities []*pipeline.Activity
 	uid, err := GetCurrentUser(req.Cookies())
 	if err != nil || uid == "" {
-		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
+		logrus.Infof("cannot get currentUser,%v,%v", uid, err)
 	}
 
-	for _, gobj := range goCollection.Data {
+	for _, gobj := range geObjList {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
@@ -52,14 +44,10 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	}
 
 	datalist := priorityPendingActivity(activities)
-	logrus.Infof("activity resource is :%v", &client.GenericCollection{
-		Data: datalist,
-	})
 	//v2client here generates error?
 	apiContext.Write(&v1client.GenericCollection{
 		Data: datalist,
 	})
-	logrus.Infof("req3:%v", req.URL.Path)
 
 	return nil
 
@@ -98,16 +86,15 @@ func canApprove(uid string, activity *pipeline.Activity) bool {
 
 func (s *Server) CleanActivities(rw http.ResponseWriter, req *http.Request) error {
 	apiClient, err := util.GetRancherClient()
-	filters := make(map[string]interface{})
-	filters["kind"] = "activity"
-	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
-		Filters: filters,
-	})
-
 	if err != nil {
 		return err
 	}
-	for _, gobj := range goCollection.Data {
+	geObjList, err := pipeline.PaginateGenericObjects("activity")
+	if err != nil {
+		logrus.Errorf("fail to list activity,err:%v", err)
+		return err
+	}
+	for _, gobj := range geObjList {
 		apiClient.GenericObject.Delete(&gobj)
 	}
 	return nil
@@ -116,16 +103,15 @@ func (s *Server) CleanActivities(rw http.ResponseWriter, req *http.Request) erro
 
 func (s *Server) CleanPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiClient, err := util.GetRancherClient()
-	filters := make(map[string]interface{})
-	filters["kind"] = "pipeline"
-	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
-		Filters: filters,
-	})
-
 	if err != nil {
 		return err
 	}
-	for _, gobj := range goCollection.Data {
+	geObjList, err := pipeline.PaginateGenericObjects("pipeline")
+	if err != nil {
+		logrus.Errorf("fail to list pipeline,err:%v", err)
+		return err
+	}
+	for _, gobj := range geObjList {
 		apiClient.GenericObject.Delete(&gobj)
 	}
 	return nil
@@ -367,21 +353,13 @@ func UpdateActivity(activity pipeline.Activity) error {
 }
 
 func ListActivities(pContext *pipeline.PipelineContext) ([]*pipeline.Activity, error) {
-	apiClient, err := util.GetRancherClient()
+	geObjList, err := pipeline.PaginateGenericObjects("activity")
 	if err != nil {
-		return nil, err
-	}
-	filters := make(map[string]interface{})
-	filters["kind"] = "activity"
-	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
-		Filters: filters,
-	})
-
-	if err != nil {
+		logrus.Errorf("fail to list activity, err:%v", err)
 		return nil, err
 	}
 	var activities []*pipeline.Activity
-	for _, gobj := range goCollection.Data {
+	for _, gobj := range geObjList {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)

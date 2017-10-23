@@ -3,6 +3,7 @@ package pipeline
 import (
 	"encoding/json"
 	"io/ioutil"
+	"net/url"
 	"os"
 	"path"
 	"strconv"
@@ -181,23 +182,13 @@ func toPipeline(pipelineBasePath, version string) *Pipeline {
 
 //get all pipelines from GenericObject
 func (p *PipelineContext) ListPipelines() []*Pipeline {
-	apiClient, err := util.GetRancherClient()
+	geObjList, err := PaginateGenericObjects("pipeline")
 	if err != nil {
-		logrus.Error("fail to get client")
-		return nil
-	}
-	filters := make(map[string]interface{})
-	filters["kind"] = "pipeline"
-	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
-		Filters: filters,
-	})
-
-	if err != nil {
-		logrus.Error("fail to list genericObject")
+		logrus.Errorf("fail to list pipeline,err:%v", err)
 		return nil
 	}
 	var pipelines []*Pipeline
-	for _, gobj := range goCollection.Data {
+	for _, gobj := range geObjList {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &Pipeline{}
 		json.Unmarshal(b, a)
@@ -385,4 +376,56 @@ func HasStepCondition(s *Step) bool {
 func HasStageCondition(s *Stage) bool {
 	//return s.Condition != ""
 	return s.Conditions != nil && (len(s.Conditions.All) > 0 || len(s.Conditions.Any) > 0)
+}
+
+func PaginateGenericObjects(kind string) ([]client.GenericObject, error) {
+	result := []client.GenericObject{}
+	limit := "1000"
+	marker := ""
+	var pageData []client.GenericObject
+	var err error
+	for {
+		logrus.Debugf("paging got:%v,%v,%v", kind, limit, marker)
+		pageData, marker, err = getGenericObjects(kind, limit, marker)
+		if err != nil {
+			logrus.Debugf("get genericobject err:%v", err)
+			return nil, err
+		}
+		result = append(result, pageData...)
+		if marker == "" {
+			break
+		}
+	}
+	return result, nil
+}
+
+func getGenericObjects(kind string, limit string, marker string) ([]client.GenericObject, string, error) {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		logrus.Errorf("fail to get client:%v", err)
+		return nil, "", err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = kind
+	filters["limit"] = limit
+	filters["marker"] = marker
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		logrus.Errorf("fail querying generic objects, error:%v", err)
+		return nil, "", err
+	}
+	//get next marker
+	nextMarker := ""
+	if goCollection.Pagination != nil && goCollection.Pagination.Next != "" {
+		r, err := url.Parse(goCollection.Pagination.Next)
+		if err != nil {
+			logrus.Errorf("fail parsing next url, error:%v", err)
+			return nil, "", err
+		}
+		nextMarker = r.Query().Get("marker")
+	}
+	return goCollection.Data, nextMarker, err
+
 }
