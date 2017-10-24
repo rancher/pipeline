@@ -608,10 +608,15 @@ func startStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
 }
 
 func failStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) {
+	now := time.Now().UnixNano() / int64(time.Millisecond)
 	stage := activity.ActivityStages[stageOrdinal]
-	stage.ActivitySteps[stepOrdinal].Status = pipeline.ActivityStepFail
+	step := stage.ActivitySteps[stepOrdinal]
+	step.Status = pipeline.ActivityStepFail
+	step.Duration = now - step.StartTS
 	stage.Status = pipeline.ActivityStageFail
+	stage.Duration = now - stage.StartTS
 	activity.Status = pipeline.ActivityFail
+	activity.StopTS = now
 	activity.FailMessage = fmt.Sprintf("Execution fail in '%v' stage, step %v", stage.Name, stepOrdinal+1)
 }
 
