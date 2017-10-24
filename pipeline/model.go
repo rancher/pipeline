@@ -121,6 +121,8 @@ type Stage struct {
 type Step struct {
 	Name string `json:"name,omitempty" yaml:"name,omitempty"`
 	Type string `json:"type,omitempty" yaml:"type,omitempty"`
+	//Step timeout in minutes
+	Timeout int `json:"timeout,omitempty" yaml:"timeout,omitempty"`
 	//Condition  string             `json:"condition,omitempty" yaml:"condition,omitempty"`
 	Conditions *PipelineConditions `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	//---SCM step

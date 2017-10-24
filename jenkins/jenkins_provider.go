@@ -391,6 +391,19 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 		Command:     fmt.Sprintf(stepStartScript, url.QueryEscape(activityId), stageOrdinal, stepOrdinal),
 	}
 
+	//Step timeout settings, at least 3 minutes
+	var timeoutWrapper *TimeoutWrapperPlugin
+	if step.Timeout > 0 {
+		timeoutWrapper = &TimeoutWrapperPlugin{
+			Plugin: "build-timeout@1.18",
+			Strategy: TimeoutStrategy{
+				Class:          "hudson.plugins.build_timeout.impl.AbsoluteTimeOutStrategy",
+				TimeoutMinutes: step.Timeout,
+			},
+			Operation: "",
+		}
+	}
+
 	v := &JenkinsProject{
 		Scm:          scm,
 		AssignedNode: activity.NodeName,
@@ -401,6 +414,7 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 		CustomWorkspace:                  workspaceName,
 		Builders:                         commandBuilders,
 		TimeStampWrapper:                 TimestampWrapperPlugin{Plugin: "timestamper@1.8.8"},
+		TimeoutWrapper:                   timeoutWrapper,
 		PreSCMBuildStepsWrapper:          preSCMStep,
 	}
 	//post task to notify pipelineserver

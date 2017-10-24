@@ -26,6 +26,7 @@ type JenkinsProject struct {
 	Builders                         JenkinsBuilder          `xml:"builders,omitempty"`
 	Publishers                       PostBuildTask           `xml:"publishers>org.jvnet.hudson.plugins.groovypostbuild.GroovyPostbuildRecorder"`
 	TimeStampWrapper                 TimestampWrapperPlugin  `xml:"buildWrappers>hudson.plugins.timestamper.TimestamperBuildWrapper"`
+	TimeoutWrapper                   *TimeoutWrapperPlugin   `xml:"buildWrappers>hudson.plugins.build__timeout.BuildTimeoutWrapper"`
 	PreSCMBuildStepsWrapper          PreSCMBuildStepsWrapper `xml:"buildWrappers>org.jenkinsci.plugins.preSCMbuildstep.PreSCMBuildStepsWrapper"`
 }
 
@@ -64,6 +65,17 @@ type JenkinsCronTrigger struct {
 
 type TimestampWrapperPlugin struct {
 	Plugin string `xml:"plugin,attr"`
+}
+
+type TimeoutWrapperPlugin struct {
+	Plugin    string          `xml:"plugin,attr"`
+	Strategy  TimeoutStrategy `xml:"strategy"`
+	Operation string          `xml:"operationList>hudson.plugins.build__timeout.operations.FailOperation"`
+}
+
+type TimeoutStrategy struct {
+	Class          string `xml:"class,attr"`
+	TimeoutMinutes int    `xml:"timeoutMinutes"`
 }
 
 type PreSCMBuildStepsWrapper struct {
