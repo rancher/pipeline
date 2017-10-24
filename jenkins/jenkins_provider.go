@@ -390,12 +390,12 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(cmd)
 			stringBuilder.WriteString("\nR_CICD_EOF\n")
 		} else {
+			if step.Entrypoint != "" {
+				entrypointPara = "--entrypoint " + step.Entrypoint
+			}
 			argsPara = step.Args
 		}
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
-		if step.Entrypoint != "" {
-			entrypointPara = "--entrypoint " + step.Entrypoint
-		}
 		//isService
 		if step.IsService {
 			containerName := activity.Id + step.Alias
