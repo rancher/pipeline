@@ -15,17 +15,20 @@ type CronRunner struct {
 }
 
 func NewCronRunner(pipelineId string, spec string, timezone string) *CronRunner {
+	//use Local as default
 	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		logrus.Errorf("Failed to load time zone %v: %+v,use local timezone instead", timezone, err)
+	if err != nil || timezone == "" || timezone == "Local" {
+		loc = time.Local
+		if err != nil {
+			logrus.Errorf("Failed to load time zone %v: %+v,use local timezone instead", timezone, err)
+		}
 	}
 	var c *cron.Cron
 	//use local timezone as default and when timezone invalid
-	if err != nil || timezone == "" {
-		c = cron.New()
-	} else {
-		c = cron.NewWithLocation(loc)
-	}
+	logrus.Debugf("newcron debug:%v,%v,%v", err, timezone, loc.String())
+	c = cron.NewWithLocation(loc)
+
+	logrus.Debugf("cron timezone is %v", c.Location().String())
 	return &CronRunner{
 		PipelineId: pipelineId,
 		Spec:       "0 " + spec, //accept standard cron spec and convert to 6 entries for corn library

@@ -306,7 +306,13 @@ func GetNextRunTime(pipeline *Pipeline) int64 {
 	}
 	trigger := pipeline.CronTrigger
 	spec := trigger.Spec
+	timezone := trigger.Timezone
 	if spec == "" {
+		return nextRunTime
+	}
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		logrus.Errorf("fail get timezone '%s',err:%v", timezone, err)
 		return nextRunTime
 	}
 	schedule, err := cron.ParseStandard(spec)
@@ -314,7 +320,7 @@ func GetNextRunTime(pipeline *Pipeline) int64 {
 		logrus.Errorf("error parse cron exp,%v,%v", spec, err)
 		return nextRunTime
 	}
-	nextRunTime = schedule.Next(time.Now()).UnixNano() / int64(time.Millisecond)
+	nextRunTime = schedule.Next(time.Now().In(loc)).UnixNano() / int64(time.Millisecond)
 
 	return nextRunTime
 }
