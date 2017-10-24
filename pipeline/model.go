@@ -21,6 +21,7 @@ const (
 	ActivityStepSuccess  = "Success"
 	ActivityStepFail     = "Fail"
 	ActivityStepSkip     = "Skipped"
+	ActivityStepAbort    = "Abort"
 
 	ActivityStageWaiting  = "Waiting"
 	ActivityStagePending  = "Pending"
@@ -29,6 +30,7 @@ const (
 	ActivityStageFail     = "Fail"
 	ActivityStageDenied   = "Denied"
 	ActivityStageSkip     = "Skipped"
+	ActivityStageAbort    = "Abort"
 
 	ActivityWaiting  = "Waiting"
 	ActivityPending  = "Pending"
@@ -36,6 +38,7 @@ const (
 	ActivitySuccess  = "Success"
 	ActivityFail     = "Fail"
 	ActivityDenied   = "Denied"
+	ActivityAbort    = "Abort"
 )
 
 var PreservedEnvs = [...]string{"CICD_GIT_COMMIT", "CICD_GIT_BRANCH",
@@ -169,6 +172,7 @@ type PipelineProvider interface {
 	RerunActivity(*Activity) error
 	RunStage(*Activity, int) error
 	RunStep(*Activity, int, int) error
+	StopActivity(*Activity) error
 	SyncActivity(*Activity) error
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
 	DeleteFormerBuild(*Activity) error

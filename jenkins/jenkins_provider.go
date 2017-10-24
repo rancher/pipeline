@@ -83,6 +83,65 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	return err
 }
 
+func (j *JenkinsProvider) StopActivity(a *pipeline.Activity) error {
+	a.Status = pipeline.ActivityAbort
+	now := time.Now().UnixNano() / int64(time.Millisecond)
+	a.StopTS = now
+	//TODO stop running steps
+	for stageOrdinal, stage := range a.ActivityStages {
+		if stage.Status == pipeline.ActivityStageSuccess || stage.Status == pipeline.ActivityStageSkip {
+			continue
+		} else {
+			for stepOrdinal := 0; stepOrdinal < len(stage.ActivitySteps); stepOrdinal++ {
+				if err := j.StopStep(a, stageOrdinal, stepOrdinal); err != nil {
+					return err
+				}
+			}
+			stage.Status = pipeline.ActivityStageAbort
+			stage.Duration = now - stage.StartTS
+			break
+		}
+
+	}
+	return nil
+}
+
+func (j *JenkinsProvider) StopStep(a *pipeline.Activity, stageOrdinal int, stepOrdinal int) error {
+	jobname := getJobName(a, stageOrdinal, stepOrdinal)
+	info, err := GetJobInfo(jobname)
+	if err != nil {
+		return err
+	}
+	if info.InQueue {
+		//delete in queue
+		queueItem, ok := info.QueueItem.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("type assertion fail for queueitem")
+		}
+		queueId, ok := queueItem["id"].(float64)
+		if !ok {
+			return fmt.Errorf("type assertion fail for queueId")
+		}
+		if err := CancelQueueItem(int(queueId)); err != nil {
+			return fmt.Errorf("cancel queueitem error:%v", err)
+		}
+	} else {
+		buildInfo, err := GetBuildInfo(jobname)
+		if err != nil {
+			return err
+		}
+		if buildInfo.Building {
+			if err := StopJob(jobname); err != nil {
+				return err
+			}
+			step := a.ActivityStages[stageOrdinal].ActivitySteps[stepOrdinal]
+			step.Status = pipeline.ActivityStepAbort
+			step.Duration = time.Now().UnixNano()/int64(time.Millisecond) - step.StartTS
+		}
+	}
+	return nil
+}
+
 //CreateStage init jenkins projects settings of the stage, each step forms a jenkins job.
 func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) error {
 	logrus.Info("create jenkins job from stage")

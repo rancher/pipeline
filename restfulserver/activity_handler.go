@@ -220,6 +220,32 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 	return err
 
 }
+
+func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
+	logrus.Infof("stopping activity")
+	id := mux.Vars(req)["id"]
+
+	mutex := MyAgent.getActivityLock(id)
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	r, err := GetActivity(id, s.PipelineContext)
+	if err != nil {
+		logrus.Errorf("fail getting activity with id:%v", id)
+		return err
+	}
+	err = s.PipelineContext.StopActivity(&r)
+	if err != nil {
+		logrus.Errorf("fail denyActivity:%v", err)
+		return err
+	}
+	err = UpdateActivity(r)
+	MyAgent.broadcast <- []byte(r.Id)
+
+	return err
+
+}
+
 func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]

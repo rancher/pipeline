@@ -119,7 +119,9 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 				if err := ws.WriteMessage(websocket.TextMessage, b); err != nil {
 					return
 				}
-				if strings.HasSuffix(stepLog, "\n  Finished: SUCCESS\n") || strings.HasSuffix(stepLog, "\n  Finished: FAILURE\n") {
+				if strings.HasSuffix(stepLog, "\n  Finished: SUCCESS\n") ||
+					strings.HasSuffix(stepLog, "\n  Finished: FAILURE\n") ||
+					strings.HasSuffix(stepLog, "\n  Finished: ABORTED\n") {
 					//finish
 					return
 				}

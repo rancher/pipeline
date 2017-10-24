@@ -299,6 +299,19 @@ func (p *PipelineContext) DenyActivity(activity *Activity) error {
 	return nil
 
 }
+
+func (p *PipelineContext) StopActivity(activity *Activity) error {
+	if activity == nil {
+		return errors.New("nil activity!")
+	}
+	if activity.Status != ActivityBuilding && activity.Status != ActivityWaiting {
+		return errors.New("Not a running activity for stop!")
+	}
+
+	return p.Provider.StopActivity(activity)
+
+}
+
 func GetNextRunTime(pipeline *Pipeline) int64 {
 	nextRunTime := int64(0)
 	if !pipeline.IsActivate {

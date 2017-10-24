@@ -12,6 +12,8 @@ const JenkinsUser = "JenkinsUser"
 const JenkinsToken = "JenkinsToken"
 const CreateJobURI = "CreateJobURI"
 const UpdateJobURI = "UpdateJobURI"
+const StopJobURI = "StopjobURI"
+const CancelQueueItemURI = "CancelQueueItemURI"
 const ScriptURI = "ScriptURI"
 const DeleteBuildURI = "DeleteBuildURI"
 const GetCrumbURI = "GetCrumbURI"
@@ -44,6 +46,8 @@ func (j jenkinsConfig) Get(key string) (string, error) {
 var JenkinsConfig = jenkinsConfig{
 	CreateJobURI:                 "/createItem",
 	UpdateJobURI:                 "/job/%s/config.xml",
+	StopJobURI:                   "/job/%s/lastBuild/stop",
+	CancelQueueItemURI:           "/queue/cancelItem?id=%d",
 	DeleteBuildURI:               "/job/%s/lastBuild/doDelete",
 	GetCrumbURI:                  "/crumbIssuer/api/xml?xpath=concat(//crumbRequestField,\":\",//crumb)",
 	JenkinsJobBuildURI:           "/job/%s/build",

@@ -41,10 +41,12 @@ func Preset(pipelineContext *pipeline.PipelineContext) {
 	logrus.Debugf("get activities size:%v", len(activities))
 	//Sync status of running activities
 	for _, a := range activities {
+		//TODO !a.IsRunning
 		if a.Status == pipeline.ActivityFail ||
 			a.Status == pipeline.ActivitySuccess ||
 			a.Status == pipeline.ActivityDenied ||
-			a.Status == pipeline.ActivityPending {
+			a.Status == pipeline.ActivityPending ||
+			a.Status == pipeline.ActivityAbort {
 			continue
 		}
 		if err := pipelineContext.Provider.SyncActivity(a); err != nil {
@@ -655,7 +657,8 @@ func triggernext(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int)
 	if activity.Status == pipeline.ActivitySuccess ||
 		activity.Status == pipeline.ActivityFail ||
 		activity.Status == pipeline.ActivityPending ||
-		activity.Status == pipeline.ActivityDenied {
+		activity.Status == pipeline.ActivityDenied ||
+		activity.Status == pipeline.ActivityAbort {
 		return
 	}
 	stage := activity.ActivityStages[stageOrdinal]

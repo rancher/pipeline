@@ -130,6 +130,8 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 		a.Status != pipeline.ActivityBuilding &&
 		a.Status != pipeline.ActivityPending {
 		a.Actions["rerun"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=rerun"
+	} else {
+		a.Actions["stop"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=stop"
 	}
 
 	//remove pipeline reference

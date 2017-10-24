@@ -92,6 +92,7 @@ func NewRouter(s *Server) *mux.Router {
 		"approve": f(schemas, s.ApproveActivity),
 		"deny":    f(schemas, s.DenyActivity),
 		"rerun":   f(schemas, s.RerunActivity),
+		"stop":    f(schemas, s.StopActivity),
 	}
 	for name, actions := range activityActions {
 		router.Methods(http.MethodPost).Path("/v1/activities/{id}").Queries("action", name).Handler(actions)

@@ -19,6 +19,7 @@ import (
 var (
 	ErrCreateJobFail    = errors.New("Create Job fail")
 	ErrUpdateJobFail    = errors.New("Update Job fail")
+	ErrStopJobFail      = errors.New("Stop Job fail")
 	ErrDeleteBuildFail  = errors.New("Delete Build fail")
 	ErrBuildJobFail     = errors.New("Build Job fail")
 	ErrGetBuildInfoFail = errors.New("Get Build Info fail")
@@ -70,6 +71,7 @@ func GetCSRF() error {
 		logrus.Error(err)
 		return err
 	}
+	defer resp.Body.Close()
 	data, _ := ioutil.ReadAll(resp.Body)
 	Crumbs := strings.Split(string(data), ":")
 	if len(Crumbs) != 2 {
@@ -112,6 +114,7 @@ func DeleteBuild(jobname string) error {
 		logrus.Error(err)
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		logrus.Infof("delete build fail,response code is :%v", resp.StatusCode)
 		data, _ := ioutil.ReadAll(resp.Body)
@@ -150,6 +153,7 @@ func ExecScript(script string) (string, error) {
 		logrus.Error(err)
 		return "", err
 	}
+	defer resp.Body.Close()
 	data, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		logrus.Errorf("jenkins run script fail,response code is :%v", resp.StatusCode)
@@ -200,6 +204,7 @@ func CreateJob(jobname string, content []byte) error {
 		logrus.Error(err)
 		return err
 	}
+	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
 		logrus.Infof("createjob code:%v", resp.StatusCode)
@@ -235,6 +240,7 @@ func UpdateJob(jobname string, content []byte) error {
 		logrus.Error(err)
 		return err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		logrus.Infof("updatejob code:%v", resp.StatusCode)
 		data, _ := ioutil.ReadAll(resp.Body)
@@ -280,6 +286,7 @@ func BuildJob(jobname string, params map[string]string) (string, error) {
 		logrus.Error(err)
 		return "", err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != 201 {
 		logrus.Error(ErrBuildJobFail)
 		return "", ErrBuildJobFail
@@ -300,7 +307,6 @@ func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
 	var targetURL *url.URL
 	var err error
 	targetURL, err = url.Parse(sah + buildInfoURI)
-	//logrus.Infof("targetURL is :%v", targetURL)
 	if err != nil {
 		logrus.Error(err)
 		return nil, err
@@ -315,9 +321,9 @@ func GetBuildInfo(jobname string) (*JenkinsBuildInfo, error) {
 		logrus.Error(err)
 		return nil, err
 	}
-	//logrus.Infof("response code is :%v", resp.StatusCode)
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
-		//logrus.Error(ErrGetBuildInfoFail)
+		logrus.Error(ErrGetBuildInfoFail)
 		return nil, ErrGetBuildInfoFail
 	}
 	buildInfo := &JenkinsBuildInfo{}
@@ -343,7 +349,6 @@ func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
 	var targetURL *url.URL
 	var err error
 	targetURL, err = url.Parse(sah + jobInfoURI)
-	//logrus.Infof("targetURL is :%v", targetURL)
 	if err != nil {
 		logrus.Error(err)
 		return nil, err
@@ -358,7 +363,7 @@ func GetJobInfo(jobname string) (*JenkinsJobInfo, error) {
 		logrus.Error(err)
 		return nil, err
 	}
-	//logrus.Infof("response code is :%v", resp.StatusCode)
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		logrus.Error(ErrGetJobInfoFail)
 		return nil, ErrGetJobInfoFail
@@ -404,7 +409,7 @@ func GetBuildRawOutput(jobname string, startLine int) (string, error) {
 		logrus.Error(err)
 		return "", err
 	}
-	//logrus.Infof("response code is :%v", resp.StatusCode)
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		logrus.Error(ErrGetJobInfoFail)
 		return "", ErrGetJobInfoFail
@@ -413,4 +418,75 @@ func GetBuildRawOutput(jobname string, startLine int) (string, error) {
 
 	return string(respBytes), nil
 
+}
+
+func StopJob(jobname string) error {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	stopJobURI, _ := JenkinsConfig.Get(StopJobURI)
+	stopJobURI = fmt.Sprintf(stopJobURI, jobname)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	targetURL, err := url.Parse(sah + stopJobURI)
+
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	req, _ := http.NewRequest(http.MethodPost, targetURL.String(), nil)
+
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode > 399 {
+		logrus.Error(ErrStopJobFail)
+		return ErrStopJobFail
+	}
+	return nil
+}
+
+func CancelQueueItem(id int) error {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	cancelQueueItemURI, _ := JenkinsConfig.Get(CancelQueueItemURI)
+	cancelQueueItemURI = fmt.Sprintf(cancelQueueItemURI, id)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+
+	targetURL, err := url.Parse(sah + cancelQueueItemURI)
+
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	req, _ := http.NewRequest(http.MethodPost, targetURL.String(), nil)
+
+	req.Header.Add(CrumbHeader, Crumb)
+	req.SetBasicAuth(user, token)
+	client := http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			//no redirect
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode > 399 {
+		logrus.Error(ErrStopJobFail)
+		return ErrStopJobFail
+	}
+	return nil
 }
