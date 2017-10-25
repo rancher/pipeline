@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	v1client "github.com/rancher/go-rancher/client"
-	client "github.com/rancher/go-rancher/v3"
+	client "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
 )

@@ -1905,7 +1905,7 @@ def create_svc(client, env, launch_config, scale=None, retainIp=False):
                                     retainIp=retainIp)
 
     service = client.wait_success(service)
-    assert service.state == "active"
+    assert service.state == "inactive"
     return service
 
 

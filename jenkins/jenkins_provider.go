@@ -485,8 +485,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 
 		}
 
-		//volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
-		volumeInfo := "-v /var/jenkins_home/workspace:/var/jenkins_home/workspace -w ${PWD}"
+		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
+		//volumeInfo := "-v /var/jenkins_home/workspace:/var/jenkins_home/workspace -w ${PWD}"
 		stringBuilder.WriteString("set -xe\n")
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
@@ -594,10 +594,10 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 	case pipeline.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Endpoint == "" {
-			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(activity, step.Compose))
+			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		} else {
-			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(activity, step.Compose))
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		}
 	case pipeline.StepTypeUpgradeCatalog:

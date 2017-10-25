@@ -4,7 +4,7 @@ import cattle
 import pytest
 
 DEFAULT_TIMEOUT = 180
-api_version = "v3"
+api_version = "v2-beta"
 
 
 @pytest.fixture(scope='session')

@@ -9,7 +9,7 @@ SUFFIX=""
 
 cd $(dirname $0)/../package
 
-TAG=${TAG:-v3}
+TAG=${TAG:-0.6.10}
 #${VERSION}${SUFFIX}}
 REPO=${REPO:-reg.cnrancher.com/rancher}
 

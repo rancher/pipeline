@@ -17,7 +17,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
-	v3client "github.com/rancher/go-rancher/v3"
+	v2client "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/config"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/restfulserver/webhook"
@@ -66,7 +66,7 @@ func checkCIEndpoint() error {
 	}
 	filters := make(map[string]interface{})
 	filters["kind"] = "webhookReceiver"
-	opt := &v3client.ListOpts{
+	opt := &v2client.ListOpts{
 		Filters: filters,
 	}
 	gCollection, err := apiClient.GenericObject.List(opt)
@@ -473,7 +473,7 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 	pId := mux.Vars(req)["id"]
 	filters := make(map[string]interface{})
 	filters["kind"] = "activity"
-	goCollection, err := apiClient.GenericObject.List(&v3client.ListOpts{
+	goCollection, err := apiClient.GenericObject.List(&v2client.ListOpts{
 		Filters: filters,
 	})
 

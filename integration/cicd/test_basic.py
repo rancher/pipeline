@@ -422,17 +422,17 @@ def test_run_pipeline_upgrade_service(pipeline_resource):
         }]
     # setup service
     launch_config = {
-        "image": "nginx:latest",
+        "imageUuid": "docker:nginx:latest",
         "labels": {"test": "cicd"}
     }
     rclient = rancher_client()
     service, env = create_env_and_svc(rclient, launch_config, 1)
-    # env = env.activateservices()
+    env = env.activateservices()
     service = rclient.wait_success(service, 300)
     create_pipeline(name='upgradeServiceTest', stages=stages)
     run_pipeline_expect('upgradeServiceTest', 'Success')
     service = rclient.reload(service)
-    assert service.launchConfig.image == "nginx:1",\
+    assert service.launchConfig.imageUuid == "docker:nginx:1",\
         "upgrade service failed"
 
     remove_pipeline('upgradeServiceTest')
@@ -453,10 +453,11 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
             "name": "up",
             "steps": [{
                 "stackName": stackname,
-                "compose": ("services:\n  ngx1:\n    image: ng"
-                            "inx:1\n    environment:\n      FO"
-                            "O: BAR\n  ngxlt:\n    image: ngin"
-                            "x:latest\n    labels:\n      FOO: BAR"),
+                "dockerCompose": ("services:\n  ngx1:\n    image: ng"
+                                  "inx:1\n    environment:\n      FO"
+                                  "O: BAR\n  ngxlt:\n    image: ngin"
+                                  "x:latest\n    labels:\n      FOO: BAR"),
+                "rancherCompose": "",
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
@@ -464,20 +465,14 @@ def test_run_pipeline_upgrade_stack(pipeline_resource):
         }]
     # setup stack/service
     launch_config = {
-        "image": "nginx:latest",
+        "imageUuid": "docker:nginx:latest",
         "labels": {"test": "foo"}
     }
     rclient = rancher_client()
     stack = rclient.create_stack(name=stackname)
     stack = rclient.wait_success(stack)
-    service = rclient.create_service(name="ngx",
-                                     stackId=stack.id,
-                                     launchConfig=launch_config,
-                                     scale=1,
-                                     retainIp=False)
-    # service = client.wait_success(service)
-    # service = create_svc(rclient, stack, launch_config, 1)
-    # stack = stack.activateservices()
+    service = create_svc(rclient, stack, launch_config, 1)
+    stack = stack.activateservices()
     service = rclient.wait_success(service, 300)
 
     create_pipeline(name='upgradeStackTest', stages=stages)
@@ -503,10 +498,11 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
             "name": "up",
             "steps": [{
                 "stackName": stackname,
-                "compose": ("services:\n  ngx1:\n    image: ng"
-                            "inx:wrong\n  x  environment:\n      FO"
-                            "O: BAR\n x ngxlt:\n    image: ngin"
-                            "x:latest\n  x  labels:\n      FOO: BAR"),
+                "dockerCompose": ("services:\n  ngx1:\n    image: ng"
+                                  "inx:wrong\n  x  environment:\n      FO"
+                                  "O: BAR\n x ngxlt:\n    image: ngin"
+                                  "x:latest\n  x  labels:\n      FOO: BAR"),
+                "rancherCompose": "",
                 "endpoint": "",
                 "accesskey": "",
                 "secretkey": "",
@@ -514,7 +510,7 @@ def test_run_pipeline_upgrade_stack_fail(pipeline_resource):
         }]
     # setup stack/service
     launch_config = {
-        "image": "nginx:latest",
+        "imageUuid": "docker:nginx:latest",
         "labels": {"test": "foo"}
     }
     rclient = rancher_client()

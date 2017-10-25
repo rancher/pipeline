@@ -79,5 +79,5 @@ def test_run_pipeline_build_fail_no_credential(pipeline_resource):
                     "type": "build"}]
         }]
     create_pipeline(name='buildfailpushtest', stages=stages)
-    run_pipeline_expect('buildfailpushtest', 'Fail')
+    run_pipeline_expect('buildfailpushtest', 'Fail', 300)
     remove_pipeline('buildfailpushtest')
