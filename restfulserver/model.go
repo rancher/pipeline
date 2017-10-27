@@ -3,6 +3,8 @@ package restfulserver
 import (
 	"net/http"
 
+	"github.com/rancher/pipeline/scm"
+
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
 	"github.com/rancher/pipeline/pipeline"
@@ -16,6 +18,7 @@ func NewSchema() *client.Schemas {
 	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))
 	acitvitySchema(schemas.AddType("activity", pipeline.Activity{}))
 	pipelineSettingSchema(schemas.AddType("setting", pipeline.PipelineSetting{}))
+	accountSchema(schemas.AddType("gitaccount", scm.Account{}))
 	return schemas
 }
 
@@ -89,6 +92,15 @@ func pipelineSettingSchema(setting *client.Schema) {
 	}
 }
 
+func accountSchema(account *client.Schema) {
+	account.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+	account.ResourceActions = map[string]client.Action{
+		"update": client.Action{
+			Output: "gitaccount",
+		},
+	}
+}
+
 func toPipelineCollections(apiContext *api.ApiContext, pipelines []*pipeline.Pipeline) []interface{} {
 	var r []interface{}
 	for _, p := range pipelines {
@@ -137,6 +149,24 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 	//remove pipeline reference
 	a.Pipeline.Type = ""
 	return a
+}
+
+func toAccountResource(apiContext *api.ApiContext, account *scm.Account) *scm.Account {
+	account.Resource = client.Resource{
+		Id:      account.Id,
+		Type:    "gitaccount",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
+	if account.Private {
+		account.Actions["share"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=share"
+	} else {
+		account.Actions["unshare"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=unshare"
+	}
+	account.Actions["refreshrepos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=refreshrepos"
+	account.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=remove"
+	account.Links["repos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "/repos"
+	return account
 }
 
 func toPipelineSettingResource(apiContext *api.ApiContext, setting *pipeline.PipelineSetting) *pipeline.PipelineSetting {

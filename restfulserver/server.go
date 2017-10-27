@@ -101,8 +101,21 @@ func checkCIEndpoint() error {
 //ListPipelines query List of pipelines
 func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
+	uid, err := GetCurrentUser(req.Cookies())
+	if err != nil || uid == "" {
+		logrus.Debugf("getAccessibleAccounts unrecognized user")
+	}
+	accessibleAccounts := getAccessibleAccounts(uid)
+	var pipelines []*pipeline.Pipeline
+	allpipelines := s.PipelineContext.ListPipelines()
+	//filter by git account access
+	for _, pipeline := range allpipelines {
+		if accessibleAccounts[pipeline.Stages[0].Steps[0].GitUser] {
+			pipelines = append(pipelines, pipeline)
+		}
+	}
 	apiContext.Write(&client.GenericCollection{
-		Data: toPipelineCollections(apiContext, s.PipelineContext.ListPipelines()),
+		Data: toPipelineCollections(apiContext, pipelines),
 	})
 	return nil
 }
@@ -278,11 +291,16 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := pipeline.Validate(ppl); err != nil {
 		return err
 	}
+	//valid git account access
+	if !validAccountAccess(req, ppl.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
+	}
 
 	ppl.Id = uuid.Rand().Hex()
 	ppl.WebHookToken = uuid.Rand().Hex()
 	//TODO Multiple
-	token, err := GetSingleUserToken()
+	gitUser := ppl.Stages[0].Steps[0].GitUser
+	token, err := GetUserToken(gitUser)
 	if err != nil {
 		return err
 	}
@@ -312,8 +330,13 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := pipeline.Validate(ppl); err != nil {
 		return err
 	}
+	//valid git account access
+	if !validAccountAccess(req, ppl.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
+	}
 	//TODO Multiple
-	token, err := GetSingleUserToken()
+	gitUser := ppl.Stages[0].Steps[0].GitUser
+	token, err := GetUserToken(gitUser)
 	if err != nil {
 		logrus.Error(err)
 		return err
@@ -354,8 +377,13 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 	ppl := s.PipelineContext.GetPipelineById(id)
+	//valid git account access
+	if !validAccountAccess(req, ppl.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
+	}
 	//TODO Multiple
-	token, err := GetSingleUserToken()
+	gitUser := ppl.Stages[0].Steps[0].GitUser
+	token, err := GetUserToken(gitUser)
 	err = webhook.DeleteWebhook(ppl, token)
 	if err != nil {
 		//log delete webhook failure but not block
@@ -378,6 +406,10 @@ func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) err
 		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
 		return err
 	}
+	//valid git account access
+	if !validAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
+	}
 	r.IsActivate = true
 	err := s.PipelineContext.UpdatePipeline(r)
 	if err != nil {
@@ -396,6 +428,10 @@ func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) e
 	if r == nil {
 		err := errors.Wrapf(pipeline.ErrPipelineNotFound, "pipeline <%s>", id)
 		return err
+	}
+	//valid git account access
+	if !validAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	r.IsActivate = false
 	err := s.PipelineContext.UpdatePipeline(r)
@@ -426,6 +462,10 @@ func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error
 			Code:   err.Error(),
 		})
 		return err
+	}
+	//valid git account access
+	if !validAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	pipeline.Clean(r)
 	content, err := yaml.Marshal(r.PipelineContent)
@@ -459,6 +499,10 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 		})
 		return err
 	}
+	//valid git account access
+	if !validAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
+	}
 	activity, err := s.PipelineContext.RunPipeline(id, pipeline.TriggerTypeManual)
 	if err != nil {
 		return err
@@ -475,6 +519,11 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 		return err
 	}
 	pId := mux.Vars(req)["id"]
+	r := s.PipelineContext.GetPipelineById(pId)
+	//valid git account access
+	if r != nil && !validAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
+	}
 	filters := make(map[string]interface{})
 	filters["kind"] = "activity"
 	goCollection, err := apiClient.GenericObject.List(&v2client.ListOpts{

@@ -69,6 +69,12 @@ func (s *Server) UpdatePipelineSetting(rw http.ResponseWriter, req *http.Request
 	if err != nil {
 		return err
 	}
+	//TODO check Admin auth
+	if setting.IsAuth == false {
+		//disable github oauth,then remove accounts
+		cleanAccounts()
+	}
+
 	toPipelineSettingResource(apiContext, setting)
 	apiContext.Write(setting)
 	return nil

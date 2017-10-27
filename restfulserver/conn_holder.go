@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rancher/pipeline/scm"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
 	"github.com/rancher/go-rancher/api"
@@ -59,16 +61,32 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			activity, ok := message.Data.(pipeline.Activity)
-			if ok {
-				toActivityResource(apiContext, &activity)
-				if canApprove(uid, &activity) {
-					//add approve action
-					activity.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=approve"
-					activity.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=deny"
+			switch v := message.Data.(type) {
+			case pipeline.Activity:
+				if !validAccountAccessById(uid, v.Pipeline.Stages[0].Steps[0].GitUser) {
+					continue
 				}
-				message.Data = activity
+				toActivityResource(apiContext, &v)
+				if canApprove(uid, &v) {
+					//add approve action
+					v.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(v.Resource) + "?action=approve"
+					v.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(v.Resource) + "?action=deny"
+				}
+				message.Data = v
+			case *pipeline.Pipeline:
+				if !validAccountAccessById(uid, v.Stages[0].Steps[0].GitUser) {
+					continue
+				}
+				toPipelineResource(apiContext, v)
+				message.Data = v
+			case *scm.Account:
+				if v.RancherUserID != uid && v.Private {
+					continue
+				}
+				toAccountResource(apiContext, v)
+				message.Data = v
 			}
+
 			b, err := json.Marshal(message)
 			if err != nil {
 				return

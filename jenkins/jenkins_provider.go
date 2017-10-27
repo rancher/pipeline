@@ -555,7 +555,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 
 	case pipeline.StepTypeUpgradeService:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
-		stringBuilder.WriteString("set -xe\n")
 		stringBuilder.WriteString("cihelper")
 		if step.Endpoint != "" {
 			stringBuilder.WriteString(" --envurl ")
@@ -643,7 +642,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		}
 
 		//TODO Multiple
-		gitUserName, _ := restfulserver.GetSingleUserName()
+		gitUserName := activity.Pipeline.Stages[0].Steps[0].GitUser
+		//gitUserName, _ := restfulserver.GetSingleUserName()
 		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
 		stringBuilder.WriteString(script)
 	case pipeline.StepTypeDeploy:

@@ -130,6 +130,7 @@ type Step struct {
 	SCMType    string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
+	GitUser    string `json:"gitUser,omitempty" yaml:"gitUser,omitempty"`
 	Webhook    bool   `json:"webhook" yaml:"webhook,omitempty"`
 	//---Build step
 	Dockerfile     string `json:"dockerFileContent,omitempty" yaml:"dockerFileContent,omitempty"`

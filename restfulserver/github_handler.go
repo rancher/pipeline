@@ -315,19 +315,6 @@ func nextGithubPage(response *http.Response) string {
 	return ""
 }
 
-func GetUserToken(userId int) (string, error) {
-	setting, err := GetPipelineSetting()
-	if err != nil {
-		return "", err
-	}
-	for _, account := range setting.GithubAccounts {
-		if account.ID == userId {
-			return account.AccessToken, nil
-		}
-	}
-	return "", fmt.Errorf("github user account not found")
-}
-
 //TODO multiple user support ⬆
 func GetSingleUserToken() (string, error) {
 	setting, err := GetPipelineSetting()
@@ -350,4 +337,12 @@ func GetSingleUserName() (string, error) {
 		return setting.GithubAccounts[0].Login, nil
 	}
 	return "", fmt.Errorf("no authorized github user found")
+}
+
+func GetUserToken(gitUser string) (string, error) {
+	account, err := getAccount(gitUser)
+	if err != nil {
+		return "", err
+	}
+	return account.AccessToken, nil
 }

@@ -29,13 +29,17 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 	var activities []*pipeline.Activity
 	uid, err := GetCurrentUser(req.Cookies())
 	if err != nil || uid == "" {
-		logrus.Infof("cannot get currentUser,%v,%v", uid, err)
+		logrus.Errorf("cannot get currentUser,%v,%v", uid, err)
 	}
 
+	accessibleAccounts := getAccessibleAccounts(uid)
 	for _, gobj := range geObjList {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &pipeline.Activity{}
 		json.Unmarshal(b, a)
+		if a == nil || !accessibleAccounts[a.Pipeline.Stages[0].Steps[0].GitUser] {
+			continue
+		}
 		toActivityResource(apiContext, a)
 		if canApprove(uid, a) {
 			//add approve action
@@ -128,7 +132,12 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(requestBytes, &activity); err != nil {
 		return err
 	}
+	//TODO validate activity
 
+	//validate git account access
+	if !validAccountAccess(req, activity.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", activity.Pipeline.Stages[0].Steps[0].GitUser)
+	}
 	_, err = CreateActivity(activity)
 	if err != nil {
 		return err
@@ -151,6 +160,12 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		logrus.Errorf("fail getting activity with id:%v", id)
 		return err
 	}
+	//TODO validate activity
+	//validate git account access
+	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
+	}
+
 	err = s.PipelineContext.ResetActivity(&r)
 
 	if err != nil {
@@ -181,7 +196,10 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 		logrus.Errorf("fail getting activity with id:%v", id)
 		return err
 	}
-	logrus.Infof("before approve,got acti:%v", r)
+	//validate git account access
+	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
+	}
 	err = s.PipelineContext.ApproveActivity(&r)
 	if err != nil {
 		logrus.Errorf("fail approveActivity:%v", err)
@@ -210,6 +228,10 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		logrus.Errorf("fail getting activity with id:%v", id)
 		return err
+	}
+	//validate git account access
+	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
 	err = s.PipelineContext.DenyActivity(&r)
 	if err != nil {
@@ -244,6 +266,10 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		logrus.Errorf("fail getting activity with id:%v", id)
 		return err
 	}
+	//validate git account access
+	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
+	}
 	err = s.PipelineContext.StopActivity(&r)
 	if err != nil {
 		logrus.Errorf("fail denyActivity:%v", err)
@@ -270,6 +296,10 @@ func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
+	//validate git account access
+	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
+	}
 	err = DeleteActivity(id)
 	if err != nil {
 		return err
@@ -285,7 +315,10 @@ func (s *Server) UpdateActivity(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(requestBytes, &activity); err != nil {
 		return err
 	}
-
+	//validate git account access
+	if !validAccountAccess(req, activity.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", activity.Pipeline.Stages[0].Steps[0].GitUser)
+	}
 	err = UpdateActivity(activity)
 	if err != nil {
 		return err
@@ -421,6 +454,11 @@ func (s *Server) GetActivity(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
+	//validate git account access
+	if !validAccountAccess(req, a.Pipeline.Stages[0].Steps[0].GitUser) {
+		return fmt.Errorf("no access to '%s' git account", a.Pipeline.Stages[0].Steps[0].GitUser)
+	}
+
 	toActivityResource(apiContext, &a)
 	uid, err := GetCurrentUser(req.Cookies())
 	if err != nil || uid == "" {

@@ -92,10 +92,10 @@ R_UPGRADESTACK_STACKNAME=%s
 rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY export $R_UPGRADESTACK_STACKNAME
 
 cd $R_UPGRADESTACK_STACKNAME
-cat>new-docker-compose.yml<<EOF
+cat>new-docker-compose.yml<<R_CICD_EOF
 %s
-EOF
-cat>new-rancher-compose.yml<<EOF
+R_CICD_EOF
+cat>new-rancher-compose.yml<<R_CICD_EOF
 %s
 R_CICD_EOF
 #merge yaml file

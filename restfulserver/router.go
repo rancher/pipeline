@@ -58,6 +58,11 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodDelete).Path("/v1/activities/{id}").Handler(f(schemas, s.DeleteActivity))
 	//router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
 
+	//scm accounts
+	router.Methods(http.MethodGet).Path("/v1/gitaccounts").Handler(f(schemas, s.ListAccounts))
+	router.Methods(http.MethodGet).Path("/v1/gitaccounts/{id}").Handler(f(schemas, s.GetAccount))
+	router.Methods(http.MethodPost).Path("/v1/gitaccountsdebug/{id}").Handler(f(schemas, s.DebugCreate))
+	router.Methods(http.MethodGet).Path("/v1/gitaccounts/{id}/repos").Handler(f(schemas, s.GetCacheRepos))
 	//settings
 	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
 
@@ -72,8 +77,8 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/events/stepstart").Handler(f(schemas, s.StepStart))
 
 	router.Methods(http.MethodPost).Path("/v1/github/login").Handler(f(schemas, s.GithubLogin))
-	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubAuthorize))
-
+	//router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubAuthorize))
+	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.Oauth))
 	pipelineActions := map[string]http.Handler{
 		"run":        f(schemas, s.RunPipeline),
 		"update":     f(schemas, s.UpdatePipeline),
@@ -100,11 +105,21 @@ func NewRouter(s *Server) *mux.Router {
 
 	pipelineSettingActions := map[string]http.Handler{
 		"update":      f(schemas, s.UpdatePipelineSetting),
-		"githuboauth": f(schemas, s.GithubAuthorize),
+		"githuboauth": f(schemas, s.Oauth),
 		"getrepos":    f(schemas, s.GithubGetRepos),
 	}
 	for name, actions := range pipelineSettingActions {
 		router.Methods(http.MethodPost).Path("/v1/settings").Queries("action", name).Handler(actions)
+	}
+
+	accountActions := map[string]http.Handler{
+		"share":        f(schemas, s.ShareAccount),
+		"unshare":      f(schemas, s.UnshareAccount),
+		"remove":       f(schemas, s.RemoveAccount),
+		"refreshrepos": f(schemas, s.RefreshRepos),
+	}
+	for name, actions := range accountActions {
+		router.Methods(http.MethodPost).Path("/v1/gitaccounts/{id}").Queries("action", name).Handler(actions)
 	}
 	return router
 }
