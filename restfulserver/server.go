@@ -198,26 +198,30 @@ func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	return nil
 }
 
-//update last activity info in the pipeline
-func (s *Server) UpdateLastActivity(pId string) {
-	logrus.Infof("begin UpdateLastActivity")
+//update last activity info in the pipeline on activity changes
+func (s *Server) UpdateLastActivity(activity pipeline.Activity) {
+	logrus.Debugf("begin UpdateLastActivity")
+	pId := activity.Pipeline.Id
 	p := s.PipelineContext.GetPipelineById(pId)
 	if p == nil || p.LastRunId == "" {
 		return
 	}
-	activityId := p.LastRunId
-	activity, err := GetActivity(activityId, s.PipelineContext)
-	if err != nil {
-		logrus.Errorf("fail update pipeline:%v last run:%v status,%v", pId, activityId, err)
+	if activity.Id != p.LastRunId {
 		return
 	}
 	p.LastRunStatus = activity.Status
 	p.CommitInfo = activity.CommitInfo
-	//TODO
 	p.NextRunTime = pipeline.GetNextRunTime(p)
-	err = s.PipelineContext.UpdatePipeline(p)
-	if err != nil {
+
+	if err := s.PipelineContext.UpdatePipeline(p); err != nil {
 		logrus.Errorf("fail update pipeline last run status,%v", err)
+	}
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "pipeline",
+		Time:         time.Now(),
+		Data:         p,
 	}
 }
 
@@ -536,7 +540,14 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 	if err = UpdateActivity(activity); err != nil {
 		return err
 	}
-	MyAgent.broadcast <- []byte(activity.Id)
+
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "activity",
+		Time:         time.Now(),
+		Data:         activity,
+	}
 	return nil
 }
 
@@ -584,8 +595,15 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	if err = UpdateActivity(activity); err != nil {
 		return err
 	}
-	MyAgent.broadcast <- []byte(activity.Id)
-	s.UpdateLastActivity(activity.Pipeline.Id)
+
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "activity",
+		Time:         time.Now(),
+		Data:         activity,
+	}
+	s.UpdateLastActivity(activity)
 
 	if activity.Status == pipeline.ActivityFail || activity.Status == pipeline.ActivitySuccess {
 		s.PipelineContext.Provider.OnActivityCompelte(&activity)

@@ -2,11 +2,13 @@ package restfulserver
 
 import (
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/pipeline/git"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/scheduler"
+	"github.com/sluu99/uuid"
 	"golang.org/x/sync/syncmap"
 )
 
@@ -20,7 +22,7 @@ type Agent struct {
 	// Unregister requests from connholder.
 	unregister chan *ConnHolder
 
-	broadcast chan []byte
+	broadcast chan WSMsg
 
 	//scheduler
 	cronRunners           map[string]*scheduler.CronRunner
@@ -38,7 +40,7 @@ func InitAgent(s *Server) {
 		connHolders:           make(map[*ConnHolder]bool),
 		register:              make(chan *ConnHolder),
 		unregister:            make(chan *ConnHolder),
-		broadcast:             make(chan []byte),
+		broadcast:             make(chan WSMsg),
 		cronRunners:           make(map[string]*scheduler.CronRunner),
 		registerCronRunnerC:   make(chan *scheduler.CronRunner),
 		unregisterCronRunnerC: make(chan string),
@@ -114,6 +116,13 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 	}
 	p.NextRunTime = pipeline.GetNextRunTime(p)
 	a.Server.PipelineContext.UpdatePipeline(p)
+	a.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "pipeline",
+		Time:         time.Now(),
+		Data:         p,
+	}
 
 }
 
@@ -121,6 +130,14 @@ func (a *Agent) onPipelineDelete(p *pipeline.Pipeline) {
 	pId := p.Id
 	if p.IsActivate {
 		a.unregisterCronRunnerC <- pId
+	}
+	p.Status = "removed"
+	a.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "pipeline",
+		Time:         time.Now(),
+		Data:         p,
 	}
 }
 func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
@@ -131,10 +148,24 @@ func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
 		cr := scheduler.NewCronRunner(pId, spec, timezone)
 		a.registerCronRunnerC <- cr
 	}
+	a.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "pipeline",
+		Time:         time.Now(),
+		Data:         p,
+	}
 }
 
 func (a *Agent) onPipelineDeActivate(p *pipeline.Pipeline) {
 	a.unregisterCronRunnerC <- p.Id
+	a.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "pipeline",
+		Time:         time.Now(),
+		Data:         p,
+	}
 }
 
 //registerCronRunner add or update a cronRunner

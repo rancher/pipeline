@@ -8,7 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
 	"github.com/rancher/go-rancher/api"
-	"github.com/sluu99/uuid"
+	"github.com/rancher/pipeline/pipeline"
 )
 
 var (
@@ -23,7 +23,7 @@ type ConnHolder struct {
 	conn *websocket.Conn
 
 	// Buffered channel of outbound messages.
-	send chan []byte
+	send chan WSMsg
 }
 
 func (c *ConnHolder) DoRead() {
@@ -59,55 +59,23 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
-			logrus.Infof("get message from c.send,%v", string(message))
-			var b []byte
-			var err error
-			activityId := string(message)
-			activity, err := GetActivity(activityId, c.agent.Server.PipelineContext)
-			if err != nil {
-				logrus.Errorf("get activity error,%v", err)
-				return
+			activity, ok := message.Data.(pipeline.Activity)
+			if ok {
+				toActivityResource(apiContext, &activity)
+				if canApprove(uid, &activity) {
+					//add approve action
+					activity.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=approve"
+					activity.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=deny"
+				}
+				message.Data = activity
 			}
-			toActivityResource(apiContext, &activity)
-			if canApprove(uid, &activity) {
-				//add approve action
-				activity.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=approve"
-				activity.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(activity.Resource) + "?action=deny"
-			}
-			response := WSMsg{
-				Id:           uuid.Rand().Hex(),
-				Name:         "resource.change",
-				ResourceType: "activity",
-				Time:         time.Now(),
-				Data:         activity,
-			}
-			b, err = json.Marshal(response)
+			b, err := json.Marshal(message)
 			if err != nil {
 				return
 			}
-			//write websocket for activity status change
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.conn.WriteMessage(websocket.TextMessage, b); err != nil {
 				return
-			}
-			//write websocket for pipeline status change
-			pipeline := c.agent.Server.PipelineContext.GetPipelineById(activity.Pipeline.Id)
-			if pipeline.LastRunId == activityId {
-				toPipelineResource(apiContext, pipeline)
-				response := WSMsg{
-					Id:           uuid.Rand().Hex(),
-					Name:         "resource.change",
-					ResourceType: "pipeline",
-					Time:         time.Now(),
-					Data:         pipeline,
-				}
-				b, err = json.Marshal(response)
-				if err != nil {
-					return
-				}
-				if err := c.conn.WriteMessage(websocket.TextMessage, b); err != nil {
-					return
-				}
 			}
 		case <-pingTicker.C:
 			//logrus.Infof("trying to ping")
@@ -138,7 +106,7 @@ func (s *Server) ServeStatusWS(w http.ResponseWriter, r *http.Request) error {
 	if err != nil || uid == "" {
 		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
 	}
-	connHolder := &ConnHolder{agent: MyAgent, conn: conn, send: make(chan []byte, 256)}
+	connHolder := &ConnHolder{agent: MyAgent, conn: conn, send: make(chan WSMsg)}
 
 	connHolder.agent.register <- connHolder
 

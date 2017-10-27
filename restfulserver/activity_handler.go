@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
@@ -13,6 +14,7 @@ import (
 	client "github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
+	"github.com/sluu99/uuid"
 )
 
 //List All Activities
@@ -215,7 +217,15 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 	err = UpdateActivity(r)
-	MyAgent.broadcast <- []byte(r.Id)
+
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "activity",
+		Time:         time.Now(),
+		Data:         r,
+	}
+	s.UpdateLastActivity(r)
 
 	return err
 
@@ -240,7 +250,14 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 	err = UpdateActivity(r)
-	MyAgent.broadcast <- []byte(r.Id)
+
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "activity",
+		Time:         time.Now(),
+		Data:         r,
+	}
 
 	return err
 
