@@ -57,6 +57,9 @@ func Validate(p *Pipeline) error {
 	}
 
 	for _, stage := range p.Stages {
+		if err := checkCondition(stage.Conditions); err != nil {
+			return err
+		}
 		for _, step := range stage.Steps {
 			if err := validateStep(step); err != nil {
 				return err
@@ -101,6 +104,9 @@ func validateStep(step *Step) error {
 	case StepTypeUpgradeCatalog:
 		//TODO
 	}
+	if err := checkCondition(step.Conditions); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -124,4 +130,21 @@ func checkCronSpec(spec string) error {
 	}
 	_, err := cron.ParseStandard(spec)
 	return err
+}
+
+func checkCondition(conditions *PipelineConditions) error {
+	if conditions == nil {
+		return nil
+	}
+	for _, condition := range conditions.All {
+		if !strings.Contains(condition, "=") {
+			return fmt.Errorf("condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
+		}
+	}
+	for _, condition := range conditions.Any {
+		if !strings.Contains(condition, "=") {
+			return fmt.Errorf("condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
+		}
+	}
+	return nil
 }
