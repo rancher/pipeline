@@ -191,12 +191,10 @@ func (j *JenkinsProvider) DeleteFormerBuild(activity *pipeline.Activity) error {
 
 //SetSCMCommit update jenkins job SCM to use commit id in activity
 func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
-	if activity.CommitInfo == "" {
-		return errors.New("no commit info in activity")
-	}
 	conf := j.generateStepJenkinsProject(activity, 0, 0)
-	conf.Scm.GitBranch = activity.CommitInfo
-
+	if activity.CommitInfo != "" {
+		conf.Scm.GitBranch = activity.CommitInfo
+	}
 	jobName := getJobName(activity, 0, 0)
 	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
 	logrus.Debugf("conf:\n%v", string(bconf))
