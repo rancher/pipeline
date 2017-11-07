@@ -81,6 +81,27 @@ func pipelineSchema(pipeline *client.Schema) {
 func acitvitySchema(activity *client.Schema) {
 	activity.CollectionMethods = []string{http.MethodGet, http.MethodPost}
 	activity.PluralName = "activities"
+
+	activity.ResourceActions = map[string]client.Action{
+		"rerun": client.Action{
+			Output: "activity",
+		},
+		"update": client.Action{
+			Output: "activity",
+		},
+		"approve": client.Action{
+			Output: "activity",
+		},
+		"deny": client.Action{
+			Output: "activity",
+		},
+		"remove": client.Action{
+			Output: "activity",
+		},
+		"stop": client.Action{
+			Output: "activity",
+		},
+	}
 }
 
 func pipelineSettingSchema(setting *client.Schema) {

@@ -150,6 +150,7 @@ func (s *Server) CreateActivity(rw http.ResponseWriter, req *http.Request) error
 
 func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["id"]
+	apiContext := api.GetApiContext(req)
 
 	mutex := MyAgent.getActivityLock(id)
 	mutex.Lock()
@@ -166,27 +167,34 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
 
-	err = s.PipelineContext.ResetActivity(&r)
-
-	if err != nil {
-		logrus.Errorf("fail resetActivity:%v", err)
+	if err = s.PipelineContext.ResetActivity(&r); err != nil {
+		logrus.Errorf("reset activity error:%v", err)
 		return err
 	}
-	err = s.PipelineContext.RerunActivity(&r)
-	if err != nil {
+
+	if err = s.PipelineContext.RerunActivity(&r); err != nil {
+		logrus.Errorf("rerun activity error:%v", err)
 		return err
 	}
-	UpdateActivity(r)
-	//MyAgent.watchActivityC <- &r
-
-	logrus.Infof("approveactivitygeterror:%v", err)
+	if err = UpdateActivity(r); err != nil {
+		logrus.Errorf("update activity error:%v", err)
+		return err
+	}
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "activity",
+		Time:         time.Now(),
+		Data:         r,
+	}
+	toActivityResource(apiContext, &r)
+	apiContext.Write(&r)
 	return err
 }
 
 func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) error {
-	logrus.Infof("start approve activity")
 	id := mux.Vars(req)["id"]
-
+	apiContext := api.GetApiContext(req)
 	mutex := MyAgent.getActivityLock(id)
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -200,25 +208,35 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
-	err = s.PipelineContext.ApproveActivity(&r)
-	if err != nil {
-		logrus.Errorf("fail approveActivity:%v", err)
+
+	if err = s.PipelineContext.ApproveActivity(&r); err != nil {
+		logrus.Errorf("fail approve activity:%v", err)
 		return err
 	}
 	r.Status = pipeline.ActivityWaiting
 	r.ActivityStages[r.PendingStage].Status = pipeline.ActivityStageWaiting
 	r.PendingStage = 0
-	UpdateActivity(r)
-	//MyAgent.watchActivityC <- &r
-
-	logrus.Infof("approveactivitygeterror:%v", err)
+	if err = UpdateActivity(r); err != nil {
+		logrus.Errorf("fail update activity:%v", err)
+		return err
+	}
+	s.UpdateLastActivity(r)
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "activity",
+		Time:         time.Now(),
+		Data:         r,
+	}
+	toActivityResource(apiContext, &r)
+	apiContext.Write(&r)
 	return err
 
 }
 
 func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
-	logrus.Infof("start deny activity")
 	id := mux.Vars(req)["id"]
+	apiContext := api.GetApiContext(req)
 
 	mutex := MyAgent.getActivityLock(id)
 	mutex.Lock()
@@ -233,12 +251,15 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
-	err = s.PipelineContext.DenyActivity(&r)
-	if err != nil {
+
+	if err = s.PipelineContext.DenyActivity(&r); err != nil {
 		logrus.Errorf("fail denyActivity:%v", err)
 		return err
 	}
-	err = UpdateActivity(r)
+	if err = UpdateActivity(r); err != nil {
+		logrus.Errorf("fail update activity:%v", err)
+		return err
+	}
 
 	MyAgent.broadcast <- WSMsg{
 		Id:           uuid.Rand().Hex(),
@@ -249,13 +270,15 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 	}
 	s.UpdateLastActivity(r)
 
+	toActivityResource(apiContext, &r)
+	apiContext.Write(&r)
 	return err
 
 }
 
 func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
-	logrus.Infof("stopping activity")
 	id := mux.Vars(req)["id"]
+	apiContext := api.GetApiContext(req)
 
 	mutex := MyAgent.getActivityLock(id)
 	mutex.Lock()
@@ -270,12 +293,15 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 	if !validAccountAccess(req, r.Pipeline.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
-	err = s.PipelineContext.StopActivity(&r)
-	if err != nil {
-		logrus.Errorf("fail denyActivity:%v", err)
+
+	if err = s.PipelineContext.StopActivity(&r); err != nil {
+		logrus.Errorf("fail stop activity:%v", err)
 		return err
 	}
-	err = UpdateActivity(r)
+	if err = UpdateActivity(r); err != nil {
+		logrus.Errorf("fail update activity:%v", err)
+		return err
+	}
 
 	MyAgent.broadcast <- WSMsg{
 		Id:           uuid.Rand().Hex(),
@@ -284,6 +310,10 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		Time:         time.Now(),
 		Data:         r,
 	}
+	s.UpdateLastActivity(r)
+
+	toActivityResource(apiContext, &r)
+	apiContext.Write(&r)
 
 	return err
 

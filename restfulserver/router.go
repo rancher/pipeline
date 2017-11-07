@@ -15,13 +15,13 @@ func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) e
 		if err := t(rw, req); err != nil {
 			logrus.Errorf("Got Error: %v", err)
 			rw.Header().Set("Content-Type", "application/json")
-			rw.WriteHeader(500)
-
+			StatusCode := 500
+			rw.WriteHeader(StatusCode)
 			e := Error{
 				Resource: client.Resource{
 					Type: "error",
 				},
-				Status: 500,
+				Status: StatusCode,
 				Msg:    err.Error(),
 			}
 			api.GetApiContext(req).Write(&e)
