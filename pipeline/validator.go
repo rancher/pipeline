@@ -56,6 +56,10 @@ func Validate(p *Pipeline) error {
 		return err
 	}
 
+	if err := checkServiceName(p); err != nil {
+		return err
+	}
+
 	for _, stage := range p.Stages {
 		if err := checkCondition(stage.Conditions); err != nil {
 			return err
@@ -102,7 +106,9 @@ func validateStep(step *Step) error {
 			return errors.New("StackName should not be null for upgradeStack step")
 		}
 	case StepTypeUpgradeCatalog:
-		//TODO
+		if step.ExternalId == "" {
+			return errors.New("ExternalId should not be null for upgradeCatalog step")
+		}
 	}
 	if err := checkCondition(step.Conditions); err != nil {
 		return err
@@ -144,6 +150,24 @@ func checkCondition(conditions *PipelineConditions) error {
 	for _, condition := range conditions.Any {
 		if !strings.Contains(condition, "=") {
 			return fmt.Errorf("condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
+		}
+	}
+	return nil
+}
+
+func checkServiceName(p *Pipeline) error {
+	names := map[string]bool{}
+	for _, stage := range p.Stages {
+		for _, step := range stage.Steps {
+			if step.IsService {
+				if step.Alias == "" {
+					return fmt.Errorf("Please provide an alias when run as a service(in stage '%s')", stage.Name)
+				}
+				if _, ok := names[step.Alias]; ok {
+					return fmt.Errorf("As a service task: alias '%s' duplicates", step.Alias)
+				}
+				names[step.Alias] = true
+			}
 		}
 	}
 	return nil
