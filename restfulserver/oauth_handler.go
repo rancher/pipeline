@@ -70,11 +70,12 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 		if err := updateAccount(existing); err != nil {
 			return err
 		}
-	} else {
-		//new account added
-		if err := createAccount(account); err != nil {
-			return err
-		}
+		return fmt.Errorf("Github account '%s' is authed, to add another github account using oauth, you need to log out on github", account.Login)
+	}
+
+	//new account added
+	if err := createAccount(account); err != nil {
+		return err
 	}
 
 	MyAgent.broadcast <- WSMsg{
