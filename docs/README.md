@@ -4,10 +4,11 @@ Easier to use, Easier to integrate CI/CD with Rancher.
 
 ## Dependencies
 
-- jenkins-master: Based on jenkins:2.60.2 wrapped in dind container.
-- jenkins-boot: Store the setup information like initial admin user and plugins 
+- Jenkins-master: Based on jenkins:2.60.2.
+- Jenkins-boot: Store the setup information including initial admin user and plugins 
   - Plugins list (see `/pluginManager/installed` after deploy jenkins-master)
   - Default user (User: admin, Password: admin)
+- Jenkins-slaves: workers to do CI jobs.
 - pipeline-server: The main service for connecting rancher and jenkins-master, and maintaining the major logic of CI/CD.
 
 ## Concept
@@ -57,6 +58,10 @@ An `Activity` is an execution of `Pipeline`. It contains the runtime status and 
 - ##### Fail
   Activity failed.
 
+- Abort
+
+  Activity terminated by user.
+
 ## User Guide
 
 Deploy `Rancher Pipeline` to your Rancher Environment, and add a pipeline to automatically build, test and deploy your code.
@@ -77,9 +82,13 @@ Click tab Pipeline to use our CICD.
 
 Before adding a pipeline you will need to add SCM authorization. You can go to setting page by clicking setting button on top right corner of CICD page. When you try to add a pipeline before setting auth, hint links will also guide you there. Currently Github Oauth is supported. You can do it by following the setting guide.
 
+When a git account is authed, it is bound to the Rancher user. The git account and its relevant pipelines and activities are only accessible by the user. The owner user can share the git account, then the resources will be accessible in environment scope.
+
+A Rancher User can add multiple git account using oauth.
+
 ### Create a Pipeline
 
-After Navigate to Pipeline tab on top menu, there will be two tabs called `Activities` and `Pipelines`. Click `Pipelines`. Then Click `Add Pipeline` on the top-right corner of `Pipeline table`. You have to start with the SCM stage in which git repository is required. After configure your git repository, you can start to configure your pipeline using different [Step types](#step-types).
+After Navigate to Pipeline tab on top menu, there will be two tabs called `Activities` and `Pipelines`. Click `Pipelines`. Then Click `Add Pipeline` on the top-right corner of `Pipeline table`. You have to start with the SCM stage in which git account and git repository is required. After configure your git repository, you can start to configure your pipeline using different [Step types](#step-types).
 
 #### Import/Export a Pipeline
 
@@ -130,7 +139,7 @@ After run a pipeline, there will be an acitivity produced. you can access the lo
 
 ### Environment Variables
 
-The following variables are available in most inputs, including shell scripts, image tag, compose file template, etc.
+The following variables are available in most inputs, including shell scripts, image tag, compose file template, etc. (except `git branch` and `timeout` config currently). Users can add user-define parameters in pipeline configuration. They act as the same role except that they are defined by users. When you input '$' in pipeline configuration inputs, we will pop up available variables for you to choose.
 
 | NAME                   | DESC                   |
 | ---------------------- | ---------------------- |
@@ -148,9 +157,13 @@ The following variables are available in most inputs, including shell scripts, i
 
 The CICD data are stored in two separate place, the whole pipeline and basic activity status informations are stored in the `generic object` of rancher/server's database, the detailed console log of activity and workspace data is stored on hosts running jenkins master/slave. So, if you want to backup the whole app data, you have to back up these two data.
 
+#### Backup/Restore Pipeline data
+
+Pipeline data is stored in Rancher server. Please refer to Rancher documentation for data backup/restore.
+
 #### Backup/Restore Jenkins data
 
-If you want to backup the Jenkins data, just copy the Volume of jenkins-boot into your backup directory. When you want restore these data, just use your backup directory as Volume of CICD.
+If you want to backup the Jenkins data, just copy the Volume of jenkins home directory into your backup directory. When you want to restore these data, use your backup directory for recovery.
 
 ## Configuration Reference
 
@@ -198,7 +211,7 @@ Webhook: If enabled, CICD will automatically create github webhook when pipeline
 
 As a service: If enabled, The task is expected to run a service during the rest of the activity lifetime. The service can be referenced by following steps using `Name`. It will be cleanup when the activity finish.
 
-Name: An alias following steps use to reference the service. Used when `As a service` is enabled.
+Name: An alias that following steps use to reference the service. Required when `As a service` is enabled.
 
 Image: context image to run the task.
 
@@ -208,7 +221,7 @@ Custom Entrypoint: entrypoint for a `docker run` using `Image`
 
 Command: command for a `docker run` using `Image`
 
-Environment Variables: environment variables to use.
+Environment Variables: environment variables passing to docker run command. These environment variables are available in the container context so you can use them in shell scripts, but you cannot use them in custom entrypoint, image, etc. where pre-define or user-define parameters work.
 
 Conditions: If conditions are set, the step will run only when conditions are satisfied. Otherwise it will be skipped and following steps/stages continue.
 
@@ -309,6 +322,7 @@ conditions:
 scmType: <string> #enum{"github"},takes no effect currently
 repository: <string>
 branch: <string>
+gitUser: <string>
 webhook: <bool> #whether or not generates webhook automatically
 
 

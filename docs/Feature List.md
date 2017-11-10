@@ -2,18 +2,21 @@
 
 Pipeline:
 
-| FEATURE                           | DESC |
-| --------------------------------- | ---- |
-| get pipeline list                 |      |
-| create pipeline                   |      |
-| edit pipeline                     |      |
-| clone pipeline                    |      |
-| delete pipeline                   |      |
-| activate/deactivate pipeline      |      |
-| import/export pipeline            |      |
-| run pipeline                      |      |
-| dragable stage/step on UI         |      |
-| setting cron trigger for pipeline |      |
+| FEATURE                                  | DESC |
+| ---------------------------------------- | ---- |
+| get pipeline list                        |      |
+| create pipeline                          |      |
+| edit pipeline                            |      |
+| clone pipeline                           |      |
+| delete pipeline                          |      |
+| activate/deactivate pipeline             |      |
+| import/export pipeline                   |      |
+| run pipeline                             |      |
+| user-define parameter                    |      |
+| pre-define environment variables         |      |
+| environment variable sustitution in pipeline configuration |      |
+| dragable stage/step on UI                |      |
+| setting cron trigger for pipeline        |      |
 
 Activity:
 
@@ -21,15 +24,19 @@ Activity:
 | ---------------------------------------- | ---- |
 | get activity list                        |      |
 | rerun activity                           |      |
+| stop activity                            |      |
 | deny/approve `pending` activity          |      |
 | get detail status of each stage and step |      |
 | get log of a step                        |      |
 
 Authorization:
 
-| FEATURE                        | DESC |
-| ------------------------------ | ---- |
-| Github Oauth for authorization |      |
+| FEATURE                                  | DESC |
+| ---------------------------------------- | ---- |
+| Github Oauth for authorization           |      |
+| Add/delete auth user                     |      |
+| disable/reconfig github oauth application |      |
+| share/unshare git account(Private by default) |      |
 
 Stage:
 

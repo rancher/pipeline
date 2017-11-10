@@ -99,3 +99,18 @@ At the start of pipeline server, it will check or create a `service_webhook` typ
 ### 7. Cron Trigger
 
 We provide cron scheduler settings for a pipeline. There will be go routines running for the cron task if it is set. We provide a `run when new commits exist` option, it uses `git ls-remote` to check if there is any updates comparing to last run of the pipeline, and only runs a pipeline when there are new changes.
+
+### 8. Multiple Git Account Support
+
+1     A github account is bound to aRancher user. By default, an account is private and only accessible by itsowner Rancher user. We can set an account from `private` to `shared` then it can be accessible by anyone in this environment.
+
+2     Users can only see and operate pipelines/activities of accessible github accounts. (including those they own and those shared by others)
+
+3     If Access control is disabled.Accounts are shared over the environment.
+
+4     When adding a pipeline, Users select an account first,then select a repo
+
+### 9. Git Repo cache
+
+Git repositories are cached so that users don't need to wait to load all repos from Git server. Respectly, users need to refresh git repositories manually if there are repo updates.
+
