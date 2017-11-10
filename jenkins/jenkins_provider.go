@@ -84,10 +84,10 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 }
 
 func (j *JenkinsProvider) StopActivity(a *pipeline.Activity) error {
+	logrus.Debugf("stopping activity, current status: %s", a.Status)
 	a.Status = pipeline.ActivityAbort
 	now := time.Now().UnixNano() / int64(time.Millisecond)
 	a.StopTS = now
-	//TODO stop running steps
 	for stageOrdinal, stage := range a.ActivityStages {
 		if stage.Status == pipeline.ActivityStageSuccess || stage.Status == pipeline.ActivityStageSkip {
 			continue
@@ -97,6 +97,7 @@ func (j *JenkinsProvider) StopActivity(a *pipeline.Activity) error {
 					return err
 				}
 			}
+			logrus.Debugf("aborting stage, current status: %s", stage.Status)
 			stage.Status = pipeline.ActivityStageAbort
 			stage.Duration = now - stage.StartTS
 			break
@@ -112,6 +113,8 @@ func (j *JenkinsProvider) StopStep(a *pipeline.Activity, stageOrdinal int, stepO
 	if err != nil {
 		return err
 	}
+	step := a.ActivityStages[stageOrdinal].ActivitySteps[stepOrdinal]
+	logrus.Debugf("aborting step, current status: %s", step.Status)
 	if info.InQueue {
 		//delete in queue
 		queueItem, ok := info.QueueItem.(map[string]interface{})
@@ -134,7 +137,6 @@ func (j *JenkinsProvider) StopStep(a *pipeline.Activity, stageOrdinal int, stepO
 			if err := StopJob(jobname); err != nil {
 				return err
 			}
-			step := a.ActivityStages[stageOrdinal].ActivitySteps[stepOrdinal]
 			step.Status = pipeline.ActivityStepAbort
 			step.Duration = time.Now().UnixNano()/int64(time.Millisecond) - step.StartTS
 		}
@@ -239,8 +241,10 @@ func EvaluateConditions(activity *pipeline.Activity, condition *pipeline.Pipelin
 func EvaluateCondition(activity *pipeline.Activity, condition string) (bool, error) {
 	m := util.GetParams(`(?P<Key>.*?)!=(?P<Value>.*)`, condition)
 	if m["Key"] != "" && m["Value"] != "" {
-		envVal := activity.EnvVars[m["Key"]]
-		if envVal != m["Value"] {
+		key := SubstituteVar(activity, m["Key"])
+		val := SubstituteVar(activity, m["Value"])
+		envVal := activity.EnvVars[key]
+		if envVal != val {
 			return true, nil
 		}
 		return false, nil
@@ -248,8 +252,10 @@ func EvaluateCondition(activity *pipeline.Activity, condition string) (bool, err
 
 	m = util.GetParams(`(?P<Key>.*?)=(?P<Value>.*)`, condition)
 	if m["Key"] != "" && m["Value"] != "" {
-		envVal := activity.EnvVars[m["Key"]]
-		if envVal == m["Value"] {
+		key := SubstituteVar(activity, m["Key"])
+		val := SubstituteVar(activity, m["Value"])
+		envVal := activity.EnvVars[key]
+		if envVal == val {
 			return true, nil
 		}
 		return false, nil
@@ -448,6 +454,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		entrypointPara := ""
 		argsPara := ""
 		svcPara := ""
+		svcCheck := ""
 		if step.ShellScript != "" {
 			entrypointPara = "--entrypoint /bin/sh"
 			entryFileName := fmt.Sprintf(".r_cicd_entrypoint_%s.sh", util.RandStringRunes(4))
@@ -470,7 +477,8 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		//isService
 		if step.IsService {
 			containerName := activity.Id + step.Alias
-			svcPara = "-d --name " + containerName
+			svcPara = "-itd --name " + containerName
+			svcCheck = fmt.Sprintf("\nsleep 3;if [ \"$(docker inspect -f {{.State.Running}} %s)\" = \"false\" ];then docker logs \"%s\";echo \"Error: service container \\\"%s\\\" is stopped.\ncheck above logs or the task step config.\nA running container is expected when using \\\"as a service\\\" option.\";exit 1;fi", containerName, containerName, step.Alias)
 		}
 
 		//add link service
@@ -485,7 +493,6 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 
 		volumeInfo := "--volumes-from ${HOSTNAME} -w ${PWD}"
 		//volumeInfo := "-v /var/jenkins_home/workspace:/var/jenkins_home/workspace -w ${PWD}"
-		stringBuilder.WriteString("set -xe\n")
 		stringBuilder.WriteString("docker run --rm")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
@@ -503,6 +510,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString(step.Image)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(argsPara)
+		stringBuilder.WriteString(svcCheck)
 	case pipeline.StepTypeBuild:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Dockerfile == "" {
@@ -517,11 +525,11 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(buildPath)
 			stringBuilder.WriteString(";")
 		} else {
-			stringBuilder.WriteString("echo " + QuoteShell(step.Dockerfile) + ">.Dockerfile;\n")
+			stringBuilder.WriteString("echo " + QuoteShell(step.Dockerfile) + ">.r_cicd_Dockerfile;\n")
 			stringBuilder.WriteString("set -xe\n")
 			stringBuilder.WriteString("docker build --tag ")
 			stringBuilder.WriteString(step.TargetImage)
-			stringBuilder.WriteString(" -f .Dockerfile .;")
+			stringBuilder.WriteString(" -f .r_cicd_Dockerfile .;")
 		}
 		if step.PushFlag {
 			stringBuilder.WriteString("\ncihelper pushimage ")
@@ -831,19 +839,20 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 	if err != nil {
 		return "", err
 	}
-	logrus.Debugf("got log:\n%s\n\n%s\n\n%d", *logText, rawOutput, startLine)
+	//logrus.Debugf("got log:\n%s\n\n%s\n\n%d", *logText, rawOutput, startLine)
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	*logText = *logText + rawOutput
 	outputs := regexp.MustCompile(token).Split(*logText, -1)
 	if len(outputs) > 1 && stageOrdinal == 0 && stepOrdinal == 0 {
 		// SCM
-		return outputs[1], nil
+		return trimFirstLine(outputs[1]), nil
 	}
 	if len(outputs) < 3 {
 		//no printed log
 		return "", nil
 	}
-	return outputs[2], nil
+	//hide set +x
+	return trimFirstLine(outputs[2]), nil
 
 }
 
@@ -1043,6 +1052,17 @@ func EscapeShell(activity *pipeline.Activity, script string) string {
 	return escaped
 }
 
+//merely substitute envvars without escaping shell
+func SubstituteVar(activity *pipeline.Activity, text string) string {
+	for k, v := range activity.EnvVars {
+		text = strings.Replace(text, "$"+k+" ", v, -1)
+		text = strings.Replace(text, "$"+k+"\n", v, -1)
+		text = strings.Replace(text, "${"+k+"}", v, -1)
+
+	}
+	return text
+}
+
 func templateURLPath(path string) (string, string, string, string, bool) {
 	pathSplit := strings.Split(path, ":")
 	switch len(pathSplit) {
@@ -1096,4 +1116,13 @@ func getStageJobsName(activity *pipeline.Activity, stageOrdinal int) string {
 		jobsName = append(jobsName, stepJobName)
 	}
 	return strings.Join(jobsName, ",")
+}
+
+func trimFirstLine(text string) string {
+	text = strings.TrimLeft(text, "\n")
+	splits := strings.SplitN(text, "\n", 2)
+	if len(splits) != 2 {
+		return ""
+	}
+	return splits[1]
 }

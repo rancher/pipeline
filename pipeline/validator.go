@@ -2,11 +2,15 @@ package pipeline
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/robfig/cron"
 )
+
+var ErrInvalidPipeline = errors.New("Invalid Pipeline definition")
+var regName = regexp.MustCompile(`^[\w]+[\w-_]*`)
 
 func Clean(p *Pipeline) {
 	p.VersionSequence = ""
@@ -78,36 +82,36 @@ func validateStep(step *Step) error {
 	switch step.Type {
 	case StepTypeSCM:
 		if step.Repository == "" {
-			return errors.New("repo field should not be null for SCM step")
+			return errors.Wrap(ErrInvalidPipeline, "repo field should not be null for SCM step")
 		}
 		if step.Branch == "" {
-			return errors.New("repo field should not be null for SCM step")
+			return errors.Wrap(ErrInvalidPipeline, "repo field should not be null for SCM step")
 		}
 		if !strings.HasSuffix(step.Repository, ".git") {
-			return errors.New("Invalid repo url for SCM step")
+			return errors.Wrap(ErrInvalidPipeline, "Invalid repo url for SCM step")
 		}
 	case StepTypeTask:
 		if step.Image == "" {
-			return errors.New("Image field should not be null for task step")
+			return errors.Wrap(ErrInvalidPipeline, "Image field should not be null for task step")
 		}
 	case StepTypeBuild:
 		if step.TargetImage == "" {
-			return errors.New("Target Image field should not be null for build step")
+			return errors.Wrap(ErrInvalidPipeline, "Target Image field should not be null for build step")
 		}
 	case StepTypeUpgradeService:
 		if step.ImageTag == "" {
-			return errors.New("Image field should not be null for upgradeService step")
+			return errors.Wrap(ErrInvalidPipeline, "Image field should not be null for upgradeService step")
 		}
 		if len(step.ServiceSelector) == 0 {
-			return errors.New("Service selector should not be null for upgradeService step")
+			return errors.Wrap(ErrInvalidPipeline, "Service selector should not be null for upgradeService step")
 		}
 	case StepTypeUpgradeStack:
 		if step.StackName == "" {
-			return errors.New("StackName should not be null for upgradeStack step")
+			return errors.Wrap(ErrInvalidPipeline, "StackName should not be null for upgradeStack step")
 		}
 	case StepTypeUpgradeCatalog:
 		if step.ExternalId == "" {
-			return errors.New("ExternalId should not be null for upgradeCatalog step")
+			return errors.Wrap(ErrInvalidPipeline, "ExternalId should not be null for upgradeCatalog step")
 		}
 	}
 	if err := checkCondition(step.Conditions); err != nil {
@@ -120,10 +124,10 @@ func checkStageName(stages []*Stage) error {
 	names := map[string]bool{}
 	for _, stage := range stages {
 		if stage.Name == "" {
-			return errors.New("Stage name should not be null")
+			return errors.Wrap(ErrInvalidPipeline, "Stage name should not be null")
 		}
 		if _, ok := names[stage.Name]; ok {
-			return errors.New(fmt.Sprintf("Stage name '%v' duplicates", stage.Name))
+			return errors.Wrapf(ErrInvalidPipeline, "Stage name '%v' duplicates", stage.Name)
 		}
 		names[stage.Name] = true
 	}
@@ -135,7 +139,7 @@ func checkCronSpec(spec string) error {
 		return nil
 	}
 	_, err := cron.ParseStandard(spec)
-	return err
+	return errors.Wrapf(ErrInvalidPipeline, "parse cron expression got error:%v", err)
 }
 
 func checkCondition(conditions *PipelineConditions) error {
@@ -144,12 +148,12 @@ func checkCondition(conditions *PipelineConditions) error {
 	}
 	for _, condition := range conditions.All {
 		if !strings.Contains(condition, "=") {
-			return fmt.Errorf("condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
+			return errors.Wrapf(ErrInvalidPipeline, "condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
 		}
 	}
 	for _, condition := range conditions.Any {
 		if !strings.Contains(condition, "=") {
-			return fmt.Errorf("condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
+			return errors.Wrapf(ErrInvalidPipeline, "condition '%s' is not valid, expected format 'xx=xx' or 'xx!=xx'", condition)
 		}
 	}
 	return nil
@@ -161,14 +165,23 @@ func checkServiceName(p *Pipeline) error {
 		for _, step := range stage.Steps {
 			if step.IsService {
 				if step.Alias == "" {
-					return fmt.Errorf("Please provide an alias when run as a service(in stage '%s')", stage.Name)
+					return errors.Wrapf(ErrInvalidPipeline, "Please provide an alias when run as a service(in stage '%s')", stage.Name)
 				}
 				if _, ok := names[step.Alias]; ok {
-					return fmt.Errorf("As a service task: alias '%s' duplicates", step.Alias)
+					return errors.Wrapf(ErrInvalidPipeline, "Alias '%s' duplicates in as a service tasks", step.Alias)
 				}
 				names[step.Alias] = true
 			}
 		}
+	}
+	return nil
+}
+
+// IsValidName checks if name valid. limit to [a-zA-Z0-9-_]
+func IsValidName(name string) error {
+	match := regName.FindAllString(name, -1)
+	if len(match) == 0 || (len(match[0]) != len(name)) {
+		return fmt.Errorf("Invalid name %s, must contain [a-zA-Z0-9-_] characters only, cannot start with '-' or '_'", name)
 	}
 	return nil
 }

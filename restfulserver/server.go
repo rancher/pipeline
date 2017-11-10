@@ -284,9 +284,9 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		if err := yaml.Unmarshal([]byte(templateContent), &ppl.PipelineContent); err != nil {
 			return err
 		}
-		pipeline.Clean(ppl)
 		logrus.Debugf("got imported pipeline:\n%v", ppl)
 	}
+	pipeline.Clean(ppl)
 
 	if err := pipeline.Validate(ppl); err != nil {
 		return err

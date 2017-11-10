@@ -103,7 +103,7 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 	pId := p.Id
 	spec := ""
 	timezone := ""
-	if !p.IsActivate {
+	if (!p.IsActivate) || (p.CronTrigger.Spec == "") {
 		//deactivate,remove the cron
 		a.unregisterCronRunnerC <- pId
 	}
@@ -173,7 +173,14 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	pId := cr.PipelineId
 	existing := a.cronRunners[pId]
 	logrus.Debugf("registering conrunner,pid:%v,spec:%v", pId, cr.Spec)
-	if existing == nil {
+	if existing != nil {
+		if existing.Spec == cr.Spec {
+			return
+		}
+		existing.Stop()
+		delete(a.cronRunners, pId)
+	}
+	if cr.Spec != "" {
 		err := cr.AddFunc(cr.Spec, func() {
 			logrus.Debugf("invoke pipeline %v cron job", cr.PipelineId)
 			ppl := a.Server.PipelineContext.GetPipelineById(pId)
@@ -184,6 +191,19 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 			}
 			if ppl.CronTrigger.TriggerOnUpdate && latestCommit == ppl.CommitInfo {
 				//run only when new changes exist
+				//update nextruntime and return
+				ppl.NextRunTime = pipeline.GetNextRunTime(ppl)
+
+				if err := a.Server.PipelineContext.UpdatePipeline(ppl); err != nil {
+					logrus.Errorf("update pipeline error,%v", err)
+				}
+				a.broadcast <- WSMsg{
+					Id:           uuid.Rand().Hex(),
+					Name:         "resource.change",
+					ResourceType: "pipeline",
+					Time:         time.Now(),
+					Data:         ppl,
+				}
 				return
 			}
 			_, err = a.Server.PipelineContext.RunPipeline(pId, pipeline.TriggerTypeCron)
@@ -191,7 +211,6 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 				logrus.Errorf("cron job fail,pid:%v", pId)
 				return
 			}
-
 		})
 		if err != nil {
 			logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
@@ -199,24 +218,6 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 		}
 		cr.Start()
 		a.cronRunners[pId] = cr
-	} else {
-		if existing.Spec == cr.Spec {
-			return
-		} else {
-			//update cron spec
-			existing.Stop()
-			delete(a.cronRunners, pId)
-			if cr.Spec != "" {
-				err := cr.AddFunc(cr.Spec, func() { a.Server.PipelineContext.RunPipeline(pId, pipeline.TriggerTypeCron) })
-				if err != nil {
-					logrus.Error("cron addfunc error for pipeline %v:%v", pId, err)
-					return
-				}
-				cr.Start()
-				a.cronRunners[pId] = cr
-			}
-		}
-
 	}
 
 }

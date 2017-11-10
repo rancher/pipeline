@@ -120,6 +120,7 @@ checkSvc()
 		exit 1
 	fi
 	UpgradingSvcCount=$(echo "$SvcStatus"|awk '$4=="yes" {print $1}'|wc -l);
+	# echo "Checking services status, upgrading remaining $UpgradingSvcCount services"
 	if [ $UpgradingSvcCount -ne 0 ]; then
 		return 1
 	fi
@@ -127,7 +128,7 @@ checkSvc()
 	return 0
 }
 
-for i in {1..36}
+while true
 do
 	checkSvc;
 	if [ $? -eq 0 ]; then
@@ -138,7 +139,6 @@ do
 	fi
 done
 
-echo "upgrade stack $R_UPGRADESTACK_STACKNAME time out(180s)."
 exit 1
 `
 
@@ -191,7 +191,7 @@ rm -r ../$TEMPDIR
 `
 
 const stepFinishScript = `def result = manager.build.result
-def command =  ["sh","-c","curl -d '' 'pipeline-server:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]
+def command =  ["sh","-c","curl -s -d '' 'pipeline-server:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]
 manager.listener.logger.println command.execute().text`
 
 const stepSCMFinishScript = `def result = manager.build.result
@@ -199,7 +199,7 @@ def env = manager.build.environment
 def GIT_COMMIT = env.get("GIT_COMMIT")
 def GIT_URL = env.get("GIT_URL")
 def GIT_BRANCH = env.get("GIT_BRANCH")
-def command =  ["sh","-c","curl -d 'GIT_URL=${GIT_URL}&GIT_BRANCH=${GIT_BRANCH}&GIT_COMMIT=${GIT_COMMIT}' 'pipeline-server:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]
+def command =  ["sh","-c","curl -s -d 'GIT_URL=${GIT_URL}&GIT_BRANCH=${GIT_BRANCH}&GIT_COMMIT=${GIT_COMMIT}' 'pipeline-server:60080/v1/events/stepfinish?id=%v&status=${result}&stageOrdinal=%v&stepOrdinal=%v'"]
 manager.listener.logger.println command.execute().text`
 
-const stepStartScript = "curl -d '' 'pipeline-server:60080/v1/events/stepstart?id=%v&stageOrdinal=%v&stepOrdinal=%v'"
+const stepStartScript = "curl -s -d '' 'pipeline-server:60080/v1/events/stepstart?id=%v&stageOrdinal=%v&stepOrdinal=%v'"
