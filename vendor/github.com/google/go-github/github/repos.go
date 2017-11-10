@@ -39,7 +39,7 @@ type Repository struct {
 	SSHURL           *string          `json:"ssh_url,omitempty"`
 	SVNURL           *string          `json:"svn_url,omitempty"`
 	Language         *string          `json:"language,omitempty"`
-	Fork             *bool            `json:"fork,omitempty"`
+	Fork             *bool            `json:"fork"`
 	ForksCount       *int             `json:"forks_count,omitempty"`
 	NetworkCount     *int             `json:"network_count,omitempty"`
 	OpenIssuesCount  *int             `json:"open_issues_count,omitempty"`
@@ -61,16 +61,16 @@ type Repository struct {
 	License *License `json:"license,omitempty"`
 
 	// Additional mutable fields when creating and editing a repository
-	Private           *bool   `json:"private,omitempty"`
-	HasIssues         *bool   `json:"has_issues,omitempty"`
-	HasWiki           *bool   `json:"has_wiki,omitempty"`
-	HasPages          *bool   `json:"has_pages,omitempty"`
-	HasDownloads      *bool   `json:"has_downloads,omitempty"`
+	Private           *bool   `json:"private"`
+	HasIssues         *bool   `json:"has_issues"`
+	HasWiki           *bool   `json:"has_wiki"`
+	HasPages          *bool   `json:"has_pages"`
+	HasDownloads      *bool   `json:"has_downloads"`
 	LicenseTemplate   *string `json:"license_template,omitempty"`
 	GitignoreTemplate *string `json:"gitignore_template,omitempty"`
 
 	// Creating an organization repository. Required for non-owners.
-	TeamID *int `json:"team_id,omitempty"`
+	TeamID *int `json:"team_id"`
 
 	// API URLs
 	URL              *string `json:"url,omitempty"`
