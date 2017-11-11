@@ -43,4 +43,4 @@ Version: <latest version>,
 # Default or customized configs and launch
 ```
 
-4. After all services are ready, access CICD UI via `http://<rancher-server-ip>:8080/r/projects/1a5/pipeline-ui/#/env/1a5/pipelines/r`(env id and server port is changable according to where you deploy cicd catalog)
+4. After all services are ready, access CICD UI via `http://<rancher-server-ip>:8080/r/projects/1a5/pipeline-ui:8000/#/env/1a5/pipelines/r`(env id and server port is changable according to where you deploy cicd catalog)
