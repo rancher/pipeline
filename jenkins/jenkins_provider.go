@@ -515,14 +515,20 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Dockerfile == "" {
 			buildPath := "."
+			dockerfileName := "Dockerfile"
 			if step.DockerfilePath != "" {
 				buildPath = step.DockerfilePath
 			}
+			if step.DockerfileName != "" {
+				dockerfileName = step.DockerfileName
+			}
 			stringBuilder.WriteString("set -xe\n")
 			stringBuilder.WriteString("docker build --tag ")
-			stringBuilder.WriteString(step.TargetImage)
+			stringBuilder.WriteString(QuoteShell(step.TargetImage))
 			stringBuilder.WriteString(" ")
-			stringBuilder.WriteString(buildPath)
+			stringBuilder.WriteString("-f " + QuoteShell(dockerfileName))
+			stringBuilder.WriteString(" ")
+			stringBuilder.WriteString(QuoteShell(buildPath))
 			stringBuilder.WriteString(";")
 		} else {
 			stringBuilder.WriteString("echo " + QuoteShell(step.Dockerfile) + ">.r_cicd_Dockerfile;\n")
