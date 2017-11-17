@@ -1,175 +1,38 @@
-package restfulserver
+package service
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/gorilla/mux"
-	"github.com/rancher/go-rancher/api"
-	v1client "github.com/rancher/go-rancher/client"
 	"github.com/rancher/go-rancher/v2"
-	"github.com/rancher/pipeline/pipeline"
-	"github.com/rancher/pipeline/scm"
+	"github.com/rancher/pipeline/model"
 	"github.com/rancher/pipeline/util"
-	"github.com/sluu99/uuid"
 )
 
-func (s *Server) ListAccounts(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-	uid, err := GetCurrentUser(req.Cookies())
-	if err != nil || uid == "" {
-		if err != nil {
-			logrus.Errorf("get user error:%v", err)
-		}
-		logrus.Warning("fail to get current user, trying in envrionment scope")
-	}
-	accounts, err := listAccounts(uid)
-	if err != nil {
-		return err
-	}
-	result := []interface{}{}
-	for _, account := range accounts {
-		result = append(result, toAccountResource(apiContext, account))
-	}
-	apiContext.Write(&v1client.GenericCollection{
-		Data: result,
-	})
-	return nil
-}
+const GIT_ACCOUNT_TYPE = "gitaccount"
+const REPO_CACHE_TYPE = "repocache"
 
-func (s *Server) GetAccount(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-
-	id := mux.Vars(req)["id"]
-	if !validAccountAccess(req, id) {
-		return fmt.Errorf("cannot access account '%s'", id)
-	}
-	r, err := getAccount(id)
-	if err != nil {
-		return err
-	}
-	return apiContext.WriteResource(toAccountResource(apiContext, r))
-}
-
-func (s *Server) RemoveAccount(rw http.ResponseWriter, req *http.Request) error {
-	id := mux.Vars(req)["id"]
-	if !validAccountAccess(req, id) {
-		return fmt.Errorf("cannot access account '%s'", id)
-	}
-	a, err := getAccount(id)
-	if err != nil {
-		return err
-	}
-	if err := removeAccount(id); err != nil {
-		return err
-	}
-	a.Status = "removed"
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "gitaccount",
-		Time:         time.Now(),
-		Data:         a,
-	}
-	return nil
-}
-
-func (s *Server) ShareAccount(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-	id := mux.Vars(req)["id"]
-	if !validAccountAccess(req, id) {
-		return fmt.Errorf("cannot access account '%s'", id)
-	}
-	a, err := shareAccount(id)
-	if err != nil {
-		return err
-	}
-
-	return apiContext.WriteResource(toAccountResource(apiContext, a))
-}
-
-func (s *Server) UnshareAccount(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
-	id := mux.Vars(req)["id"]
-	if !validAccountAccess(req, id) {
-		return fmt.Errorf("cannot access account '%s'", id)
-	}
-	a, err := unshareAccount(id)
-	if err != nil {
-		return err
-	}
-	return apiContext.WriteResource(toAccountResource(apiContext, a))
-}
-
-func (s *Server) RefreshRepos(rw http.ResponseWriter, req *http.Request) error {
-	id := mux.Vars(req)["id"]
-	repos, err := refreshRepos(id)
-	if err != nil {
-		return err
-	}
-	b, err := json.Marshal(repos)
-	if err != nil {
-		return err
-	}
-	if _, err = rw.Write(b); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Server) GetCacheRepos(rw http.ResponseWriter, req *http.Request) error {
-	id := mux.Vars(req)["id"]
-	if !validAccountAccess(req, id) {
-		return fmt.Errorf("cannot access account '%s'", id)
-	}
-	repos, err := getCacheRepoList(id)
-	if err != nil {
-		return err
-	}
-
-	if _, err = rw.Write([]byte(repos.(string))); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (s *Server) DebugCreate(rw http.ResponseWriter, req *http.Request) error {
-	id := mux.Vars(req)["id"]
-	githubManager := scm.GithubManager{}
-	account, err := githubManager.GetAccount(id)
-	if err != nil {
-		return err
-	}
-	createAccount(account)
-	return nil
-}
-
-func refreshRepos(accountId string) (interface{}, error) {
-	account, err := getAccount(accountId)
+func RefreshRepos(manager model.SCManager, accountId string) (interface{}, error) {
+	account, err := GetAccount(accountId)
 	if err != nil {
 		return nil, err
 	}
-	githubManager := scm.GithubManager{}
-
-	repos, err := githubManager.GetRepos(account)
+	repos, err := manager.GetRepos(account)
 	if err != nil {
 		return nil, err
 	}
-	return repos, createOrUpdateCacheRepoList(accountId, repos)
+	return repos, CreateOrUpdateCacheRepoList(accountId, repos)
 }
 
-func getAccount(id string) (*scm.Account, error) {
+func GetAccount(id string) (*model.GitAccount, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return nil, err
 	}
 	filters := make(map[string]interface{})
-	filters["kind"] = "gitaccount"
+	filters["kind"] = GIT_ACCOUNT_TYPE
 	filters["key"] = id
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
@@ -181,7 +44,7 @@ func getAccount(id string) (*scm.Account, error) {
 		return nil, fmt.Errorf("cannot find account with id '%s'", id)
 	}
 	data := goCollection.Data[0]
-	account := &scm.Account{}
+	account := &model.GitAccount{}
 	if err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), &account); err != nil {
 		return nil, err
 	}
@@ -189,23 +52,23 @@ func getAccount(id string) (*scm.Account, error) {
 }
 
 //listAccounts gets scm accounts accessible by the user
-func listAccounts(uid string) ([]*scm.Account, error) {
+func ListAccounts(uid string) ([]*model.GitAccount, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return nil, err
 	}
 	filters := make(map[string]interface{})
-	filters["kind"] = "gitaccount"
+	filters["kind"] = GIT_ACCOUNT_TYPE
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("Error %v filtering genericObjects by key", err)
 	}
-	var accounts []*scm.Account
+	var accounts []*model.GitAccount
 	for _, gobj := range goCollection.Data {
 		b := []byte(gobj.ResourceData["data"].(string))
-		a := &scm.Account{}
+		a := &model.GitAccount{}
 		json.Unmarshal(b, a)
 		if uid == a.RancherUserID || !a.Private {
 			accounts = append(accounts, a)
@@ -215,38 +78,38 @@ func listAccounts(uid string) ([]*scm.Account, error) {
 	return accounts, nil
 }
 
-func shareAccount(id string) (*scm.Account, error) {
+func ShareAccount(id string) (*model.GitAccount, error) {
 
-	r, err := getAccount(id)
+	r, err := GetAccount(id)
 	if err != nil {
 		logrus.Errorf("fail getting account with id:%v", id)
 		return nil, err
 	}
 	if r.Private {
 		r.Private = false
-		if err := updateAccount(r); err != nil {
+		if err := UpdateAccount(r); err != nil {
 			return nil, err
 		}
 	}
 	return r, nil
 }
 
-func unshareAccount(id string) (*scm.Account, error) {
-	r, err := getAccount(id)
+func UnshareAccount(id string) (*model.GitAccount, error) {
+	r, err := GetAccount(id)
 	if err != nil {
 		logrus.Errorf("fail getting account with id:%v", id)
 		return nil, err
 	}
 	if !r.Private {
 		r.Private = true
-		if err := updateAccount(r); err != nil {
+		if err := UpdateAccount(r); err != nil {
 			return nil, err
 		}
 	}
 	return r, nil
 }
 
-func updateAccount(account *scm.Account) error {
+func UpdateAccount(account *model.GitAccount) error {
 	b, err := json.Marshal(account)
 	if err != nil {
 		return err
@@ -261,7 +124,7 @@ func updateAccount(account *scm.Account) error {
 
 	filters := make(map[string]interface{})
 	filters["key"] = account.Id
-	filters["kind"] = "gitaccount"
+	filters["kind"] = GIT_ACCOUNT_TYPE
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
 	})
@@ -277,12 +140,12 @@ func updateAccount(account *scm.Account) error {
 		Name:         account.Id,
 		Key:          account.Id,
 		ResourceData: resourceData,
-		Kind:         "gitaccount",
+		Kind:         GIT_ACCOUNT_TYPE,
 	})
 	return err
 }
 
-func removeAccount(id string) error {
+func RemoveAccount(id string) error {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return err
@@ -290,7 +153,7 @@ func removeAccount(id string) error {
 
 	filters := make(map[string]interface{})
 	filters["key"] = id
-	filters["kind"] = "gitaccount"
+	filters["kind"] = GIT_ACCOUNT_TYPE
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
 	})
@@ -305,13 +168,13 @@ func removeAccount(id string) error {
 	return apiClient.GenericObject.Delete(&existing)
 }
 
-func cleanAccounts() error {
+func CleanAccounts() error {
 
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return err
 	}
-	geObjList, err := pipeline.PaginateGenericObjects("gitaccount")
+	geObjList, err := PaginateGenericObjects(GIT_ACCOUNT_TYPE)
 	if err != nil {
 		logrus.Errorf("fail to list acciybt,err:%v", err)
 		return err
@@ -322,7 +185,7 @@ func cleanAccounts() error {
 	return nil
 }
 
-func createAccount(account *scm.Account) error {
+func CreateAccount(account *model.GitAccount) error {
 	b, err := json.Marshal(account)
 	if err != nil {
 		return err
@@ -338,18 +201,18 @@ func createAccount(account *scm.Account) error {
 		Name:         account.Id,
 		Key:          account.Id,
 		ResourceData: resourceData,
-		Kind:         "gitaccount",
+		Kind:         GIT_ACCOUNT_TYPE,
 	})
 	return err
 }
 
-func getCacheRepoList(accountId string) (interface{}, error) {
+func GetCacheRepoList(manager model.SCManager, accountId string) (interface{}, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
-		return &scm.Account{}, err
+		return nil, err
 	}
 	filters := make(map[string]interface{})
-	filters["kind"] = "repocache"
+	filters["kind"] = REPO_CACHE_TYPE
 	filters["key"] = accountId
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
@@ -359,13 +222,21 @@ func getCacheRepoList(accountId string) (interface{}, error) {
 	}
 	if len(goCollection.Data) == 0 {
 		//no cache,refresh
-		return refreshRepos(accountId)
+		repos, err := RefreshRepos(manager, accountId)
+		if err != nil {
+			return nil, err
+		}
+		b, err := json.Marshal(repos)
+		if err != nil {
+			return nil, err
+		}
+		return string(b), nil
 	}
 	data := goCollection.Data[0]
 	return data.ResourceData["data"], nil
 }
 
-func createOrUpdateCacheRepoList(accountId string, repos interface{}) error {
+func CreateOrUpdateCacheRepoList(accountId string, repos interface{}) error {
 
 	logrus.Debugf("refreshing repos")
 	b, err := json.Marshal(repos)
@@ -382,7 +253,7 @@ func createOrUpdateCacheRepoList(accountId string, repos interface{}) error {
 
 	filters := make(map[string]interface{})
 	filters["key"] = accountId
-	filters["kind"] = "repocache"
+	filters["kind"] = REPO_CACHE_TYPE
 	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
 		Filters: filters,
 	})
@@ -395,7 +266,7 @@ func createOrUpdateCacheRepoList(accountId string, repos interface{}) error {
 		if _, err := apiClient.GenericObject.Create(&client.GenericObject{
 			Key:          accountId,
 			ResourceData: resourceData,
-			Kind:         "repocache",
+			Kind:         REPO_CACHE_TYPE,
 		}); err != nil {
 			return fmt.Errorf("Save repo cache got error: %v", err)
 		}
@@ -407,17 +278,17 @@ func createOrUpdateCacheRepoList(accountId string, repos interface{}) error {
 	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
 		Key:          accountId,
 		ResourceData: resourceData,
-		Kind:         "repocache",
+		Kind:         REPO_CACHE_TYPE,
 	})
 	return err
 }
 
-func validAccountAccess(req *http.Request, accountId string) bool {
-	uid, err := GetCurrentUser(req.Cookies())
+func ValidAccountAccess(req *http.Request, accountId string) bool {
+	uid, err := util.GetCurrentUser(req.Cookies())
 	if err != nil || uid == "" {
 		logrus.Debugf("validAccountAccess unrecognized user")
 	}
-	r, err := getAccount(accountId)
+	r, err := GetAccount(accountId)
 	if err != nil {
 		logrus.Errorf("get account error:%v", err)
 		return false
@@ -428,8 +299,8 @@ func validAccountAccess(req *http.Request, accountId string) bool {
 	return false
 }
 
-func validAccountAccessById(uid string, accountId string) bool {
-	r, err := getAccount(accountId)
+func ValidAccountAccessById(uid string, accountId string) bool {
+	r, err := GetAccount(accountId)
 	if err != nil {
 		logrus.Errorf("get account error:%v", err)
 		return false
@@ -440,9 +311,9 @@ func validAccountAccessById(uid string, accountId string) bool {
 	return false
 }
 
-func getAccessibleAccounts(uid string) map[string]bool {
+func GetAccessibleAccounts(uid string) map[string]bool {
 	result := map[string]bool{}
-	accounts, err := listAccounts(uid)
+	accounts, err := ListAccounts(uid)
 	if err != nil {
 		logrus.Errorf("getAccessibleAccounts error:%v", err)
 		return result
@@ -451,4 +322,12 @@ func getAccessibleAccounts(uid string) map[string]bool {
 		result[account.Id] = true
 	}
 	return result
+}
+
+func GetUserToken(gitUser string) (string, error) {
+	account, err := GetAccount(gitUser)
+	if err != nil {
+		return "", err
+	}
+	return account.AccessToken, nil
 }

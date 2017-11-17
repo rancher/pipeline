@@ -1,6 +1,9 @@
-package pipeline
+package model
 
 import (
+	"net/http"
+
+	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/client"
 )
 
@@ -15,6 +18,7 @@ const StepTypeUpgradeCatalog = "upgradeCatalog"
 const TriggerTypeCron = "cron"
 const TriggerTypeManual = "manual"
 const TriggerTypeWebhook = "webhook"
+
 const (
 	ActivityStepWaiting  = "Waiting"
 	ActivityStepBuilding = "Building"
@@ -41,35 +45,23 @@ const (
 	ActivityAbort    = "Abort"
 )
 
+var ErrPipelineNotFound = errors.New("Pipeline Not found")
+
 var PreservedEnvs = [...]string{"CICD_GIT_COMMIT", "CICD_GIT_BRANCH",
 	"CICD_GIT_URL", "CICD_PIPELINE_NAME", "CICD_PIPELINE_ID",
 	"CICD_TRIGGER_TYPE", "CICD_NODE_NAME", "CICD_ACTIVITY_ID",
 	"CICD_ACTIVITY_SEQUENCE",
-	// "CICD_GIT_PREVIOUS_COMMIT", "CICD_GIT_PREVIOUS_SUCCESSFUL_COMMIT",
-	// "CICD_GIT_LOCAL_BRANCH", "CICD_GIT_COMMITTER_NAME",
-	// "CICD_GIT_AUTHOR_NAME", "CICD_GIT_COMMITTER_EMAIL", "CICD_GIT_AUTHOR_EMAIL", "CICD_SVN_REVISION",
-	// "CICD_SVN_URL",
-}
-
-type GithubAccount struct {
-	ID          int    `json:"id,omitempty"`
-	Login       string `json:"login,omitempty"`
-	Name        string `json:"name,omitempty"`
-	AvatarURL   string `json:"avatar_url,omitempty"`
-	HTMLURL     string `json:"html_url,omitempty"`
-	AccessToken string `json:"accessToken,omitempty"`
 }
 
 type PipelineSetting struct {
 	client.Resource
-	IsAuth             bool            `json:"isAuth,omitempty" yaml:"isAuth,omitempty"`
-	GithubHostName     string          `json:"githubHostName,omitempty" yaml:"githubHostName,omitempty"`
-	GithubSchema       string          `json:"githubSchema,omitempty" yaml:"githubSchema,omitempty"`
-	GithubHomePage     string          `json:"githubHomepage,omitempty" yaml:"githubHomepage,omitempty"`
-	GithubClientID     string          `json:"githubClientID,omitempty" yaml:"githubClientID,omitempty"`
-	GithubClientSecret string          `json:"githubClientSecret,omitempty" yaml:"githubClientSecret,omitempty"`
-	GithubRedirectURL  string          `json:"githubRedirectURL,omitempty" yaml:"githubRedirectURL,omitempty"`
-	GithubAccounts     []GithubAccount `json:"githubAccounts,omitempty" yaml:"githubAccounts,omitempty"`
+	IsAuth             bool   `json:"isAuth,omitempty" yaml:"isAuth,omitempty"`
+	GithubHostName     string `json:"githubHostName,omitempty" yaml:"githubHostName,omitempty"`
+	GithubSchema       string `json:"githubSchema,omitempty" yaml:"githubSchema,omitempty"`
+	GithubHomePage     string `json:"githubHomepage,omitempty" yaml:"githubHomepage,omitempty"`
+	GithubClientID     string `json:"githubClientID,omitempty" yaml:"githubClientID,omitempty"`
+	GithubClientSecret string `json:"githubClientSecret,omitempty" yaml:"githubClientSecret,omitempty"`
+	GithubRedirectURL  string `json:"githubRedirectURL,omitempty" yaml:"githubRedirectURL,omitempty"`
 }
 
 type Pipeline struct {
@@ -127,7 +119,7 @@ type Step struct {
 	//Condition  string             `json:"condition,omitempty" yaml:"condition,omitempty"`
 	Conditions *PipelineConditions `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	//---SCM step
-	SCMType    string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
+	SCMType    string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	GitUser    string `json:"gitUser,omitempty" yaml:"gitUser,omitempty"`
@@ -171,18 +163,6 @@ type Step struct {
 	DeployFlag bool              `json:"deploy" yaml:"deploy,omitempty"`
 	Templates  map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	Answers    string            `json:"answerString,omitempty" yaml:"answerString,omitempty"`
-}
-
-type PipelineProvider interface {
-	RunPipeline(*Pipeline, string) (*Activity, error)
-	RerunActivity(*Activity) error
-	RunStage(*Activity, int) error
-	RunStep(*Activity, int, int) error
-	StopActivity(*Activity) error
-	SyncActivity(*Activity) error
-	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
-	DeleteFormerBuild(*Activity) error
-	OnActivityCompelte(*Activity)
 }
 
 type PipelineConditions struct {
@@ -235,4 +215,58 @@ type CIService struct {
 	Image         string `json:"image,omitempty"`
 	Entrypoint    string `json:"entrypoint,omitempty"`
 	Command       string `json:"command,omitempty"`
+}
+
+func (activity *Activity) CanApprove(userId string) bool {
+	if activity.Status == ActivityPending && len(activity.Pipeline.Stages) > activity.PendingStage {
+		approvers := activity.Pipeline.Stages[activity.PendingStage].Approvers
+		if len(approvers) == 0 {
+			//no approver limit
+			return true
+		}
+		for _, approver := range approvers {
+			if approver == userId {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type PipelineProvider interface {
+	RunPipeline(*Pipeline, string) (*Activity, error)
+	RerunActivity(*Activity) error
+	RunStage(*Activity, int) error
+	RunStep(*Activity, int, int) error
+	StopActivity(*Activity) error
+	SyncActivity(*Activity) error
+	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
+	DeleteFormerBuild(*Activity) error
+	OnActivityCompelte(*Activity)
+}
+
+//scm stands for Source Code Manager
+type SCManager interface {
+	GetType() string
+	GetRepos(account *GitAccount) (interface{}, error)
+	GetAccount(accessToken string) (*GitAccount, error)
+	OAuth(redirectURL string, clientID string, clientSecret string, code string) (*GitAccount, error)
+	DeleteWebhook(pipeline *Pipeline, gitToken string) error
+	CreateWebhook(pipeline *Pipeline, gitToken string, ciEndpoint string) error
+	VerifyWebhookPayload(pipeline *Pipeline, req *http.Request) bool
+}
+
+type GitAccount struct {
+	client.Resource
+	//private or shared across environment
+	Private       bool   `json:"private,omitempty"`
+	AccountType   string `json:"accountType,omitempty"`
+	RancherUserID string `json:"rancherUserId,omitempty"`
+	Status        string `json:"status,omitempty"`
+
+	Login       string `json:"login,omitempty"`
+	Name        string `json:"name,omitempty"`
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	HTMLURL     string `json:"html_url,omitempty"`
+	AccessToken string `json:"accessToken,omitempty"`
 }

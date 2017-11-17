@@ -15,8 +15,8 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/pkg/errors"
-	"github.com/rancher/pipeline/pipeline"
-	"github.com/rancher/pipeline/restfulserver"
+	"github.com/rancher/pipeline/model"
+	"github.com/rancher/pipeline/server/service"
 	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
 )
@@ -24,45 +24,41 @@ import (
 type JenkinsProvider struct {
 }
 
-func (j *JenkinsProvider) Init(pipeline *pipeline.Pipeline) error {
-	return nil
-}
-
-func (j *JenkinsProvider) RunPipeline(p *pipeline.Pipeline, triggerType string) (*pipeline.Activity, error) {
+func (j JenkinsProvider) RunPipeline(p *model.Pipeline, triggerType string) (*model.Activity, error) {
 
 	activity, err := ToActivity(p)
 	if err != nil {
-		return &pipeline.Activity{}, err
+		return nil, err
 	}
 	activity.TriggerType = triggerType
 	initActivityEnvvars(activity)
 
 	if len(p.Stages) == 0 {
-		return &pipeline.Activity{}, errors.New("no stage in pipeline definition to run!")
+		return nil, errors.New("no stage in pipeline definition to run!")
 	}
 	for i := 0; i < len(p.Stages); i++ {
 		logrus.Debugf("creating stage:%v", p.Stages[i])
 		if err := j.CreateStage(activity, i); err != nil {
 			logrus.Error(errors.Wrapf(err, "stage <%s> fail", p.Stages[i].Name))
-			return &pipeline.Activity{}, err
+			return nil, err
 		}
 	}
 	logrus.Debugf("running stage:%v", p.Stages[0])
 	if err = j.RunStage(activity, 0); err != nil {
-		return &pipeline.Activity{}, err
+		return nil, err
 	}
 
 	logrus.Debugf("creating activity:%v", activity)
-	_, err = restfulserver.CreateActivity(*activity)
-	if err != nil {
-		return &pipeline.Activity{}, err
+
+	if err = service.CreateActivity(activity); err != nil {
+		return nil, err
 	}
 
 	return activity, nil
 }
 
 //RerunActivity runs an existing activity
-func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
+func (j JenkinsProvider) RerunActivity(a *model.Activity) error {
 	//find an available node to run
 	nodeName, err := getNodeNameToRun()
 	if err != nil {
@@ -83,13 +79,13 @@ func (j *JenkinsProvider) RerunActivity(a *pipeline.Activity) error {
 	return err
 }
 
-func (j *JenkinsProvider) StopActivity(a *pipeline.Activity) error {
+func (j JenkinsProvider) StopActivity(a *model.Activity) error {
 	logrus.Debugf("stopping activity, current status: %s", a.Status)
-	a.Status = pipeline.ActivityAbort
+	a.Status = model.ActivityAbort
 	now := time.Now().UnixNano() / int64(time.Millisecond)
 	a.StopTS = now
 	for stageOrdinal, stage := range a.ActivityStages {
-		if stage.Status == pipeline.ActivityStageSuccess || stage.Status == pipeline.ActivityStageSkip {
+		if stage.Status == model.ActivityStageSuccess || stage.Status == model.ActivityStageSkip {
 			continue
 		} else {
 			for stepOrdinal := 0; stepOrdinal < len(stage.ActivitySteps); stepOrdinal++ {
@@ -98,7 +94,7 @@ func (j *JenkinsProvider) StopActivity(a *pipeline.Activity) error {
 				}
 			}
 			logrus.Debugf("aborting stage, current status: %s", stage.Status)
-			stage.Status = pipeline.ActivityStageAbort
+			stage.Status = model.ActivityStageAbort
 			stage.Duration = now - stage.StartTS
 			break
 		}
@@ -107,7 +103,7 @@ func (j *JenkinsProvider) StopActivity(a *pipeline.Activity) error {
 	return nil
 }
 
-func (j *JenkinsProvider) StopStep(a *pipeline.Activity, stageOrdinal int, stepOrdinal int) error {
+func (j JenkinsProvider) StopStep(a *model.Activity, stageOrdinal int, stepOrdinal int) error {
 	jobname := getJobName(a, stageOrdinal, stepOrdinal)
 	info, err := GetJobInfo(jobname)
 	if err != nil {
@@ -137,7 +133,7 @@ func (j *JenkinsProvider) StopStep(a *pipeline.Activity, stageOrdinal int, stepO
 			if err := StopJob(jobname); err != nil {
 				return err
 			}
-			step.Status = pipeline.ActivityStepAbort
+			step.Status = model.ActivityStepAbort
 			step.Duration = time.Now().UnixNano()/int64(time.Millisecond) - step.StartTS
 		}
 	}
@@ -145,7 +141,7 @@ func (j *JenkinsProvider) StopStep(a *pipeline.Activity, stageOrdinal int, stepO
 }
 
 //CreateStage init jenkins projects settings of the stage, each step forms a jenkins job.
-func (j *JenkinsProvider) CreateStage(activity *pipeline.Activity, ordinal int) error {
+func (j JenkinsProvider) CreateStage(activity *model.Activity, ordinal int) error {
 	logrus.Info("create jenkins job from stage")
 	stage := activity.ActivityStages[ordinal]
 	for i, _ := range stage.ActivitySteps {
@@ -172,14 +168,14 @@ func getNodeNameToRun() (string, error) {
 }
 
 //DeleteFormerBuild delete last build info of a completed activity
-func (j *JenkinsProvider) DeleteFormerBuild(activity *pipeline.Activity) error {
-	if activity.Status == pipeline.ActivityBuilding || activity.Status == pipeline.ActivityWaiting {
+func (j JenkinsProvider) DeleteFormerBuild(activity *model.Activity) error {
+	if activity.Status == model.ActivityBuilding || activity.Status == model.ActivityWaiting {
 		return errors.New("cannot delete lastbuild of running activity!")
 	}
 	for stageOrdinal, stage := range activity.ActivityStages {
 		for stepOrdinal, step := range stage.ActivitySteps {
 			jobName := getJobName(activity, stageOrdinal, stepOrdinal)
-			if step.Status == pipeline.ActivityStepSuccess || step.Status == pipeline.ActivityStepFail {
+			if step.Status == model.ActivityStepSuccess || step.Status == model.ActivityStepFail {
 				logrus.Infof("deleting:%v", jobName)
 				if err := DeleteBuild(jobName); err != nil {
 					return err
@@ -192,7 +188,7 @@ func (j *JenkinsProvider) DeleteFormerBuild(activity *pipeline.Activity) error {
 }
 
 //SetSCMCommit update jenkins job SCM to use commit id in activity
-func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
+func (j JenkinsProvider) SetSCMCommit(activity *model.Activity) error {
 	conf := j.generateStepJenkinsProject(activity, 0, 0)
 	if activity.CommitInfo != "" {
 		conf.Scm.GitBranch = activity.CommitInfo
@@ -208,7 +204,7 @@ func (j *JenkinsProvider) SetSCMCommit(activity *pipeline.Activity) error {
 	return nil
 }
 
-func EvaluateConditions(activity *pipeline.Activity, condition *pipeline.PipelineConditions) (bool, error) {
+func EvaluateConditions(activity *model.Activity, condition *model.PipelineConditions) (bool, error) {
 	if condition == nil || (len(condition.All) == 0 && len(condition.Any) == 0) {
 		return false, fmt.Errorf("Nil condition")
 	}
@@ -238,7 +234,7 @@ func EvaluateConditions(activity *pipeline.Activity, condition *pipeline.Pipelin
 }
 
 //valid format:     xxx=xxx; xxx!=xxx
-func EvaluateCondition(activity *pipeline.Activity, condition string) (bool, error) {
+func EvaluateCondition(activity *model.Activity, condition string) (bool, error) {
 	m := util.GetParams(`(?P<Key>.*?)!=(?P<Value>.*)`, condition)
 	if m["Key"] != "" && m["Value"] != "" {
 		key := SubstituteVar(activity, m["Key"])
@@ -263,7 +259,7 @@ func EvaluateCondition(activity *pipeline.Activity, condition string) (bool, err
 	return false, fmt.Errorf("cannot parse condition:%s", condition)
 }
 
-func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) error {
+func (j JenkinsProvider) RunStage(activity *model.Activity, ordinal int) error {
 	if len(activity.ActivityStages) <= ordinal {
 		return fmt.Errorf("error run stage,stage index out of range")
 	}
@@ -273,7 +269,7 @@ func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) err
 	condFlag := true
 	curTime := time.Now().UnixNano() / int64(time.Millisecond)
 	var err error
-	if pipeline.HasStageCondition(stage) {
+	if service.HasStageCondition(stage) {
 		condFlag, err = EvaluateConditions(activity, stage.Conditions)
 		if err != nil {
 			logrus.Errorf("Evaluate condition '%v' got error:%v", stage.Conditions, err)
@@ -281,10 +277,10 @@ func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) err
 		}
 	}
 	if !condFlag {
-		activity.ActivityStages[ordinal].Status = pipeline.ActivityStageSkip
+		activity.ActivityStages[ordinal].Status = model.ActivityStageSkip
 		if ordinal == len(activity.ActivityStages)-1 {
 			//skip last stage and success activity
-			activity.Status = pipeline.ActivitySuccess
+			activity.Status = model.ActivitySuccess
 			activity.StopTS = curTime
 			j.OnActivityCompelte(activity)
 		} else {
@@ -314,7 +310,7 @@ func (j *JenkinsProvider) RunStage(activity *pipeline.Activity, ordinal int) err
 	return nil
 }
 
-func (j *JenkinsProvider) RunStep(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) error {
+func (j JenkinsProvider) RunStep(activity *model.Activity, stageOrdinal int, stepOrdinal int) error {
 	if len(activity.ActivityStages) <= stageOrdinal ||
 		len(activity.ActivityStages[stageOrdinal].ActivitySteps) <= stepOrdinal ||
 		stageOrdinal < 0 || stepOrdinal < 0 {
@@ -324,7 +320,7 @@ func (j *JenkinsProvider) RunStep(activity *pipeline.Activity, stageOrdinal int,
 	step := stage.Steps[stepOrdinal]
 	condFlag := true
 	var err error
-	if pipeline.HasStepCondition(step) {
+	if service.HasStepCondition(step) {
 		condFlag, err = EvaluateConditions(activity, step.Conditions)
 		if err != nil {
 			logrus.Errorf("Evaluate condition '%v' got error:%v", step.Conditions, err)
@@ -332,16 +328,16 @@ func (j *JenkinsProvider) RunStep(activity *pipeline.Activity, stageOrdinal int,
 		}
 	}
 	if !condFlag {
-		activity.ActivityStages[stageOrdinal].ActivitySteps[stepOrdinal].Status = pipeline.ActivityStepSkip
+		activity.ActivityStages[stageOrdinal].ActivitySteps[stepOrdinal].Status = model.ActivityStepSkip
 		actiStage := activity.ActivityStages[stageOrdinal]
 		curTime := time.Now().UnixNano() / int64(time.Millisecond)
-		if restfulserver.IsStageSuccess(actiStage) {
+		if service.IsStageSuccess(actiStage) {
 			//if skipped and stage success
-			actiStage.Status = pipeline.ActivityStageSuccess
+			actiStage.Status = model.ActivityStageSuccess
 			actiStage.Duration = curTime - actiStage.StartTS
 			if stageOrdinal == len(activity.ActivityStages)-1 {
 				//last stage success and success activity
-				activity.Status = pipeline.ActivitySuccess
+				activity.Status = model.ActivitySuccess
 				activity.StopTS = curTime
 				j.OnActivityCompelte(activity)
 			} else {
@@ -364,14 +360,14 @@ func (j *JenkinsProvider) RunStep(activity *pipeline.Activity, stageOrdinal int,
 	return nil
 }
 
-func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) *JenkinsProject {
+func (j JenkinsProvider) generateStepJenkinsProject(activity *model.Activity, stageOrdinal int, stepOrdinal int) *JenkinsProject {
 	logrus.Info("generating jenkins project config")
 	activityId := activity.Id
 	workspaceName := path.Join("${JENKINS_HOME}", "workspace", activityId)
 	stage := activity.Pipeline.Stages[stageOrdinal]
 	step := stage.Steps[stepOrdinal]
 
-	step.Services = pipeline.GetServices(activity, stageOrdinal, stepOrdinal)
+	step.Services = service.GetServices(activity, stageOrdinal, stepOrdinal)
 	taskShells := []JenkinsTaskShell{}
 	taskShells = append(taskShells, JenkinsTaskShell{Command: commandBuilder(activity, step)})
 	commandBuilders := JenkinsBuilder{TaskShells: taskShells}
@@ -379,7 +375,7 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 	scm := JenkinsSCM{Class: "hudson.scm.NullSCM"}
 
 	postBuildSctipt := stepFinishScript
-	if step.Type == pipeline.StepTypeSCM {
+	if step.Type == model.StepTypeSCM {
 		scm = JenkinsSCM{
 			Class:         "hudson.plugins.git.GitSCM",
 			Plugin:        "git@3.3.1",
@@ -438,11 +434,11 @@ func (j *JenkinsProvider) generateStepJenkinsProject(activity *pipeline.Activity
 
 }
 
-func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
+func commandBuilder(activity *model.Activity, step *model.Step) string {
 	stringBuilder := new(bytes.Buffer)
 	stringBuilder.WriteString("set +x \n")
 	switch step.Type {
-	case pipeline.StepTypeTask:
+	case model.StepTypeTask:
 
 		envVars := ""
 		if len(step.Env) > 0 {
@@ -511,7 +507,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(argsPara)
 		stringBuilder.WriteString(svcCheck)
-	case pipeline.StepTypeBuild:
+	case model.StepTypeBuild:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Dockerfile == "" {
 			buildPath := "."
@@ -542,7 +538,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(step.TargetImage)
 			stringBuilder.WriteString(";")
 		}
-	case pipeline.StepTypeSCM:
+	case model.StepTypeSCM:
 		//write to a env file that provides the environment variables to use throughout the activity.
 		stringBuilder.WriteString("GIT_BRANCH=$(echo $GIT_BRANCH|cut -d / -f 2)\n")
 		stringBuilder.WriteString("cat>.r_cicd.env<<R_CICD_EOF\n")
@@ -565,7 +561,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 		}
 		stringBuilder.WriteString("\nR_CICD_EOF\n")
 
-	case pipeline.StepTypeUpgradeService:
+	case model.StepTypeUpgradeService:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		stringBuilder.WriteString("cihelper")
 		if step.Endpoint != "" {
@@ -602,7 +598,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			stringBuilder.WriteString(" --startfirst")
 			stringBuilder.WriteString(" true")
 		}
-	case pipeline.StepTypeUpgradeStack:
+	case model.StepTypeUpgradeStack:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Endpoint == "" {
 			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
@@ -611,7 +607,7 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		}
-	case pipeline.StepTypeUpgradeCatalog:
+	case model.StepTypeUpgradeCatalog:
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 
 		_, templateName, templateBase, _, _ := templateURLPath(step.ExternalId)
@@ -653,21 +649,18 @@ func commandBuilder(activity *pipeline.Activity, step *pipeline.Step) string {
 			secretKey = "$CATTLE_SECRET_KEY"
 		}
 
-		//TODO Multiple
 		gitUserName := activity.Pipeline.Stages[0].Steps[0].GitUser
-		//gitUserName, _ := restfulserver.GetSingleUserName()
 		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
 		stringBuilder.WriteString(script)
-	case pipeline.StepTypeDeploy:
 	}
-	//logrus.Infof("Finish building command for step command is %s", stringBuilder.String())
+
 	return stringBuilder.String()
 }
 
-func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) error {
+func (j JenkinsProvider) SyncActivity(activity *model.Activity) error {
 	for i, actiStage := range activity.ActivityStages {
 		for j, actiStep := range actiStage.ActivitySteps {
-			if actiStep.Status == pipeline.ActivityStepFail || actiStep.Status == pipeline.ActivityStepSuccess {
+			if actiStep.Status == model.ActivityStepFail || actiStep.Status == model.ActivityStepSuccess {
 				continue
 			}
 			jobName := getJobName(activity, i, j)
@@ -682,8 +675,8 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) error {
 			if err != nil {
 				if actiStage.NeedApproval && j == 0 {
 					//Pending
-					actiStage.Status = pipeline.ActivityStagePending
-					activity.Status = pipeline.ActivityPending
+					actiStage.Status = model.ActivityStagePending
+					activity.Status = model.ActivityPending
 				}
 				break
 			}
@@ -692,28 +685,28 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) error {
 				if buildInfo.Result == "SUCCESS" {
 					actiStep.StartTS = buildInfo.Timestamp
 					actiStep.Duration = buildInfo.Duration
-					actiStep.Status = pipeline.ActivityStepSuccess
+					actiStep.Status = model.ActivityStepSuccess
 					if j == len(actiStage.ActivitySteps)-1 {
 						//Stage Success
-						actiStage.Status = pipeline.ActivityStageSuccess
+						actiStage.Status = model.ActivityStageSuccess
 						actiStage.Duration = buildInfo.Timestamp + buildInfo.Duration - actiStage.StartTS
 					}
 				} else if buildInfo.Result == "FAILURE" {
 					actiStep.StartTS = buildInfo.Timestamp
 					actiStep.Duration = buildInfo.Duration
-					actiStep.Status = pipeline.ActivityStepFail
+					actiStep.Status = model.ActivityStepFail
 					//Stage Fail
-					actiStage.Status = pipeline.ActivityStageFail
+					actiStage.Status = model.ActivityStageFail
 					actiStage.Duration = buildInfo.Timestamp + buildInfo.Duration - actiStage.StartTS
 					//Activity Fail
-					activity.Status = pipeline.ActivityFail
+					activity.Status = model.ActivityFail
 					activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
 				} else if buildInfo.Building {
 					//Building
 					actiStep.StartTS = buildInfo.Timestamp
-					actiStep.Status = pipeline.ActivityStepBuilding
-					actiStage.Status = pipeline.ActivityStageBuilding
-					activity.Status = pipeline.ActivityBuilding
+					actiStep.Status = model.ActivityStepBuilding
+					actiStage.Status = model.ActivityStageBuilding
+					activity.Status = model.ActivityBuilding
 					break
 				}
 
@@ -725,7 +718,7 @@ func (j *JenkinsProvider) SyncActivity(activity *pipeline.Activity) error {
 }
 
 //SyncActivity gets latest activity info, return true if status if changed
-func (j *JenkinsProvider) SyncActivityStale(activity *pipeline.Activity) (bool, error) {
+func (j JenkinsProvider) SyncActivityStale(activity *model.Activity) (bool, error) {
 	p := activity.Pipeline
 	var updated bool
 
@@ -735,7 +728,7 @@ func (j *JenkinsProvider) SyncActivityStale(activity *pipeline.Activity) (bool, 
 		jobName := p.Name + "_" + actiStage.Name + "_" + activity.Id
 		beforeStatus := actiStage.Status
 
-		if beforeStatus == pipeline.ActivityStageSuccess {
+		if beforeStatus == model.ActivityStageSuccess {
 			continue
 		}
 
@@ -757,16 +750,16 @@ func (j *JenkinsProvider) SyncActivityStale(activity *pipeline.Activity) (bool, 
 		if err != nil {
 			//cannot get build info
 			//build not started
-			if actiStage.Status == pipeline.ActivityStagePending {
+			if actiStage.Status == model.ActivityStagePending {
 				return updated, nil
 			}
-			actiStage.Status = pipeline.ActivityStageWaiting
+			actiStage.Status = model.ActivityStageWaiting
 			break
 		}
 		getCommit(activity, buildInfo)
 		//if any buildInfo found,activity in building status
-		activity.Status = pipeline.ActivityBuilding
-		actiStage.Status = pipeline.ActivityStageBuilding
+		activity.Status = model.ActivityBuilding
+		actiStage.Status = model.ActivityStageBuilding
 		actiStage.StartTS = buildInfo.Timestamp
 
 		//logrus.Info("get buildinfo result:%v,actiStagestatus:%v", buildInfo.Result, actiStage.Status)
@@ -778,22 +771,22 @@ func (j *JenkinsProvider) SyncActivityStale(activity *pipeline.Activity) (bool, 
 			//actiStage.RawOutput = rawOutput
 			stepStatusUpdated := parseSteps(actiStage, rawOutput)
 
-			if actiStage.Status == pipeline.ActivityStageFail {
-				activity.Status = pipeline.ActivityFail
+			if actiStage.Status == model.ActivityStageFail {
+				activity.Status = model.ActivityFail
 				updated = true
-			} else if actiStage.Status == pipeline.ActivityStageSuccess {
+			} else if actiStage.Status == model.ActivityStageSuccess {
 				if i == len(p.Stages)-1 {
 					//if all stage success , mark activity as success
 					activity.StopTS = buildInfo.Timestamp + buildInfo.Duration
-					activity.Status = pipeline.ActivitySuccess
+					activity.Status = model.ActivitySuccess
 					updated = true
 				}
 				logrus.Infof("stage success:%v", i)
 
 				if i < len(p.Stages)-1 && activity.Pipeline.Stages[i+1].NeedApprove {
 					logrus.Infof("set pending")
-					activity.Status = pipeline.ActivityPending
-					activity.ActivityStages[i+1].Status = pipeline.ActivityStagePending
+					activity.Status = model.ActivityPending
+					activity.ActivityStages[i+1].Status = model.ActivityStagePending
 					activity.PendingStage = i + 1
 				}
 			}
@@ -810,9 +803,9 @@ func (j *JenkinsProvider) SyncActivityStale(activity *pipeline.Activity) (bool, 
 }
 
 //OnActivityCompelte helps clean up
-func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
+func (j JenkinsProvider) OnActivityCompelte(activity *model.Activity) {
 	//clean services in activity
-	services := pipeline.GetAllServices(activity)
+	services := service.GetAllServices(activity)
 	containerNames := []string{}
 	for _, service := range services {
 		containerNames = append(containerNames, service.ContainerName)
@@ -830,7 +823,8 @@ func (j *JenkinsProvider) OnActivityCompelte(activity *pipeline.Activity) {
 	// logrus.Infof("clean workspace result:%v,%v", res, err)
 
 }
-func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int, paras map[string]interface{}) (string, error) {
+
+func (j JenkinsProvider) GetStepLog(activity *model.Activity, stageOrdinal int, stepOrdinal int, paras map[string]interface{}) (string, error) {
 	if stageOrdinal < 0 || stageOrdinal >= len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal >= len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
 		return "", errors.New("ordinal out of range")
 	}
@@ -862,7 +856,7 @@ func (j *JenkinsProvider) GetStepLog(activity *pipeline.Activity, stageOrdinal i
 
 }
 
-func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
+func getCommit(activity *model.Activity, buildInfo *JenkinsBuildInfo) {
 	if activity.CommitInfo != "" {
 		return
 	}
@@ -879,16 +873,16 @@ func getCommit(activity *pipeline.Activity, buildInfo *JenkinsBuildInfo) {
 }
 
 //parse jenkins rawoutput to steps,return true if status updated
-func parseSteps(actiStage *pipeline.ActivityStage, rawOutput string) bool {
+func parseSteps(actiStage *model.ActivityStage, rawOutput string) bool {
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
-	lastStatus := pipeline.ActivityStepBuilding
+	lastStatus := model.ActivityStepBuilding
 	var updated bool = false
 	if strings.HasSuffix(rawOutput, "  Finished: SUCCESS\n") {
-		lastStatus = pipeline.ActivityStepSuccess
-		actiStage.Status = pipeline.ActivityStageSuccess
+		lastStatus = model.ActivityStepSuccess
+		actiStage.Status = model.ActivityStageSuccess
 	} else if strings.HasSuffix(rawOutput, "  Finished: FAILURE\n") {
-		lastStatus = pipeline.ActivityStepFail
-		actiStage.Status = pipeline.ActivityStageFail
+		lastStatus = model.ActivityStepFail
+		actiStage.Status = model.ActivityStageFail
 	}
 	outputs := regexp.MustCompile(token).Split(rawOutput, -1)
 	//logrus.Infof("split to %v parts,steps number:%v, parse outputs:%v", len(outputs), len(actiStage.ActivitySteps), outputs)
@@ -912,7 +906,7 @@ func parseSteps(actiStage *pipeline.ActivityStage, rawOutput string) bool {
 		logrus.Debug("getting step %v", i)
 		if i < finishStepNum-1 {
 			//passed steps
-			step.Status = pipeline.ActivityStepSuccess
+			step.Status = model.ActivityStepSuccess
 			parseStepTime(step, outputs[i+1], actiStage.StartTS)
 			stageTime = stageTime + step.Duration
 		} else if i == finishStepNum-1 {
@@ -922,7 +916,7 @@ func parseSteps(actiStage *pipeline.ActivityStage, rawOutput string) bool {
 			stageTime = stageTime + step.Duration
 		} else {
 			//not run steps
-			step.Status = pipeline.ActivityStepWaiting
+			step.Status = model.ActivityStepWaiting
 		}
 		if prevStatus != step.Status {
 			updated = true
@@ -937,7 +931,7 @@ func parseSteps(actiStage *pipeline.ActivityStage, rawOutput string) bool {
 
 }
 
-func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int64) {
+func parseStepTime(step *model.ActivityStep, log string, activityStartTS int64) {
 	logrus.Infof("parsesteptime")
 	token := "(^|\\n)\\w{14}  "
 	r, _ := regexp.Compile(token)
@@ -957,7 +951,7 @@ func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int6
 	//compute step duration when done
 	step.StartTS = activityStartTS + (durationStart.Nanoseconds() / int64(time.Millisecond))
 
-	if step.Status != pipeline.ActivityStepSuccess && step.Status != pipeline.ActivityStepFail {
+	if step.Status != model.ActivityStepSuccess && step.Status != model.ActivityStepFail {
 		return
 	}
 
@@ -973,18 +967,18 @@ func parseStepTime(step *pipeline.ActivityStep, log string, activityStartTS int6
 }
 
 //ToActivity init an activity from pipeline def
-func ToActivity(p *pipeline.Pipeline) (*pipeline.Activity, error) {
+func ToActivity(p *model.Pipeline) (*model.Activity, error) {
 
 	//Find a jenkins slave on which to run
 	nodeName, err := getNodeNameToRun()
 	if err != nil {
-		return &pipeline.Activity{}, err
+		return &model.Activity{}, err
 	}
-	activity := &pipeline.Activity{
+	activity := &model.Activity{
 		Id:          uuid.Rand().Hex(),
 		Pipeline:    *p,
 		RunSequence: p.RunCount + 1,
-		Status:      pipeline.ActivityWaiting,
+		Status:      model.ActivityWaiting,
 		StartTS:     time.Now().UnixNano() / int64(time.Millisecond),
 		NodeName:    nodeName,
 	}
@@ -995,7 +989,7 @@ func ToActivity(p *pipeline.Pipeline) (*pipeline.Activity, error) {
 	return activity, nil
 }
 
-func initActivityEnvvars(activity *pipeline.Activity) {
+func initActivityEnvvars(activity *model.Activity) {
 	p := activity.Pipeline
 	vars := map[string]string{}
 	vars["CICD_PIPELINE_NAME"] = p.Name
@@ -1018,17 +1012,17 @@ func initActivityEnvvars(activity *pipeline.Activity) {
 	activity.EnvVars = vars
 }
 
-func ToActivityStage(stage *pipeline.Stage) *pipeline.ActivityStage {
-	actiStage := pipeline.ActivityStage{
+func ToActivityStage(stage *model.Stage) *model.ActivityStage {
+	actiStage := model.ActivityStage{
 		Name:          stage.Name,
 		NeedApproval:  stage.NeedApprove,
 		Status:        "Waiting",
-		ActivitySteps: []*pipeline.ActivityStep{},
+		ActivitySteps: []*model.ActivityStep{},
 	}
 	for _, step := range stage.Steps {
-		actiStep := &pipeline.ActivityStep{
+		actiStep := &model.ActivityStep{
 			Name:   step.Name,
-			Status: pipeline.ActivityStepWaiting,
+			Status: model.ActivityStepWaiting,
 		}
 		actiStage.ActivitySteps = append(actiStage.ActivitySteps, actiStep)
 	}
@@ -1045,7 +1039,7 @@ func QuoteShell(script string) string {
 	return escaped
 }
 
-func EscapeShell(activity *pipeline.Activity, script string) string {
+func EscapeShell(activity *model.Activity, script string) string {
 	escaped := strings.Replace(script, "\\", "\\\\", -1)
 	escaped = strings.Replace(escaped, "$", "\\$", -1)
 
@@ -1059,7 +1053,7 @@ func EscapeShell(activity *pipeline.Activity, script string) string {
 }
 
 //merely substitute envvars without escaping shell
-func SubstituteVar(activity *pipeline.Activity, text string) string {
+func SubstituteVar(activity *model.Activity, text string) string {
 	for k, v := range activity.EnvVars {
 		text = strings.Replace(text, "$"+k+" ", v, -1)
 		text = strings.Replace(text, "$"+k+"\n", v, -1)
@@ -1108,13 +1102,13 @@ func templateURLPath(path string) (string, string, string, string, bool) {
 	}
 }
 
-func getJobName(activity *pipeline.Activity, stageOrdinal int, stepOrdinal int) string {
+func getJobName(activity *model.Activity, stageOrdinal int, stepOrdinal int) string {
 	stage := activity.ActivityStages[stageOrdinal]
 	jobName := strings.Join([]string{activity.Pipeline.Name, activity.Id, stage.Name, strconv.Itoa(stepOrdinal)}, "_")
 	return jobName
 }
 
-func getStageJobsName(activity *pipeline.Activity, stageOrdinal int) string {
+func getStageJobsName(activity *model.Activity, stageOrdinal int) string {
 	stage := activity.ActivityStages[stageOrdinal]
 	jobsName := []string{}
 	for i := 0; i < len(stage.ActivitySteps); i++ {

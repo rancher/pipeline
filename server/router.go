@@ -1,4 +1,4 @@
-package restfulserver
+package server
 
 import (
 	"net/http"
@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
+	"github.com/rancher/pipeline/model"
 )
 
 //HandleError handle error from operation
@@ -17,7 +18,7 @@ func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) e
 			rw.Header().Set("Content-Type", "application/json")
 			StatusCode := 500
 			rw.WriteHeader(StatusCode)
-			e := Error{
+			e := model.Error{
 				Resource: client.Resource{
 					Type: "error",
 				},
@@ -31,7 +32,7 @@ func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) e
 
 //NewRouter router for schema
 func NewRouter(s *Server) *mux.Router {
-	schemas := NewSchema()
+	schemas := model.NewSchema()
 	router := mux.NewRouter().StrictSlash(true)
 	f := HandleError
 	// API framework routes
@@ -52,8 +53,6 @@ func NewRouter(s *Server) *mux.Router {
 
 	//activities
 	router.Methods(http.MethodGet).Path("/v1/activities").Handler(f(schemas, s.ListActivities))
-	router.Methods(http.MethodPost).Path("/v1/activity").Handler(f(schemas, s.CreateActivity))
-	router.Methods(http.MethodPost).Path("/v1/activities").Handler(f(schemas, s.CreateActivity))
 	router.Methods(http.MethodGet).Path("/v1/activities/{id}").Handler(f(schemas, s.GetActivity))
 	router.Methods(http.MethodDelete).Path("/v1/activities/{id}").Handler(f(schemas, s.DeleteActivity))
 	//router.Methods(http.MethodDelete).Path("/v1/activity").Handler(f(schemas, s.CleanActivities))
@@ -61,7 +60,6 @@ func NewRouter(s *Server) *mux.Router {
 	//scm accounts
 	router.Methods(http.MethodGet).Path("/v1/gitaccounts").Handler(f(schemas, s.ListAccounts))
 	router.Methods(http.MethodGet).Path("/v1/gitaccounts/{id}").Handler(f(schemas, s.GetAccount))
-	router.Methods(http.MethodPost).Path("/v1/gitaccountsdebug/{id}").Handler(f(schemas, s.DebugCreate))
 	router.Methods(http.MethodGet).Path("/v1/gitaccounts/{id}/repos").Handler(f(schemas, s.GetCacheRepos))
 	//settings
 	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
@@ -76,9 +74,8 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodPost).Path("/v1/events/stepfinish").Handler(f(schemas, s.StepFinish))
 	router.Methods(http.MethodPost).Path("/v1/events/stepstart").Handler(f(schemas, s.StepStart))
 
-	router.Methods(http.MethodPost).Path("/v1/github/login").Handler(f(schemas, s.GithubLogin))
-	//router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.GithubAuthorize))
-	router.Methods(http.MethodPost).Path("/v1/github/oauth").Handler(f(schemas, s.Oauth))
+	//webhook endpoint
+	router.Methods(http.MethodPost).Path("/v1/webhook").Handler(f(schemas, s.Webhook))
 	pipelineActions := map[string]http.Handler{
 		"run":        f(schemas, s.RunPipeline),
 		"update":     f(schemas, s.UpdatePipeline),
@@ -105,8 +102,7 @@ func NewRouter(s *Server) *mux.Router {
 
 	pipelineSettingActions := map[string]http.Handler{
 		"update":      f(schemas, s.UpdatePipelineSetting),
-		"githuboauth": f(schemas, s.Oauth),
-		"getrepos":    f(schemas, s.GithubGetRepos),
+		"githuboauth": f(schemas, s.GithubOauth),
 	}
 	for name, actions := range pipelineSettingActions {
 		router.Methods(http.MethodPost).Path("/v1/settings").Queries("action", name).Handler(actions)

@@ -1,13 +1,10 @@
-package restfulserver
+package model
 
 import (
 	"net/http"
 
-	"github.com/rancher/pipeline/scm"
-
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
-	"github.com/rancher/pipeline/pipeline"
 )
 
 func NewSchema() *client.Schemas {
@@ -15,10 +12,10 @@ func NewSchema() *client.Schemas {
 	schemas.AddType("error", Error{})
 	schemas.AddType("apiVersion", client.Resource{})
 	schemas.AddType("schema", client.Schema{})
-	pipelineSchema(schemas.AddType("pipeline", pipeline.Pipeline{}))
-	acitvitySchema(schemas.AddType("activity", pipeline.Activity{}))
-	pipelineSettingSchema(schemas.AddType("setting", pipeline.PipelineSetting{}))
-	accountSchema(schemas.AddType("gitaccount", scm.Account{}))
+	pipelineSchema(schemas.AddType("pipeline", Pipeline{}))
+	acitvitySchema(schemas.AddType("activity", Activity{}))
+	pipelineSettingSchema(schemas.AddType("setting", PipelineSetting{}))
+	accountSchema(schemas.AddType("gitaccount", GitAccount{}))
 	return schemas
 }
 
@@ -122,15 +119,15 @@ func accountSchema(account *client.Schema) {
 	}
 }
 
-func toPipelineCollections(apiContext *api.ApiContext, pipelines []*pipeline.Pipeline) []interface{} {
+func ToPipelineCollections(apiContext *api.ApiContext, pipelines []*Pipeline) []interface{} {
 	var r []interface{}
 	for _, p := range pipelines {
-		r = append(r, toPipelineResource(apiContext, p))
+		r = append(r, ToPipelineResource(apiContext, p))
 	}
 	return r
 }
 
-func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline) *pipeline.Pipeline {
+func ToPipelineResource(apiContext *api.ApiContext, pipeline *Pipeline) *Pipeline {
 	pipeline.Resource = client.Resource{
 		Id:      pipeline.Id,
 		Type:    "pipeline",
@@ -149,7 +146,7 @@ func toPipelineResource(apiContext *api.ApiContext, pipeline *pipeline.Pipeline)
 	return pipeline
 }
 
-func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipeline.Activity {
+func ToActivityResource(apiContext *api.ApiContext, a *Activity) *Activity {
 	a.Resource = client.Resource{
 		Id:      a.Id,
 		Type:    "activity",
@@ -159,9 +156,9 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 	a.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=update"
 	a.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=remove"
 	//TODO if a.Iscomplete()
-	if a.Status != pipeline.ActivityWaiting &&
-		a.Status != pipeline.ActivityBuilding &&
-		a.Status != pipeline.ActivityPending {
+	if a.Status != ActivityWaiting &&
+		a.Status != ActivityBuilding &&
+		a.Status != ActivityPending {
 		a.Actions["rerun"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=rerun"
 	} else {
 		a.Actions["stop"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=stop"
@@ -172,7 +169,7 @@ func toActivityResource(apiContext *api.ApiContext, a *pipeline.Activity) *pipel
 	return a
 }
 
-func toAccountResource(apiContext *api.ApiContext, account *scm.Account) *scm.Account {
+func ToAccountResource(apiContext *api.ApiContext, account *GitAccount) *GitAccount {
 	account.Resource = client.Resource{
 		Id:      account.Id,
 		Type:    "gitaccount",
@@ -187,10 +184,11 @@ func toAccountResource(apiContext *api.ApiContext, account *scm.Account) *scm.Ac
 	account.Actions["refreshrepos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=refreshrepos"
 	account.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=remove"
 	account.Links["repos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "/repos"
+	account.AccessToken = ""
 	return account
 }
 
-func toPipelineSettingResource(apiContext *api.ApiContext, setting *pipeline.PipelineSetting) *pipeline.PipelineSetting {
+func ToPipelineSettingResource(apiContext *api.ApiContext, setting *PipelineSetting) *PipelineSetting {
 	setting.Resource = client.Resource{
 		Type:    "setting",
 		Actions: map[string]string{},
@@ -198,16 +196,6 @@ func toPipelineSettingResource(apiContext *api.ApiContext, setting *pipeline.Pip
 	}
 	setting.Actions["update"] = apiContext.UrlBuilder.Current() + "?action=update" //apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
 	setting.Actions["githuboauth"] = apiContext.UrlBuilder.Current() + "?action=githuboauth"
-	setting.Actions["getrepos"] = apiContext.UrlBuilder.Current() + "?action=getrepos"
 
 	return setting
-}
-
-func initActivityResource(a *pipeline.Activity) {
-	a.Resource = client.Resource{
-		Id:      a.Id,
-		Type:    "activity",
-		Actions: map[string]string{},
-		Links:   map[string]string{},
-	}
 }

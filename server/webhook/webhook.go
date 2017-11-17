@@ -4,12 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/config"
-	"github.com/rancher/pipeline/pipeline"
 	"github.com/rancher/pipeline/util"
 )
 
@@ -73,7 +71,7 @@ func CreateCIEndpointWebhook() error {
 		Config: map[string]string{
 			"projectId":   projectId,
 			"serviceName": "pipeline-server",
-			"port":        "60081",
+			"port":        "60080",
 			"path":        "/v1/webhook",
 		},
 	}
@@ -92,68 +90,5 @@ func CreateCIEndpointWebhook() error {
 	logrus.Infof("Created and Using webhook '%s' as CI Endpoint.", wh.URL)
 	//get CIWebhookEndpoint
 	CIWebhookEndpoint = wh.URL
-	return nil
-}
-
-func DeleteWebhook(p *pipeline.Pipeline, token string) error {
-	logrus.Infof("deletewebhook for pipeline:%v", p.Id)
-	if p == nil {
-		return errors.New("empty pipeline to delete webhook")
-	}
-
-	//delete webhook
-	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		if p.WebHookId > 0 {
-			//TODO
-			repoUrl := p.Stages[0].Steps[0].Repository
-			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
-			match := reg.FindStringSubmatch(repoUrl)
-			if len(match) != 3 {
-				logrus.Infof("get match:%v", match)
-				logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
-				return errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
-			}
-			user := match[1]
-			repo := match[2]
-			err := util.DeleteWebhook(user, repo, token, p.WebHookId)
-			if err != nil {
-				logrus.Errorf("error delete webhook,%v", err)
-				return err
-			}
-			p.WebHookId = 0
-		}
-	}
-	return nil
-}
-
-func CreateWebhook(p *pipeline.Pipeline, token string) error {
-	logrus.Debugf("createwebhook for pipeline:%v", p.Id)
-	if p == nil {
-		return errors.New("empty pipeline to create webhook")
-	}
-
-	//create webhook
-	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
-		if p.Stages[0].Steps[0].Webhook {
-			repoUrl := p.Stages[0].Steps[0].Repository
-			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
-			match := reg.FindStringSubmatch(repoUrl)
-			if len(match) < 3 {
-				logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
-				return errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
-			}
-			user := match[1]
-			repo := match[2]
-			secret := p.WebHookToken
-			webhookUrl := fmt.Sprintf("%s&pipelineId=%s", CIWebhookEndpoint, p.Id)
-			id, err := util.CreateWebhook(user, repo, token, webhookUrl, secret)
-			logrus.Debugf("Creating webhook:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
-			if err != nil {
-				logrus.Errorf("error delete webhook,%v", err)
-				return err
-			}
-			p.WebHookId = id
-		}
-	}
 	return nil
 }

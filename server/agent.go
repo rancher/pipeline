@@ -1,4 +1,4 @@
-package restfulserver
+package server
 
 import (
 	"sync"
@@ -6,8 +6,9 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/rancher/pipeline/git"
-	"github.com/rancher/pipeline/pipeline"
+	"github.com/rancher/pipeline/model"
 	"github.com/rancher/pipeline/scheduler"
+	"github.com/rancher/pipeline/server/service"
 	"github.com/sluu99/uuid"
 	"golang.org/x/sync/syncmap"
 )
@@ -80,7 +81,7 @@ func (a *Agent) handleWS() {
 
 func (a *Agent) RunScheduler() {
 
-	pipelines := a.Server.PipelineContext.ListPipelines()
+	pipelines := service.ListPipelines()
 	for _, pipeline := range pipelines {
 		if pipeline.IsActivate && pipeline.CronTrigger.Spec != "" {
 			cr := scheduler.NewCronRunner(pipeline.Id, pipeline.CronTrigger.Spec, pipeline.CronTrigger.Timezone)
@@ -98,7 +99,7 @@ func (a *Agent) RunScheduler() {
 	}
 }
 
-func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
+func (a *Agent) onPipelineChange(p *model.Pipeline) {
 	logrus.Debugf("on pipeline change")
 	pId := p.Id
 	spec := ""
@@ -114,8 +115,8 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 		cr := scheduler.NewCronRunner(pId, spec, timezone)
 		a.registerCronRunnerC <- cr
 	}
-	p.NextRunTime = pipeline.GetNextRunTime(p)
-	a.Server.PipelineContext.UpdatePipeline(p)
+	p.NextRunTime = service.GetNextRunTime(p)
+	service.UpdatePipeline(p)
 	a.broadcast <- WSMsg{
 		Id:           uuid.Rand().Hex(),
 		Name:         "resource.change",
@@ -126,7 +127,7 @@ func (a *Agent) onPipelineChange(p *pipeline.Pipeline) {
 
 }
 
-func (a *Agent) onPipelineDelete(p *pipeline.Pipeline) {
+func (a *Agent) onPipelineDelete(p *model.Pipeline) {
 	pId := p.Id
 	if p.IsActivate {
 		a.unregisterCronRunnerC <- pId
@@ -140,7 +141,7 @@ func (a *Agent) onPipelineDelete(p *pipeline.Pipeline) {
 		Data:         p,
 	}
 }
-func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
+func (a *Agent) onPipelineActivate(p *model.Pipeline) {
 	if p.CronTrigger.Spec != "" {
 		pId := p.Id
 		spec := p.CronTrigger.Spec
@@ -157,7 +158,7 @@ func (a *Agent) onPipelineActivate(p *pipeline.Pipeline) {
 	}
 }
 
-func (a *Agent) onPipelineDeActivate(p *pipeline.Pipeline) {
+func (a *Agent) onPipelineDeActivate(p *model.Pipeline) {
 	a.unregisterCronRunnerC <- p.Id
 	a.broadcast <- WSMsg{
 		Id:           uuid.Rand().Hex(),
@@ -183,7 +184,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	if cr.Spec != "" {
 		err := cr.AddFunc(cr.Spec, func() {
 			logrus.Debugf("invoke pipeline %v cron job", cr.PipelineId)
-			ppl := a.Server.PipelineContext.GetPipelineById(pId)
+			ppl := service.GetPipelineById(pId)
 			latestCommit, err := git.BranchHeadCommit(ppl.Stages[0].Steps[0].Repository, ppl.Stages[0].Steps[0].Branch)
 			if err != nil {
 				logrus.Errorf("cron job fail,Error:%v", err)
@@ -192,9 +193,9 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 			if ppl.CronTrigger.TriggerOnUpdate && latestCommit == ppl.CommitInfo {
 				//run only when new changes exist
 				//update nextruntime and return
-				ppl.NextRunTime = pipeline.GetNextRunTime(ppl)
+				ppl.NextRunTime = service.GetNextRunTime(ppl)
 
-				if err := a.Server.PipelineContext.UpdatePipeline(ppl); err != nil {
+				if err := service.UpdatePipeline(ppl); err != nil {
 					logrus.Errorf("update pipeline error,%v", err)
 				}
 				a.broadcast <- WSMsg{
@@ -206,7 +207,7 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 				}
 				return
 			}
-			_, err = a.Server.PipelineContext.RunPipeline(pId, pipeline.TriggerTypeCron)
+			_, err = service.RunPipeline(a.Server.Provider, pId, model.TriggerTypeCron)
 			if err != nil {
 				logrus.Errorf("cron job fail,pid:%v", pId)
 				return
@@ -238,7 +239,6 @@ func (a *Agent) getActivityLock(activityId string) *sync.Mutex {
 		mutex := &sync.Mutex{}
 		a.activityLocks.Store(activityId, mutex)
 		return mutex
-	} else {
-		return lock.(*sync.Mutex)
 	}
+	return lock.(*sync.Mutex)
 }

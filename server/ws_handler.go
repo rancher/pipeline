@@ -1,8 +1,4 @@
-// Copyright 2013 The Gorilla WebSocket Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-package restfulserver
+package server
 
 import (
 	"bytes"
@@ -15,6 +11,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
+	"github.com/rancher/pipeline/server/service"
 	"github.com/sluu99/uuid"
 )
 
@@ -87,7 +84,7 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 		pollTicker.Stop()
 		ws.Close()
 	}()
-	activity, err := GetActivity(activityId, s.PipelineContext)
+	activity, err := service.GetActivity(activityId)
 	if err != nil {
 		return
 	}
@@ -100,7 +97,7 @@ func (s *Server) stepLogWriter(ws *websocket.Conn, activityId string, stageOrdin
 
 			paras := map[string]interface{}{}
 			paras["prevLog"] = &prevLog
-			stepLog, err := s.PipelineContext.Provider.GetStepLog(&activity, stageOrdinal, stepOrdinal, paras)
+			stepLog, err := s.Provider.GetStepLog(activity, stageOrdinal, stepOrdinal, paras)
 			if err != nil {
 				logrus.Errorf("error get steplog,%v", err)
 				return

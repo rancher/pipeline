@@ -1,16 +1,15 @@
-package restfulserver
+package server
 
 import (
 	"encoding/json"
-	"net/http"
 	"time"
 
-	"github.com/rancher/pipeline/scm"
+	"github.com/rancher/pipeline/model"
+	"github.com/rancher/pipeline/server/service"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
 	"github.com/rancher/go-rancher/api"
-	"github.com/rancher/pipeline/pipeline"
 )
 
 var (
@@ -62,28 +61,28 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 				return
 			}
 			switch v := message.Data.(type) {
-			case pipeline.Activity:
-				if !validAccountAccessById(uid, v.Pipeline.Stages[0].Steps[0].GitUser) {
+			case *model.Activity:
+				if !service.ValidAccountAccessById(uid, v.Pipeline.Stages[0].Steps[0].GitUser) {
 					continue
 				}
-				toActivityResource(apiContext, &v)
-				if canApprove(uid, &v) {
+				model.ToActivityResource(apiContext, v)
+				if v.CanApprove(uid) {
 					//add approve action
 					v.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(v.Resource) + "?action=approve"
 					v.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(v.Resource) + "?action=deny"
 				}
 				message.Data = v
-			case *pipeline.Pipeline:
-				if !validAccountAccessById(uid, v.Stages[0].Steps[0].GitUser) {
+			case *model.Pipeline:
+				if !service.ValidAccountAccessById(uid, v.Stages[0].Steps[0].GitUser) {
 					continue
 				}
-				toPipelineResource(apiContext, v)
+				model.ToPipelineResource(apiContext, v)
 				message.Data = v
-			case *scm.Account:
+			case *model.GitAccount:
 				if v.RancherUserID != uid && v.Private {
 					continue
 				}
-				toAccountResource(apiContext, v)
+				model.ToAccountResource(apiContext, v)
 				message.Data = v
 			}
 
@@ -108,29 +107,4 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 			}
 		}
 	}
-}
-
-func (s *Server) ServeStatusWS(w http.ResponseWriter, r *http.Request) error {
-	apiContext := api.GetApiContext(r)
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		if _, ok := err.(websocket.HandshakeError); !ok {
-			logrus.Errorf("ws handshake error")
-		}
-		return err
-	}
-	uid, err := GetCurrentUser(r.Cookies())
-	//logrus.Infof("got currentUser,%v,%v", uid, err)
-	if err != nil || uid == "" {
-		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
-	}
-	connHolder := &ConnHolder{agent: MyAgent, conn: conn, send: make(chan WSMsg)}
-
-	connHolder.agent.register <- connHolder
-
-	//new go routines
-	go connHolder.DoWrite(apiContext, uid)
-	connHolder.DoRead()
-
-	return nil
 }
