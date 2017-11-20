@@ -22,6 +22,8 @@ Pipeline server is the API server in CICD system. It provides API to handle Pipe
 
 Jenkins is the executor of CICD tasks. Jenkins jobs are configured and triggered by Pipeline server. Jenkins does what pipeline server ask and it will call back pipeline server on specific events(such as jobs start/end) to update activity status. Jenkins also stores detail logs of the activities and workspace contents in file system, which is mounted in local docker volumes. You can add arbitrary Jenkins slave by setting CICD catalog configuration according to your workload needs. Rancher cli and a dedicated tool running on Jenkins Jobs can directly talk to Rancher Server to do specific tasks, such as getting registry credential for pushing images, and deploying to Rancher environments.
 
+Docker socket is bind mounted on slaves so slave nodes can leverage docker functionalities from docker on the host. However it is not exposed in the container that runs user-custom tasks. So the docker socket is not directly exposed to the users.
+
 ## Pipeline
 
 Pipelines are the construct defining a CI flow. A Pipeline consists of stages and a stage consists of steps. Steps are minimum execution units that do the CI actions. Steps in the same stage can run in sequence or parallel while stages run in sequence. An execution of a pipeline is called an activity. An activity contains its pipeline model and the runtime status of the execution. Pipelines are expected to start with a SCM step.
