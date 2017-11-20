@@ -90,3 +90,40 @@ func CreateOrUpdatePipelineSetting(setting *model.PipelineSetting) error {
 	})
 	return err
 }
+
+func Reset() error {
+	if err := cleanGO("activity"); err != nil {
+		return err
+	}
+	if err := cleanGO("pipeline"); err != nil {
+		return err
+	}
+	if err := cleanGO("pipelineSetting"); err != nil {
+		return err
+	}
+	if err := cleanGO("gitaccount"); err != nil {
+		return err
+	}
+	if err := cleanGO("repocache"); err != nil {
+		return err
+	}
+	return nil
+}
+
+func cleanGO(kind string) error {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	data, err := PaginateGenericObjects(kind)
+	if err != nil {
+		return err
+	}
+	for _, gobj := range data {
+		if err := apiClient.GenericObject.Delete(&gobj); err != nil {
+			return err
+		}
+	}
+	return nil
+
+}

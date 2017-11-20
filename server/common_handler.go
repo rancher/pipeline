@@ -213,3 +213,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 
 	return nil
 }
+
+func (s *Server) Reset(rw http.ResponseWriter, req *http.Request) error {
+	return service.Reset()
+}

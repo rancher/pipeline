@@ -102,6 +102,7 @@ func NewRouter(s *Server) *mux.Router {
 
 	pipelineSettingActions := map[string]http.Handler{
 		"update":      f(schemas, s.UpdatePipelineSetting),
+		"reset":       f(schemas, s.Reset),
 		"githuboauth": f(schemas, s.GithubOauth),
 	}
 	for name, actions := range pipelineSettingActions {
