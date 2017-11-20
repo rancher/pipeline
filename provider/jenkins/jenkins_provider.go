@@ -511,18 +511,18 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		stringBuilder.WriteString(". ${PWD}/.r_cicd.env\n")
 		if step.Dockerfile == "" {
 			buildPath := "."
-			dockerfileName := "Dockerfile"
-			if step.DockerfilePath != "" {
-				buildPath = step.DockerfilePath
+			if step.BuildPath != "" {
+				buildPath = step.BuildPath
 			}
-			if step.DockerfileName != "" {
-				dockerfileName = step.DockerfileName
+			dockerfilePath := "Dockerfile"
+			if step.DockerfilePath != "" {
+				dockerfilePath = step.DockerfilePath
 			}
 			stringBuilder.WriteString("set -xe\n")
 			stringBuilder.WriteString("docker build --tag ")
 			stringBuilder.WriteString(QuoteShell(step.TargetImage))
 			stringBuilder.WriteString(" ")
-			stringBuilder.WriteString("-f " + QuoteShell(dockerfileName))
+			stringBuilder.WriteString("-f " + QuoteShell(dockerfilePath))
 			stringBuilder.WriteString(" ")
 			stringBuilder.WriteString(QuoteShell(buildPath))
 			stringBuilder.WriteString(";")

@@ -126,7 +126,7 @@ type Step struct {
 	Webhook    bool   `json:"webhook" yaml:"webhook,omitempty"`
 	//---Build step
 	Dockerfile     string `json:"dockerFileContent,omitempty" yaml:"dockerFileContent,omitempty"`
-	DockerfileName string `json:"dockerFileName,omitempty" yaml:"dockerFileName,omitempty"`
+	BuildPath      string `json:"buildPath,omitempty" yaml:"buildPath,omitempty"`
 	DockerfilePath string `json:"dockerFilePath,omittempty" yaml:"dockerFilePath,omitempty"`
 	TargetImage    string `json:"targetImage,omitempty" yaml:"targetImage,omitempty"`
 	PushFlag       bool   `json:"push" yaml:"push,omitempty"`
