@@ -84,6 +84,12 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 				}
 				model.ToAccountResource(apiContext, v)
 				message.Data = v
+			case *model.PipelineSetting:
+				model.ToPipelineSettingResource(apiContext, v)
+				message.Data = v
+			case *model.SCMSetting:
+				model.ToSCMSettingResource(apiContext, v)
+				message.Data = v
 			}
 
 			b, err := json.Marshal(message)

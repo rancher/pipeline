@@ -2,86 +2,68 @@ package server
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/google/go-github/github"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/pipeline/model"
-	"github.com/rancher/pipeline/scm"
 	"github.com/rancher/pipeline/server/service"
 	"github.com/rancher/pipeline/util"
 	"github.com/sluu99/uuid"
 )
 
 func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
-	var signature string
-	var event_type string
-	logrus.Debugln("get webhook request")
 	logrus.Debugf("get header:%v", req.Header)
 	logrus.Debugf("get url:%v", req.RequestURI)
 
-	if signature = req.Header.Get("X-Hub-Signature"); len(signature) == 0 {
-		return errors.New("No signature!")
-	}
-	if event_type = req.Header.Get("X-GitHub-Event"); len(event_type) == 0 {
-		return errors.New("No event!")
-	}
-
-	if event_type == "ping" {
-		rw.Write([]byte("pong"))
-		return nil
-	}
-	if event_type != "push" {
-		logrus.Errorf("not push event")
-		return errors.New("not push event")
+	var manager model.SCManager
+	var err error
+	var eventType string
+	if eventType = req.Header.Get("X-GitHub-Event"); len(eventType) != 0 {
+		logrus.Debug("receive webhook from github")
+		manager, err = service.GetSCManager("github")
+		if err != nil {
+			return err
+		}
+	} else if eventType = req.Header.Get("X-Gitlab-Event"); len(eventType) != 0 {
+		logrus.Debug("receive webhook from gitlab")
+		manager, err = service.GetSCManager("gitlab")
+		if err != nil {
+			return err
+		}
+	} else {
+		//TODO generic webhook
+		return errors.New("Unknown webhook source")
 	}
 
 	id := req.FormValue("pipelineId")
-	body, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		return err
-	}
-
-	r := service.GetPipelineById(id)
-	if r == nil {
+	pipeline := service.GetPipelineById(id)
+	if pipeline == nil {
 		err := errors.Wrapf(model.ErrPipelineNotFound, "pipeline <%s>", id)
 		rw.WriteHeader(http.StatusInternalServerError)
 		rw.Write([]byte("pipeline not found!"))
 		return err
 	}
-	//TODO
-	logrus.Debugf("webhook trigger,id:%v,event:%v,signature:%v,body:\n%v\n%v", id, event_type, signature, body, string(body))
-	if !scm.VerifyGithubWebhookSignature([]byte(r.WebHookToken), signature, body) {
-		return errors.New("Invalid signature")
+	if !pipeline.IsActivate {
+		logrus.Errorf("pipeline is not activated!")
+		return errors.New("pipeline is not activated")
 	}
+	if !manager.VerifyWebhookPayload(pipeline, req) {
+		return errors.New("verify webhook fail")
+	}
+
 	logrus.Debugf("token validate pass")
 
-	//check branch
-	payload := &github.WebHookPayload{}
-	if err := json.Unmarshal(body, payload); err != nil {
-		return err
-	}
-	if *payload.Ref != "refs/heads/"+r.Stages[0].Steps[0].Branch {
-		logrus.Warningf("branch not match:%v,%v", *payload.Ref, r.Stages[0].Steps[0].Branch)
-		return nil
-	}
-
-	if !r.IsActivate {
-		logrus.Errorf("pipeline is not activated!")
-		return errors.New("pipeline is not activated!")
-	}
 	if _, err = service.RunPipeline(s.Provider, id, model.TriggerTypeWebhook); err != nil {
 		rw.Write([]byte("run pipeline error!"))
 		return err
 	}
 	rw.Write([]byte("run pipeline success!"))
-	logrus.Infof("webhook run success")
+	logrus.Infof("webhook trigger run for '%s' success", pipeline.Name)
 	return nil
 }
 

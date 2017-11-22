@@ -63,6 +63,9 @@ func NewRouter(s *Server) *mux.Router {
 	router.Methods(http.MethodGet).Path("/v1/gitaccounts/{id}/repos").Handler(f(schemas, s.GetCacheRepos))
 	//settings
 	router.Methods(http.MethodGet).Path("/v1/settings").Handler(f(schemas, s.GetPipelineSetting))
+	router.Methods(http.MethodGet).Path("/v1/settings/scmsettings").Handler(f(schemas, s.ListSCMSetting))
+	router.Methods(http.MethodGet).Path("/v1/scmsettings/{id}").Handler(f(schemas, s.GetSCMSetting))
+	router.Methods(http.MethodGet).Path("/v1/scmsettings").Handler(f(schemas, s.ListSCMSetting))
 
 	router.Methods(http.MethodGet).Path("/v1/envvars").Handler(f(schemas, s.ListEnvVars))
 
@@ -101,12 +104,20 @@ func NewRouter(s *Server) *mux.Router {
 	}
 
 	pipelineSettingActions := map[string]http.Handler{
-		"update":      f(schemas, s.UpdatePipelineSetting),
-		"reset":       f(schemas, s.Reset),
-		"githuboauth": f(schemas, s.GithubOauth),
+		"update": f(schemas, s.UpdatePipelineSetting),
+		"reset":  f(schemas, s.Reset),
+		"oauth":  f(schemas, s.Oauth),
 	}
 	for name, actions := range pipelineSettingActions {
 		router.Methods(http.MethodPost).Path("/v1/settings").Queries("action", name).Handler(actions)
+	}
+
+	scmSettingActions := map[string]http.Handler{
+		"update": f(schemas, s.UpdateSCMSetting),
+		"remove": f(schemas, s.RemoveSCMSetting),
+	}
+	for name, actions := range scmSettingActions {
+		router.Methods(http.MethodPost).Path("/v1/scmsettings/{id}").Queries("action", name).Handler(actions)
 	}
 
 	accountActions := map[string]http.Handler{

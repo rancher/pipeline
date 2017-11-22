@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/rancher/pipeline/scm"
-
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/handlers"
 	v2client "github.com/rancher/go-rancher/v2"
@@ -25,7 +23,6 @@ func NewServer(provider model.PipelineProvider) *Server {
 	s := &Server{
 		Provider: provider,
 	}
-	s.registerSCManagers()
 	return s
 }
 
@@ -108,18 +105,4 @@ func checkCIEndpoint() error {
 
 	}
 	return nil
-}
-
-func (s *Server) registerSCManagers() {
-	s.SCManagers = map[string]model.SCManager{}
-	s.SCManagers["github"] = scm.GithubManager{}
-}
-
-func (s *Server) getSCM(scmType string) model.SCManager {
-	manager, ok := s.SCManagers[scmType]
-	if !ok {
-		logrus.Warnf("cannot find source code manager for '%s', using github as default", scmType)
-		manager = scm.GithubManager{}
-	}
-	return manager
 }

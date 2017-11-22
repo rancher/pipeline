@@ -105,85 +105,117 @@ func (s *Server) UnshareAccount(rw http.ResponseWriter, req *http.Request) error
 }
 
 func (s *Server) RefreshRepos(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	//TODO
-	scmType := "github"
-	repos, err := service.RefreshRepos(s.getSCM(scmType), id)
+	repos, err := service.RefreshRepos(id)
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(repos)
-	if err != nil {
-		return err
+	result := []interface{}{}
+	for _, repo := range repos {
+		result = append(result, model.ToRepositoryResource(apiContext, repo))
 	}
-	if _, err = rw.Write(b); err != nil {
-		return err
-	}
-
+	apiContext.Write(&v1client.GenericCollection{
+		Data: result,
+	})
 	return nil
 }
 
 func (s *Server) GetCacheRepos(rw http.ResponseWriter, req *http.Request) error {
+	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 	if !service.ValidAccountAccess(req, id) {
 		return fmt.Errorf("cannot access account '%s'", id)
 	}
-	//TODO
-	scmType := "github"
-	repos, err := service.GetCacheRepoList(s.getSCM(scmType), id)
+	repos, err := service.GetCacheRepoList(id)
 	if err != nil {
 		return err
 	}
-
-	if _, err = rw.Write([]byte(repos.(string))); err != nil {
-		return err
+	result := []interface{}{}
+	for _, repo := range repos {
+		result = append(result, model.ToRepositoryResource(apiContext, repo))
 	}
-
+	apiContext.Write(&v1client.GenericCollection{
+		Data: result,
+	})
 	return nil
 }
 
-func (s *Server) GithubOauth(rw http.ResponseWriter, req *http.Request) error {
+func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	requestBody := make(map[string]interface{})
 	requestBytes, err := ioutil.ReadAll(req.Body)
 	if err := json.Unmarshal(requestBytes, &requestBody); err != nil {
 		return err
 	}
-	var code, githubClientID, githubClientSecret, githubRedirectURL string
+	var code, scmType, clientID, clientSecret, redirectURL, schema, hostName string
 	if requestBody["code"] != nil {
 		code = requestBody["code"].(string)
 	}
-	if requestBody["githubClientID"] != nil {
-		githubClientID = requestBody["githubClientID"].(string)
+	if requestBody["clientID"] != nil {
+		clientID = requestBody["clientID"].(string)
 	}
-	if requestBody["githubClientSecret"] != nil {
-		githubClientSecret = requestBody["githubClientSecret"].(string)
+	if requestBody["clientSecret"] != nil {
+		clientSecret = requestBody["clientSecret"].(string)
 	}
-	if requestBody["githubRedirectURL"] != nil {
-		githubRedirectURL = requestBody["githubRedirectURL"].(string)
+	if requestBody["redirectURL"] != nil {
+		redirectURL = requestBody["redirectURL"].(string)
+	}
+	if requestBody["schema"] != nil {
+		schema = requestBody["schema"].(string)
+	}
+	if requestBody["hostName"] != nil {
+		hostName = requestBody["hostName"].(string)
+	}
+	if requestBody["scmType"] != nil {
+		scmType = requestBody["scmType"].(string)
 	}
 
-	logrus.Debugf("get vars:%v,%v,%v,%v", code, githubClientID, githubClientSecret, githubRedirectURL)
-	if githubClientID == "" || githubClientSecret == "" || githubRedirectURL == "" {
-		setting, err := service.GetPipelineSetting()
+	logrus.Debugf("get vars:%v,%v,%v,%v", code, clientID, clientSecret, redirectURL)
+	var account *model.GitAccount
+	if clientID == "" || clientSecret == "" || redirectURL == "" {
+		setting, err := service.GetSCMSetting(scmType)
 		if err != nil {
 			return err
 		}
 		if !setting.IsAuth {
 			return fmt.Errorf("auth not set")
 		}
-		githubClientID = setting.GithubClientID
-		githubClientSecret = setting.GithubClientSecret
-		githubRedirectURL = setting.GithubRedirectURL
-	} else {
-		if err := saveOauthConfig(githubClientID, githubClientSecret, githubRedirectURL); err != nil {
+		clientID = setting.ClientID
+		clientSecret = setting.ClientSecret
+		redirectURL = setting.RedirectURL
+
+		SCManager, err := service.GetSCManager(scmType)
+		if err != nil {
 			return err
 		}
-	}
-	githubManager := s.getSCM("github")
-	account, err := githubManager.OAuth(githubRedirectURL, githubClientID, githubClientSecret, code)
-	if err != nil {
-		return err
+
+		account, err = SCManager.OAuth(redirectURL, clientID, clientSecret, code)
+		if err != nil {
+			return err
+		}
+	} else {
+		setting := &model.SCMSetting{}
+		setting.IsAuth = true
+		setting.Id = scmType
+		setting.ClientID = clientID
+		setting.ClientSecret = clientSecret
+		setting.RedirectURL = redirectURL
+		setting.Schema = schema
+		setting.HostName = hostName
+		setting.ScmType = scmType
+		SCManager, err := service.GetSCManagerFromSetting(setting)
+		if err != nil {
+			return err
+		}
+		account, err = SCManager.OAuth(redirectURL, clientID, clientSecret, code)
+		if err != nil {
+			return err
+		}
+		//init scmSetting on success
+		if err := service.CreateOrUpdateSCMSetting(setting); err != nil {
+			return err
+		}
 	}
 	uid, err := util.GetCurrentUser(req.Cookies())
 	if err == nil && uid != "" {
@@ -192,13 +224,7 @@ func (s *Server) GithubOauth(rw http.ResponseWriter, req *http.Request) error {
 	existing, err := service.GetAccount(account.Id)
 	if err == nil && existing != nil {
 		//git account exists
-		if existing.RancherUserID != uid {
-			return fmt.Errorf("this git account is authed by other user '%s'", existing.RancherUserID)
-		}
-		if err := service.UpdateAccount(existing); err != nil {
-			return err
-		}
-		return fmt.Errorf("Github account '%s' is authed, to add another github account using oauth, you need to log out on github", account.Login)
+		return fmt.Errorf("%s account '%s' is authed, to add another account using oauth, you need to log out on %s first", account.AccountType, account.Login, account.AccountType)
 	}
 
 	//new account added
@@ -213,28 +239,21 @@ func (s *Server) GithubOauth(rw http.ResponseWriter, req *http.Request) error {
 		Time:         time.Now(),
 		Data:         account,
 	}
-	//TODO
-	scmType := "github"
-	go service.RefreshRepos(s.getSCM(scmType), account.Id)
-	ps, err := service.GetPipelineSetting()
+	go service.RefreshRepos(account.Id)
+	setting, err := service.GetSCMSetting(scmType)
 	if err != nil {
 		return err
 	}
-	model.ToPipelineSettingResource(apiContext, ps)
-	if err = apiContext.WriteResource(ps); err != nil {
+	MyAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: "scmSetting",
+		Time:         time.Now(),
+		Data:         setting,
+	}
+	model.ToSCMSettingResource(apiContext, setting)
+	if err = apiContext.WriteResource(setting); err != nil {
 		return err
 	}
 	return nil
-}
-
-func saveOauthConfig(githubClientID string, githubClientSecret string, githubRedirectURL string) error {
-	setting, err := service.GetPipelineSetting()
-	if err != nil {
-		return err
-	}
-	setting.GithubClientID = githubClientID
-	setting.GithubClientSecret = githubClientSecret
-	setting.GithubRedirectURL = githubRedirectURL
-	setting.IsAuth = true
-	return service.CreateOrUpdatePipelineSetting(setting)
 }

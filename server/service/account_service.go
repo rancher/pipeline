@@ -14,8 +14,13 @@ import (
 const GIT_ACCOUNT_TYPE = "gitaccount"
 const REPO_CACHE_TYPE = "repocache"
 
-func RefreshRepos(manager model.SCManager, accountId string) (interface{}, error) {
+func RefreshRepos(accountId string) ([]*model.GitRepository, error) {
+
 	account, err := GetAccount(accountId)
+	if err != nil {
+		return nil, err
+	}
+	manager, err := GetSCManager(account.AccountType)
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +173,7 @@ func RemoveAccount(id string) error {
 	return apiClient.GenericObject.Delete(&existing)
 }
 
-func CleanAccounts() error {
+func CleanAccounts(scmType string) error {
 
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
@@ -180,7 +185,14 @@ func CleanAccounts() error {
 		return err
 	}
 	for _, gobj := range geObjList {
-		apiClient.GenericObject.Delete(&gobj)
+		account := &model.GitAccount{}
+		if err := json.Unmarshal([]byte(gobj.ResourceData["data"].(string)), account); err != nil {
+			logrus.Errorf("parse data got error:%v", err)
+			continue
+		}
+		if account.AccountType == scmType {
+			apiClient.GenericObject.Delete(&gobj)
+		}
 	}
 	return nil
 }
@@ -206,7 +218,7 @@ func CreateAccount(account *model.GitAccount) error {
 	return err
 }
 
-func GetCacheRepoList(manager model.SCManager, accountId string) (interface{}, error) {
+func GetCacheRepoList(accountId string) ([]*model.GitRepository, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return nil, err
@@ -222,21 +234,21 @@ func GetCacheRepoList(manager model.SCManager, accountId string) (interface{}, e
 	}
 	if len(goCollection.Data) == 0 {
 		//no cache,refresh
-		repos, err := RefreshRepos(manager, accountId)
+		repos, err := RefreshRepos(accountId)
 		if err != nil {
 			return nil, err
 		}
-		b, err := json.Marshal(repos)
-		if err != nil {
-			return nil, err
-		}
-		return string(b), nil
+		return repos, nil
 	}
+	repos := []*model.GitRepository{}
 	data := goCollection.Data[0]
-	return data.ResourceData["data"], nil
+	if err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), &repos); err != nil {
+		return nil, err
+	}
+	return repos, nil
 }
 
-func CreateOrUpdateCacheRepoList(accountId string, repos interface{}) error {
+func CreateOrUpdateCacheRepoList(accountId string, repos []*model.GitRepository) error {
 
 	logrus.Debugf("refreshing repos")
 	b, err := json.Marshal(repos)

@@ -38,6 +38,10 @@ type GithubAccount struct {
 type GithubManager struct {
 }
 
+func (g GithubManager) Config(setting *model.SCMSetting) model.SCManager {
+	return g
+}
+
 func (g GithubManager) GetType() string {
 	return "github"
 }
@@ -51,7 +55,7 @@ func (g GithubManager) GetAccount(accessToken string) (*model.GitAccount, error)
 	return toAccount(account), nil
 }
 
-func (g GithubManager) GetRepos(account *model.GitAccount) (interface{}, error) {
+func (g GithubManager) GetRepos(account *model.GitAccount) ([]*model.GitRepository, error) {
 	if account == nil {
 		return nil, fmt.Errorf("empty account")
 	}
@@ -114,20 +118,20 @@ func toAccount(gitaccount *GithubAccount) *model.GitAccount {
 	account.AccessToken = gitaccount.AccessToken
 	account.AvatarURL = gitaccount.AvatarURL
 	account.HTMLURL = gitaccount.HTMLURL
-	account.Id = gitaccount.Login
+	account.Id = "github:" + gitaccount.Login
 	account.Login = gitaccount.Login
 	account.Name = gitaccount.Name
-	account.Private = true
+	account.Private = false
 	return account
 }
 
-func getGithubRepos(githubAccessToken string) ([]github.Repository, error) {
+func getGithubRepos(githubAccessToken string) ([]*model.GitRepository, error) {
 	url := githubAPI + "/user/repos"
 	var repos []github.Repository
 	responses, err := paginateGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getGithubRepos: GET url %v received error from github, err: %v", url, err)
-		return repos, err
+		return nil, err
 	}
 	for _, response := range responses {
 		defer response.Body.Close()
@@ -138,24 +142,24 @@ func getGithubRepos(githubAccessToken string) ([]github.Repository, error) {
 		}
 		var reposObj []github.Repository
 		if err := json.Unmarshal(b, &reposObj); err != nil {
-			return repos, err
+			return nil, err
 		}
 		repos = append(repos, reposObj...)
 	}
 
-	return trimRepo(repos), nil
+	return toGitRepo(repos), nil
 }
 
 //reduce repo data
-func trimRepo(repos []github.Repository) []github.Repository {
-	trimed := []github.Repository{}
+func toGitRepo(repos []github.Repository) []*model.GitRepository {
+	result := []*model.GitRepository{}
 	for _, repo := range repos {
-		trimRepo := github.Repository{}
-		trimRepo.CloneURL = repo.CloneURL
-		trimRepo.Permissions = repo.Permissions
-		trimed = append(trimed, trimRepo)
+		r := &model.GitRepository{}
+		r.CloneURL = *repo.CloneURL
+		r.Permissions = *repo.Permissions
+		result = append(result, r)
 	}
-	return trimed
+	return result
 }
 
 func paginateGithub(githubAccessToken string, url string) ([]*http.Response, error) {
@@ -235,19 +239,11 @@ func (g GithubManager) DeleteWebhook(p *model.Pipeline, token string) error {
 	//delete webhook
 	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
 		if p.WebHookId > 0 {
-			//TODO
-			repoUrl := p.Stages[0].Steps[0].Repository
-			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
-			match := reg.FindStringSubmatch(repoUrl)
-			if len(match) != 3 {
-				logrus.Infof("get match:%v", match)
-				logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
-				return errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
-			}
-			user := match[1]
-			repo := match[2]
-			err := deleteGithubWebhook(user, repo, token, p.WebHookId)
+			user, repo, err := getUserRepoFromURL(p.Stages[0].Steps[0].Repository)
 			if err != nil {
+				return nil
+			}
+			if err := deleteGithubWebhook(user, repo, token, p.WebHookId); err != nil {
 				logrus.Errorf("error delete webhook,%v", err)
 				return err
 			}
@@ -266,15 +262,10 @@ func (g GithubManager) CreateWebhook(p *model.Pipeline, token string, ciWebhookE
 	//create webhook
 	if len(p.Stages) > 0 && len(p.Stages[0].Steps) > 0 {
 		if p.Stages[0].Steps[0].Webhook {
-			repoUrl := p.Stages[0].Steps[0].Repository
-			reg := regexp.MustCompile(".*?github.com/(.*?)/(.*?).git")
-			match := reg.FindStringSubmatch(repoUrl)
-			if len(match) < 3 {
-				logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
-				return errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
+			user, repo, err := getUserRepoFromURL(p.Stages[0].Steps[0].Repository)
+			if err != nil {
+				return nil
 			}
-			user := match[1]
-			repo := match[2]
 			secret := p.WebHookToken
 			webhookUrl := fmt.Sprintf("%s&pipelineId=%s", ciWebhookEndpoint, p.Id)
 			id, err := createGithubWebhook(user, repo, token, webhookUrl, secret)
@@ -320,6 +311,16 @@ func (g GithubManager) VerifyWebhookPayload(p *model.Pipeline, req *http.Request
 		logrus.Errorf("receive github webhook, invalid signature")
 		return false
 	}
+	//check branch
+	payload := &github.WebHookPayload{}
+	if err := json.Unmarshal(body, payload); err != nil {
+		logrus.Error("fail to parse github webhook payload")
+		return false
+	}
+	if *payload.Ref != "refs/heads/"+p.Stages[0].Steps[0].Branch {
+		logrus.Warningf("branch not match:%v,%v", *payload.Ref, p.Stages[0].Steps[0].Branch)
+		return false
+	}
 	return true
 }
 
@@ -361,16 +362,17 @@ func createGithubWebhook(user string, repo string, accesstoken string, webhookUr
 	logrus.Infof("hook to create:%v", hook)
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(hook)
-	hc := http.Client{}
+	client := http.Client{}
 	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
 	req, err := http.NewRequest("POST", APIURL, b)
 
 	req.Header.Add("Authorization", "Basic "+sEnc)
 
-	resp, err := hc.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return -1, err
 	}
+	defer resp.Body.Close()
 	respData, err := ioutil.ReadAll(resp.Body)
 	logrus.Infof("respData:%v", string(respData))
 	if resp.StatusCode > 399 {
@@ -383,84 +385,37 @@ func createGithubWebhook(user string, repo string, accesstoken string, webhookUr
 	return hook.GetID(), err
 }
 
-func ListWebhook(user string, repo string, accesstoken string) ([]*github.Hook, error) {
-	data := user + ":" + accesstoken
-	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
-	hc := http.Client{}
-	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
-	req, err := http.NewRequest("GET", APIURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	var hooks []*github.Hook
-	logrus.Infof("get encrpyt:%v", sEnc)
-	req.Header.Add("Authorization", "Basic "+sEnc)
-	resp, err := hc.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	respData, err := ioutil.ReadAll(resp.Body)
-	logrus.Infof("get response data:%v", string(respData))
-	if resp.StatusCode > 399 {
-		return nil, errors.New(string(respData))
-	}
-	err = json.Unmarshal(respData, &hooks)
-	if err != nil {
-		return nil, err
-	}
-
-	return hooks, nil
-}
-
-func GetWebhook(user string, repo string, accesstoken string, id string) (*github.Hook, error) {
-	data := user + ":" + accesstoken
-	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
-	hc := http.Client{}
-	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
-	req, err := http.NewRequest("GET", APIURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	var hook *github.Hook
-	logrus.Infof("get encrpyt:%v", sEnc)
-	req.Header.Add("Authorization", "Basic "+sEnc)
-	resp, err := hc.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	respData, err := ioutil.ReadAll(resp.Body)
-	logrus.Infof("get response data:%v", string(respData))
-	if resp.StatusCode > 399 {
-		return nil, errors.New(string(respData))
-	}
-	err = json.Unmarshal(respData, hook)
-	if err != nil {
-		return nil, err
-	}
-	return hook, nil
-}
-
 func deleteGithubWebhook(user string, repo string, accesstoken string, id int) error {
 
-	logrus.Infof("deleting webhook:%v,%v,%v,%v", user, repo, accesstoken, id)
 	data := user + ":" + accesstoken
 	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
-	hc := http.Client{}
+	client := http.Client{}
 	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks/%v", user, repo, id)
 	req, err := http.NewRequest("DELETE", APIURL, nil)
 	if err != nil {
 		return err
 	}
-	logrus.Infof("get encrpyt:%v", sEnc)
 	req.Header.Add("Authorization", "Basic "+sEnc)
-	resp, err := hc.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	respData, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode > 399 {
 		return errors.New(string(respData))
 	}
-	logrus.Infof("after delete,%v,%v", string(respData))
+	logrus.Debugf("after delete,%v,%v", string(respData))
 	return err
+}
+
+func getUserRepoFromURL(repoUrl string) (string, string, error) {
+	reg := regexp.MustCompile(".*/([^/]*?)/([^/]*?).git")
+	match := reg.FindStringSubmatch(repoUrl)
+	if len(match) != 3 {
+		logrus.Infof("get match:%v", match)
+		logrus.Errorf("error getting user/repo from gitrepoUrl:%v", repoUrl)
+		return "", "", errors.New(fmt.Sprintf("error getting user/repo from gitrepoUrl:%v", repoUrl))
+	}
+	return match[1], match[2], nil
 }

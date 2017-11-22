@@ -55,13 +55,20 @@ var PreservedEnvs = [...]string{"CICD_GIT_COMMIT", "CICD_GIT_BRANCH",
 
 type PipelineSetting struct {
 	client.Resource
-	IsAuth             bool   `json:"isAuth,omitempty" yaml:"isAuth,omitempty"`
-	GithubHostName     string `json:"githubHostName,omitempty" yaml:"githubHostName,omitempty"`
-	GithubSchema       string `json:"githubSchema,omitempty" yaml:"githubSchema,omitempty"`
-	GithubHomePage     string `json:"githubHomepage,omitempty" yaml:"githubHomepage,omitempty"`
-	GithubClientID     string `json:"githubClientID,omitempty" yaml:"githubClientID,omitempty"`
-	GithubClientSecret string `json:"githubClientSecret,omitempty" yaml:"githubClientSecret,omitempty"`
-	GithubRedirectURL  string `json:"githubRedirectURL,omitempty" yaml:"githubRedirectURL,omitempty"`
+	Status string `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+type SCMSetting struct {
+	client.Resource
+	IsAuth       bool   `json:"isAuth" yaml:"isAuth"`
+	Status       string `json:"status,omitempty" yaml:"status,omitempty"`
+	ScmType      string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
+	HostName     string `json:"hostName,omitempty" yaml:"hostName,omitempty"`
+	Schema       string `json:"schema,omitempty" yaml:"schema,omitempty"`
+	HomePage     string `json:"homepage,omitempty" yaml:"homepage,omitempty"`
+	ClientID     string `json:"clientID,omitempty" yaml:"clientID,omitempty"`
+	ClientSecret string `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
+	RedirectURL  string `json:"redirectURL,omitempty" yaml:"redirectURL,omitempty"`
 }
 
 type Pipeline struct {
@@ -119,7 +126,6 @@ type Step struct {
 	//Condition  string             `json:"condition,omitempty" yaml:"condition,omitempty"`
 	Conditions *PipelineConditions `json:"conditions,omitempty" yaml:"conditions,omitempty"`
 	//---SCM step
-	SCMType    string `json:"sourceType,omitempty" yaml:"sourceType,omitempty"`
 	Repository string `json:"repository,omitempty" yaml:"repository,omitempty"`
 	Branch     string `json:"branch,omitempty" yaml:"branch,omitempty"`
 	GitUser    string `json:"gitUser,omitempty" yaml:"gitUser,omitempty"`
@@ -248,7 +254,8 @@ type PipelineProvider interface {
 //scm stands for Source Code Manager
 type SCManager interface {
 	GetType() string
-	GetRepos(account *GitAccount) (interface{}, error)
+	Config(setting *SCMSetting) SCManager
+	GetRepos(account *GitAccount) ([]*GitRepository, error)
 	GetAccount(accessToken string) (*GitAccount, error)
 	OAuth(redirectURL string, clientID string, clientSecret string, code string) (*GitAccount, error)
 	DeleteWebhook(pipeline *Pipeline, gitToken string) error
@@ -269,4 +276,11 @@ type GitAccount struct {
 	AvatarURL   string `json:"avatar_url,omitempty"`
 	HTMLURL     string `json:"html_url,omitempty"`
 	AccessToken string `json:"accessToken,omitempty"`
+}
+
+type GitRepository struct {
+	client.Resource
+	CloneURL    string          `json:"clone_url,omitempty"`
+	ScmType     string          `json:"scmType,omitempty"`
+	Permissions map[string]bool `json:"permissions,omitempty"`
 }

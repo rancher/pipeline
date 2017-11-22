@@ -15,7 +15,9 @@ func NewSchema() *client.Schemas {
 	pipelineSchema(schemas.AddType("pipeline", Pipeline{}))
 	acitvitySchema(schemas.AddType("activity", Activity{}))
 	pipelineSettingSchema(schemas.AddType("setting", PipelineSetting{}))
+	scmSettingSchema(schemas.AddType("scmSetting", SCMSetting{}))
 	accountSchema(schemas.AddType("gitaccount", GitAccount{}))
+	repositorySchema(schemas.AddType("gitrepository", GitRepository{}))
 	return schemas
 }
 
@@ -49,7 +51,6 @@ func pipelineSchema(pipeline *client.Schema) {
 	pipelineBranch.Required = true
 	pipeline.ResourceFields["branch"] = pipelineBranch
 
-	//todo others
 	pipeline.ResourceActions = map[string]client.Action{
 		"run": client.Action{
 			Output: "activity",
@@ -110,6 +111,18 @@ func pipelineSettingSchema(setting *client.Schema) {
 	}
 }
 
+func scmSettingSchema(setting *client.Schema) {
+	setting.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+	setting.ResourceActions = map[string]client.Action{
+		"update": client.Action{
+			Output: "scmSetting",
+		},
+		"remove": client.Action{
+			Output: "scmSetting",
+		},
+	}
+}
+
 func accountSchema(account *client.Schema) {
 	account.CollectionMethods = []string{http.MethodGet, http.MethodPost}
 	account.ResourceActions = map[string]client.Action{
@@ -117,6 +130,11 @@ func accountSchema(account *client.Schema) {
 			Output: "gitaccount",
 		},
 	}
+}
+
+func repositorySchema(repository *client.Schema) {
+	repository.CollectionMethods = []string{http.MethodGet, http.MethodPost}
+	repository.PluralName = "gitrepositories"
 }
 
 func ToPipelineCollections(apiContext *api.ApiContext, pipelines []*Pipeline) []interface{} {
@@ -188,6 +206,16 @@ func ToAccountResource(apiContext *api.ApiContext, account *GitAccount) *GitAcco
 	return account
 }
 
+func ToRepositoryResource(apiContext *api.ApiContext, repository *GitRepository) *GitRepository {
+	repository.Resource = client.Resource{
+		Id:      repository.Id,
+		Type:    "gitrepository",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
+	return repository
+}
+
 func ToPipelineSettingResource(apiContext *api.ApiContext, setting *PipelineSetting) *PipelineSetting {
 	setting.Resource = client.Resource{
 		Type:    "setting",
@@ -195,7 +223,21 @@ func ToPipelineSettingResource(apiContext *api.ApiContext, setting *PipelineSett
 		Links:   map[string]string{},
 	}
 	setting.Actions["update"] = apiContext.UrlBuilder.Current() + "?action=update" //apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
-	setting.Actions["githuboauth"] = apiContext.UrlBuilder.Current() + "?action=githuboauth"
+	setting.Actions["oauth"] = apiContext.UrlBuilder.Current() + "?action=oauth"
+	setting.Actions["reset"] = apiContext.UrlBuilder.Current() + "?action=reset"
 
+	setting.Links["scmsettings"] = apiContext.UrlBuilder.Current() + "/scmsettings"
+	return setting
+}
+
+func ToSCMSettingResource(apiContext *api.ApiContext, setting *SCMSetting) *SCMSetting {
+	setting.Resource = client.Resource{
+		Id:      setting.Id,
+		Type:    "scmSetting",
+		Actions: map[string]string{},
+		Links:   map[string]string{},
+	}
+	setting.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
+	setting.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=remove"
 	return setting
 }

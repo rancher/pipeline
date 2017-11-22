@@ -91,14 +91,15 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 
 	ppl.Id = uuid.Rand().Hex()
 	ppl.WebHookToken = uuid.Rand().Hex()
-	//TODO Multiple
 	gitUser := ppl.Stages[0].Steps[0].GitUser
 	token, err := service.GetUserToken(gitUser)
 	if err != nil {
 		return err
 	}
-	scmType := ppl.Stages[0].Steps[0].SCMType
-	scManager := s.getSCM(scmType)
+	scManager, err := service.GetSCManagerFromUserID(gitUser)
+	if err != nil {
+		return err
+	}
 
 	if err = scManager.CreateWebhook(ppl, token, webhook.CIWebhookEndpoint); err != nil {
 		logrus.Errorf("fail createWebhook")
@@ -128,15 +129,16 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if !service.ValidAccountAccess(req, ppl.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
 	}
-	//TODO Multiple
 	gitUser := ppl.Stages[0].Steps[0].GitUser
 	token, err := service.GetUserToken(gitUser)
 	if err != nil {
 		logrus.Error(err)
 		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
 	}
-	scmType := ppl.Stages[0].Steps[0].SCMType
-	scManager := s.getSCM(scmType)
+	scManager, err := service.GetSCManagerFromUserID(gitUser)
+	if err != nil {
+		return err
+	}
 	// Update webhook
 	prevPipeline := service.GetPipelineById(id)
 	if prevPipeline.Stages[0].Steps[0].Webhook && !ppl.Stages[0].Steps[0].Webhook {
@@ -177,12 +179,13 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	if !service.ValidAccountAccess(req, ppl.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
 	}
-	//TODO Multiple
+
 	gitUser := ppl.Stages[0].Steps[0].GitUser
 	token, err := service.GetUserToken(gitUser)
-	scmType := ppl.Stages[0].Steps[0].SCMType
-	scManager := s.getSCM(scmType)
-	if err = scManager.DeleteWebhook(ppl, token); err != nil {
+	scManager, err := service.GetSCManagerFromUserID(gitUser)
+	if err != nil {
+		logrus.Error(err)
+	} else if err = scManager.DeleteWebhook(ppl, token); err != nil {
 		//log delete webhook failure but not block
 		logrus.Errorf("fail to delete webhook for pipeline \"%v\",for %v", ppl.Name, err)
 	}
