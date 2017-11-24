@@ -24,8 +24,11 @@ import (
 	ogithub "golang.org/x/oauth2/github"
 )
 
-const githubAPI = "https://api.github.com"
-const maxPerPage = "100"
+const (
+	defaultGithubAPI = "https://api.github.com"
+	maxPerPage       = "100"
+	gheAPI           = "/api/v3"
+)
 
 type GithubAccount struct {
 	Login       string `json:"login,omitempty"`
@@ -36,9 +39,22 @@ type GithubAccount struct {
 }
 
 type GithubManager struct {
+	schema      string
+	hostName    string
+	apiEndpoint string
 }
 
 func (g GithubManager) Config(setting *model.SCMSetting) model.SCManager {
+	if setting.HostName != "" {
+		g.schema = setting.Schema
+		g.hostName = setting.HostName
+		g.apiEndpoint = setting.Schema + setting.HostName + gheAPI
+	} else {
+		g.schema = "https://"
+		g.hostName = "github.com"
+		g.apiEndpoint = defaultGithubAPI
+	}
+
 	return g
 }
 
@@ -47,7 +63,7 @@ func (g GithubManager) GetType() string {
 }
 
 func (g GithubManager) GetAccount(accessToken string) (*model.GitAccount, error) {
-	account, err := getGithubUser(accessToken)
+	account, err := g.getGithubUser(accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +76,7 @@ func (g GithubManager) GetRepos(account *model.GitAccount) ([]*model.GitReposito
 		return nil, fmt.Errorf("empty account")
 	}
 	accessToken := account.AccessToken
-	return getGithubRepos(accessToken)
+	return g.getGithubRepos(accessToken)
 }
 
 func (g GithubManager) OAuth(redirectURL string, clientID string, clientSecret string, code string) (*model.GitAccount, error) {
@@ -85,9 +101,9 @@ func (g GithubManager) OAuth(redirectURL string, clientID string, clientSecret s
 	logrus.Debugf("get accesstoken:%v", token)
 	return g.GetAccount(token.AccessToken)
 }
-func getGithubUser(githubAccessToken string) (*GithubAccount, error) {
+func (g GithubManager) getGithubUser(githubAccessToken string) (*GithubAccount, error) {
 
-	url := githubAPI + "/user"
+	url := g.apiEndpoint + "/user"
 	resp, err := getFromGithub(githubAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Github getGithubUser: GET url %v received error from github, err: %v", url, err)
@@ -125,8 +141,8 @@ func toAccount(gitaccount *GithubAccount) *model.GitAccount {
 	return account
 }
 
-func getGithubRepos(githubAccessToken string) ([]*model.GitRepository, error) {
-	url := githubAPI + "/user/repos"
+func (g GithubManager) getGithubRepos(githubAccessToken string) ([]*model.GitRepository, error) {
+	url := g.apiEndpoint + "/user/repos"
 	var repos []github.Repository
 	responses, err := paginateGithub(githubAccessToken, url)
 	if err != nil {
