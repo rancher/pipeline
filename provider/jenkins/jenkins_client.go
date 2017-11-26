@@ -489,3 +489,70 @@ func CancelQueueItem(id int) error {
 	}
 	return nil
 }
+
+func CreateCredential(content []byte) error {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	setCredURI, _ := JenkinsConfig.Get(JenkinsSetCredURI)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+	setCredURL, err := url.Parse(sah + setCredURI)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	req, _ := http.NewRequest(http.MethodPost, setCredURL.String(), bytes.NewReader(content))
+	req.Header.Add(CrumbHeader, Crumb)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		logrus.Infof("create jenkins credential got code:%v", resp.StatusCode)
+		data, _ := ioutil.ReadAll(resp.Body)
+		logrus.Error(string(data))
+		return errors.New("create credential fail")
+	}
+	return nil
+}
+
+func DeleteCredential(id string) error {
+	sah, _ := JenkinsConfig.Get(JenkinsServerAddress)
+	delCredURI, _ := JenkinsConfig.Get(JenkinsDeleteCredURI)
+	delCredURI = fmt.Sprintf(delCredURI, id)
+	user, _ := JenkinsConfig.Get(JenkinsUser)
+	token, _ := JenkinsConfig.Get(JenkinsToken)
+	CrumbHeader, _ := JenkinsConfig.Get(JenkinsCrumbHeader)
+	Crumb, _ := JenkinsConfig.Get(JenkinsCrumb)
+	delCredURL, err := url.Parse(sah + delCredURI)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	req, _ := http.NewRequest(http.MethodPost, delCredURL.String(), nil)
+	req.Header.Add(CrumbHeader, Crumb)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.SetBasicAuth(user, token)
+	client := http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		logrus.Error(err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		logrus.Infof("delete jenkins credential got code:%v", resp.StatusCode)
+		data, _ := ioutil.ReadAll(resp.Body)
+		logrus.Error(string(data))
+		return errors.New("remove credential fail")
+	}
+	return nil
+}

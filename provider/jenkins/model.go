@@ -35,6 +35,7 @@ type JenkinsSCM struct {
 	Plugin                            string `xml:"plugin,attr"`
 	ConfigVersion                     int    `xml:"configVersion"`
 	GitRepo                           string `xml:"userRemoteConfigs>hudson.plugins.git.UserRemoteConfig>url"`
+	GitCredentialId                   string `xml:"userRemoteConfigs>hudson.plugins.git.UserRemoteConfig>credentialsId"`
 	GitBranch                         string `xml:"branches>hudson.plugins.git.BranchSpec>name"`
 	DoGenerateSubmoduleConfigurations bool   `xml:"doGenerateSubmoduleConfigurations"`
 	SubmodelCfg                       string `xml:"submoduleCfg,omitempty"`
@@ -256,4 +257,13 @@ type JenkinsBuildInfo struct {
 	Result            string      `json:"result"`
 	Timestamp         int64       `json:"timestamp"`
 	URL               string      `json:"url"`
+}
+
+type JenkinsCredential struct {
+	Scope       string `json:"scope"`
+	Id          string `json:"id"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	Description string `json:"description"`
+	Class       string `json:"$class"`
 }

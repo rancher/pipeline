@@ -249,6 +249,9 @@ type PipelineProvider interface {
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
 	DeleteFormerBuild(*Activity) error
 	OnActivityCompelte(*Activity)
+	OnCreateAccount(*GitAccount) error
+	OnDeleteAccount(*GitAccount) error
+	Reset() error
 }
 
 //scm stands for Source Code Manager

@@ -1,6 +1,7 @@
 package jenkins
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"math/rand"
@@ -377,11 +378,12 @@ func (j JenkinsProvider) generateStepJenkinsProject(activity *model.Activity, st
 	postBuildSctipt := stepFinishScript
 	if step.Type == model.StepTypeSCM {
 		scm = JenkinsSCM{
-			Class:         "hudson.plugins.git.GitSCM",
-			Plugin:        "git@3.3.1",
-			ConfigVersion: 2,
-			GitRepo:       step.Repository,
-			GitBranch:     step.Branch,
+			Class:           "hudson.plugins.git.GitSCM",
+			Plugin:          "git@3.3.1",
+			ConfigVersion:   2,
+			GitRepo:         step.Repository,
+			GitCredentialId: step.GitUser,
+			GitBranch:       step.Branch,
 		}
 		postBuildSctipt = stepSCMFinishScript
 	}
@@ -432,6 +434,11 @@ func (j JenkinsProvider) generateStepJenkinsProject(activity *model.Activity, st
 
 	return v
 
+}
+
+func (j JenkinsProvider) Reset() error {
+	//TODO cleanup
+	return nil
 }
 
 func commandBuilder(activity *model.Activity, step *model.Step) string {
@@ -824,6 +831,42 @@ func (j JenkinsProvider) OnActivityCompelte(activity *model.Activity) {
 
 }
 
+func (j JenkinsProvider) OnCreateAccount(account *model.GitAccount) error {
+	jenkinsCred := &JenkinsCredential{}
+	jenkinsCred.Class = "com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl"
+	jenkinsCred.Scope = "GLOBAL"
+	jenkinsCred.Id = account.Id
+	if account.AccountType == "github" {
+		jenkinsCred.Username = account.Login
+		jenkinsCred.Password = account.AccessToken
+	} else if account.AccountType == "gitlab" {
+		jenkinsCred.Username = "oauth2"
+		jenkinsCred.Password = account.AccessToken
+	} else {
+		return errors.New("unknown scmtype")
+	}
+	bodyContent := map[string]interface{}{}
+	bodyContent["credentials"] = jenkinsCred
+	b, err := json.Marshal(bodyContent)
+	if err != nil {
+		return err
+	}
+	buff := bytes.NewBufferString("json=")
+	buff.Write(b)
+	fmt.Print(string(buff.Bytes()))
+	if err := CreateCredential(buff.Bytes()); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (j JenkinsProvider) OnDeleteAccount(account *model.GitAccount) error {
+	if account == nil {
+		return errors.New("nil account")
+	}
+	return DeleteCredential(account.Id)
+}
+
 func (j JenkinsProvider) GetStepLog(activity *model.Activity, stageOrdinal int, stepOrdinal int, paras map[string]interface{}) (string, error) {
 	if stageOrdinal < 0 || stageOrdinal >= len(activity.ActivityStages) || stepOrdinal < 0 || stepOrdinal >= len(activity.ActivityStages[stageOrdinal].ActivitySteps) {
 		return "", errors.New("ordinal out of range")
@@ -839,7 +882,6 @@ func (j JenkinsProvider) GetStepLog(activity *model.Activity, stageOrdinal int, 
 	if err != nil {
 		return "", err
 	}
-	//logrus.Debugf("got log:\n%s\n\n%s\n\n%d", *logText, rawOutput, startLine)
 	token := "\\n\\w{14}\\s{2}\\[.*?\\].*?\\.sh"
 	*logText = *logText + rawOutput
 	outputs := regexp.MustCompile(token).Split(*logText, -1)

@@ -150,10 +150,10 @@ func UpdateAccount(account *model.GitAccount) error {
 	return err
 }
 
-func RemoveAccount(id string) error {
+func RemoveAccount(id string) (*model.GitAccount, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	filters := make(map[string]interface{})
@@ -164,13 +164,22 @@ func RemoveAccount(id string) error {
 	})
 	if err != nil {
 		logrus.Errorf("Error querying account:%v", err)
-		return err
+		return nil, err
 	}
 	if len(goCollection.Data) == 0 {
-		return fmt.Errorf("account '%s' not found", id)
+		return nil, fmt.Errorf("account '%s' not found", id)
 	}
 	existing := goCollection.Data[0]
-	return apiClient.GenericObject.Delete(&existing)
+
+	account := &model.GitAccount{}
+	if err = json.Unmarshal([]byte(existing.ResourceData["data"].(string)), account); err != nil {
+		return nil, err
+	}
+	if err = apiClient.GenericObject.Delete(&existing); err != nil {
+		return nil, err
+	}
+
+	return account, nil
 }
 
 func CleanAccounts(scmType string) error {

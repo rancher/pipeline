@@ -21,6 +21,8 @@ const JenkinsCrumbHeader = "JenkinsCrumbHeader"
 const JenkinsCrumb = "JenkinsCrumb"
 const JenkinsJobBuildURI = "JenkinsJobBuildURI"
 const JenkinsJobInfoURI = "JenkinsJobInfoURI"
+const JenkinsSetCredURI = "JenkinsSetCredURI"
+const JenkinsDeleteCredURI = "JenkinsDeleteCredURI"
 const JenkinsBuildInfoURI = "JenkinsBuildInfoURI"
 const JenkinsBuildLogURI = "JenkinsBuildLogURI"
 const JenkinsJobBuildWithParamsURI = "JenkinsJobBuildWithParamsURI"
@@ -53,6 +55,8 @@ var JenkinsConfig = jenkinsConfig{
 	JenkinsJobBuildURI:           "/job/%s/build",
 	JenkinsJobBuildWithParamsURI: "/job/%s/buildWithParameters",
 	JenkinsJobInfoURI:            "/job/%s/api/json",
+	JenkinsSetCredURI:            "/credentials/store/system/domain/_/createCredentials",
+	JenkinsDeleteCredURI:         "/credentials/store/system/domain/_/credential/%s/doDelete",
 	JenkinsBuildInfoURI:          "/job/%s/lastBuild/api/json",
 	JenkinsBuildLogURI:           "/job/%s/lastBuild/timestamps/?elapsed=HH'h'mm'm'ss's'S'ms'&appendLog",
 	ScriptURI:                    "/scriptText",

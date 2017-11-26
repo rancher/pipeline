@@ -63,7 +63,11 @@ func (s *Server) RemoveAccount(rw http.ResponseWriter, req *http.Request) error 
 	if err != nil {
 		return err
 	}
-	if err := service.RemoveAccount(id); err != nil {
+	account, err := service.RemoveAccount(id)
+	if err != nil {
+		return err
+	}
+	if err := s.Provider.OnDeleteAccount(account); err != nil {
 		return err
 	}
 	a.Status = "removed"
@@ -231,6 +235,8 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 	if err := service.CreateAccount(account); err != nil {
 		return err
 	}
+
+	s.Provider.OnCreateAccount(account)
 
 	MyAgent.broadcast <- WSMsg{
 		Id:           uuid.Rand().Hex(),
