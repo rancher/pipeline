@@ -1,5 +1,7 @@
 # CICD Deploy Guide on Rancher 1.6.x
 
+Updated on `November 25`
+
 ***Note: If you need a access point of pipeline-ui in 1.6.x. Then `rancher/server:v1.6.10` is recommended, and follow the steps in [Access point in UI 1.6.10](#access-point-in-ui-1.6.10)***
 
 We should be able to deploy cicd via one button click using default library catalog when everything is ready.
@@ -8,7 +10,7 @@ We should be able to deploy cicd via one button click using default library cata
 
 Remaining dependencies:
 
-1. Related webhook-service update is not merged.
+1. Related webhook-service update ~~is not merged~~ is merged but not released yet (got some issues setting up a v1.6-development server).
 2. CICD UI code is not merged.
 
 
@@ -19,11 +21,9 @@ To deploy & test CICD:
 
 2. Substitute webhook-service from 
 ```
-https://github.com/biblesyme/webhook-service, branch: service-webhook
+https://github.com/rancher/webhook-service, branch: master
 ```
 (git pull, make and get `webhook-service` binary )
-
-built binary: `https://rancher.slack.com/files/U4E1KJKA7/F7RQZGYSY/webhook-service`
 
 ```
 docker cp webhook-service <rancher-server-container>:/usr/local/bin/
@@ -41,7 +41,8 @@ BRANCH:master
 
 ```
 Item: "Rancher CICD",
-Version: <latest version>,
+Version: 0.0.1-dev,
+# choose the 0.0.1-dev version to get latest updates before release
 # Default or customized configs and launch
 ```
 
