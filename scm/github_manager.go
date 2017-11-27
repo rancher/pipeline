@@ -307,10 +307,6 @@ func (g GithubManager) VerifyWebhookPayload(p *model.Pipeline, req *http.Request
 		logrus.Errorf("receive github webhook,no event")
 		return false
 	}
-
-	if event_type == "ping" {
-		return true
-	}
 	if event_type != "push" {
 		logrus.Errorf("receive github webhook,not push event")
 		return false

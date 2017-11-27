@@ -24,6 +24,9 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 	var err error
 	var eventType string
 	if eventType = req.Header.Get("X-GitHub-Event"); len(eventType) != 0 {
+		if eventType == "ping" {
+			return nil
+		}
 		logrus.Debug("receive webhook from github")
 		manager, err = service.GetSCManager("github")
 		if err != nil {
