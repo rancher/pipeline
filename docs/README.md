@@ -165,6 +165,12 @@ You can config environment variables for a task step. Unlike pre-define or user-
 
 Environment variables in step configuration take precedence over global variables when they are overlapped.
 
+### Condition
+
+You can specify conditions of running a step/stage. When conditions are added, they will be checked before running a step/stage. If the conditions are met, the step/stage runs as usual. If the conditions are not met, the step/stage is skipped and following steps/stages continue.
+
+Conditions consist of expressions, each in the form `<envvar> <operator> <value>`. Pre-define or user-define variables are supported here. `=` for `equal to` and `!=` for `not equal to ` are supported as the operator. You can combine multiple expressions and choose to run the step/stage when all/any of the expressions are true.
+
 ### Backup/Restore
 
 The CICD data are stored in two separate place, the whole pipeline and basic activity status informations are stored in the `generic object` of rancher/server's database, the detailed console log of activity and workspace data is stored on hosts running jenkins master/slave. So, if you want to backup the whole app data, you have to back up these two data.
