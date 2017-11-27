@@ -29,15 +29,8 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 	if err != nil || uid == "" {
 		logrus.Debugf("getAccessibleAccounts unrecognized user")
 	}
-	accessibleAccounts := service.GetAccessibleAccounts(uid)
-	var pipelines []*model.Pipeline
-	allpipelines := service.ListPipelines()
-	//filter by git account access
-	for _, pipeline := range allpipelines {
-		if accessibleAccounts[pipeline.Stages[0].Steps[0].GitUser] {
-			pipelines = append(pipelines, pipeline)
-		}
-	}
+	pipelines := service.ListPipelines()
+
 	apiContext.Write(&client.GenericCollection{
 		Data: model.ToPipelineCollections(apiContext, pipelines),
 	})

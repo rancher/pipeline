@@ -33,14 +33,10 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		logrus.Errorf("cannot get currentUser,%v,%v", uid, err)
 	}
 
-	accessibleAccounts := service.GetAccessibleAccounts(uid)
 	for _, gobj := range geObjList {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &model.Activity{}
 		json.Unmarshal(b, a)
-		if a == nil || !accessibleAccounts[a.Pipeline.Stages[0].Steps[0].GitUser] {
-			continue
-		}
 		model.ToActivityResource(apiContext, a)
 		if a.CanApprove(uid) {
 			//add approve action

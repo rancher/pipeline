@@ -305,44 +305,11 @@ func CreateOrUpdateCacheRepoList(accountId string, repos []*model.GitRepository)
 }
 
 func ValidAccountAccess(req *http.Request, accountId string) bool {
-	uid, err := util.GetCurrentUser(req.Cookies())
-	if err != nil || uid == "" {
-		logrus.Debugf("validAccountAccess unrecognized user")
-	}
-	r, err := GetAccount(accountId)
-	if err != nil {
-		logrus.Errorf("get account error:%v", err)
-		return false
-	}
-	if !r.Private || r.RancherUserID == uid {
-		return true
-	}
-	return false
+	return true
 }
 
 func ValidAccountAccessById(uid string, accountId string) bool {
-	r, err := GetAccount(accountId)
-	if err != nil {
-		logrus.Errorf("get account error:%v", err)
-		return false
-	}
-	if !r.Private || r.RancherUserID == uid {
-		return true
-	}
-	return false
-}
-
-func GetAccessibleAccounts(uid string) map[string]bool {
-	result := map[string]bool{}
-	accounts, err := ListAccounts(uid)
-	if err != nil {
-		logrus.Errorf("getAccessibleAccounts error:%v", err)
-		return result
-	}
-	for _, account := range accounts {
-		result[account.Id] = true
-	}
-	return result
+	return true
 }
 
 func GetUserToken(gitUser string) (string, error) {
