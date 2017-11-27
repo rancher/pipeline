@@ -64,7 +64,7 @@ type SCMSetting struct {
 	Status       string `json:"status,omitempty" yaml:"status,omitempty"`
 	ScmType      string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
 	HostName     string `json:"hostName,omitempty" yaml:"hostName,omitempty"`
-	Schema       string `json:"schema,omitempty" yaml:"schema,omitempty"`
+	Scheme       string `json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	HomePage     string `json:"homepage,omitempty" yaml:"homepage,omitempty"`
 	ClientID     string `json:"clientID,omitempty" yaml:"clientID,omitempty"`
 	ClientSecret string `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`

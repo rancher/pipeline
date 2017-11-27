@@ -39,18 +39,18 @@ type GithubAccount struct {
 }
 
 type GithubManager struct {
-	schema      string
+	scheme      string
 	hostName    string
 	apiEndpoint string
 }
 
 func (g GithubManager) Config(setting *model.SCMSetting) model.SCManager {
 	if setting.HostName != "" {
-		g.schema = setting.Schema
+		g.scheme = setting.Scheme
 		g.hostName = setting.HostName
-		g.apiEndpoint = setting.Schema + setting.HostName + gheAPI
+		g.apiEndpoint = setting.Scheme + setting.HostName + gheAPI
 	} else {
-		g.schema = "https://"
+		g.scheme = "https://"
 		g.hostName = "github.com"
 		g.apiEndpoint = defaultGithubAPI
 	}

@@ -152,7 +152,7 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 	if err := json.Unmarshal(requestBytes, &requestBody); err != nil {
 		return err
 	}
-	var code, scmType, clientID, clientSecret, redirectURL, schema, hostName string
+	var code, scmType, clientID, clientSecret, redirectURL, scheme, hostName string
 	if requestBody["code"] != nil {
 		code = requestBody["code"].(string)
 	}
@@ -165,8 +165,8 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 	if requestBody["redirectURL"] != nil {
 		redirectURL = requestBody["redirectURL"].(string)
 	}
-	if requestBody["schema"] != nil {
-		schema = requestBody["schema"].(string)
+	if requestBody["scheme"] != nil {
+		scheme = requestBody["scheme"].(string)
 	}
 	if requestBody["hostName"] != nil {
 		hostName = requestBody["hostName"].(string)
@@ -205,7 +205,7 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 		setting.ClientID = clientID
 		setting.ClientSecret = clientSecret
 		setting.RedirectURL = redirectURL
-		setting.Schema = schema
+		setting.Scheme = scheme
 		setting.HostName = hostName
 		setting.ScmType = scmType
 		SCManager, err := service.GetSCManagerFromSetting(setting)
