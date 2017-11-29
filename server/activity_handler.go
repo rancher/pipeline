@@ -264,7 +264,6 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		logrus.Errorf("fail update activity:%v", err)
 		return err
 	}
-
 	MyAgent.broadcast <- WSMsg{
 		Id:           uuid.Rand().Hex(),
 		Name:         "resource.change",
@@ -273,6 +272,7 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		Data:         *r,
 	}
 	s.UpdateLastActivity(r)
+	s.Provider.OnActivityCompelte(r)
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
 	return nil

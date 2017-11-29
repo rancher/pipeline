@@ -189,7 +189,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	}
 	s.UpdateLastActivity(activity)
 
-	if activity.Status == model.ActivityFail || activity.Status == model.ActivitySuccess {
+	if service.IsComplete(activity) {
 		s.Provider.OnActivityCompelte(activity)
 	}
 

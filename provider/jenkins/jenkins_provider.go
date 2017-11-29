@@ -828,12 +828,20 @@ func (j JenkinsProvider) OnActivityCompelte(activity *model.Activity) {
 	logrus.Debugf("cleanservicescript is: %v", cleanServiceScript)
 	res, err := ExecScript(cleanServiceScript)
 	logrus.Debugf("clean services result:%v,%v", res, err)
+	if err != nil {
+		logrus.Errorf("error cleanning up on worker node: %v, got result '%s'", err, res)
+	}
 	logrus.Infof("activity '%s' complete", activity.Id)
 	//clean workspace
-	// command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
-	// cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
-	// res, err = ExecScript(cleanWorkspaceScript)
-	// logrus.Infof("clean workspace result:%v,%v", res, err)
+	if !activity.Pipeline.KeepWorkspace {
+		command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
+		cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
+		res, err = ExecScript(cleanWorkspaceScript)
+		if err != nil {
+			logrus.Errorf("error cleanning up on worker node: %v, got result '%s'", err, res)
+		}
+		logrus.Debugf("clean workspace result:%v,%v", res, err)
+	}
 
 }
 

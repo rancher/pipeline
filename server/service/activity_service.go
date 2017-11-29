@@ -186,6 +186,19 @@ func resetActivityStatus(activity *model.Activity) {
 	}
 }
 
+func IsComplete(activity *model.Activity) bool {
+	if activity == nil {
+		return false
+	}
+	if activity.Status == model.ActivityAbort ||
+		activity.Status == model.ActivityDenied ||
+		activity.Status == model.ActivityFail ||
+		activity.Status == model.ActivitySuccess {
+		return true
+	}
+	return false
+}
+
 func ApproveActivity(provider model.PipelineProvider, activity *model.Activity) error {
 	if activity == nil {
 		return errors.New("nil activity")
@@ -265,7 +278,7 @@ func GetAllServices(activity *model.Activity) []*model.CIService {
 	if lastStepOrdinal < 0 {
 		lastStepOrdinal = 0
 	}
-	return GetServices(activity, lastStageOrdinal, lastStepOrdinal)
+	return GetServices(activity, lastStageOrdinal, lastStepOrdinal+1)
 }
 
 func IsStageSuccess(stage *model.ActivityStage) bool {

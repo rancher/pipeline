@@ -98,8 +98,9 @@ type PipelineContent struct {
 	//for import
 	Templates map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	//trigger
-	CronTrigger CronTrigger `json:"cronTrigger,omitempty" yaml:"cronTrigger,omitempty"`
-	Stages      []*Stage    `json:"stages,omitempty" yaml:"stages,omitempty"`
+	CronTrigger   CronTrigger `json:"cronTrigger,omitempty" yaml:"cronTrigger,omitempty"`
+	Stages        []*Stage    `json:"stages,omitempty" yaml:"stages,omitempty"`
+	KeepWorkspace bool        `json:"keepWorkspace,omitempty" yaml:"keepWorkspace,omitempty"`
 }
 
 type CronTrigger struct {
