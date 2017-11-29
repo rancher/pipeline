@@ -18,7 +18,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const gitlabAPI = "%s%s/api/v4"
+//use v3 endpoint for compatibility
+const gitlabAPI = "%s%s/api/v3"
 
 type GitlabManager struct {
 	host   string
@@ -64,7 +65,6 @@ func (g GitlabManager) GetRepos(account *model.GitAccount) ([]*model.GitReposito
 
 func (g GitlabManager) OAuth(redirectURL string, clientID string, clientSecret string, code string) (*model.GitAccount, error) {
 
-	logrus.Debugf("gitlab oauth get vars:%v,%v,%v,%v", redirectURL, clientID, clientSecret, code)
 	gitlabOauthConfig := &oauth2.Config{
 		RedirectURL:  redirectURL,
 		ClientID:     clientID,
