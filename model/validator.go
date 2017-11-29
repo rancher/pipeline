@@ -139,7 +139,10 @@ func checkCronSpec(spec string) error {
 		return nil
 	}
 	_, err := cron.ParseStandard(spec)
-	return errors.Wrapf(ErrInvalidPipeline, "parse cron expression got error:%v", err)
+	if err != nil {
+		return errors.Wrapf(ErrInvalidPipeline, "parse cron expression got error:%v", err)
+	}
+	return nil
 }
 
 func checkCondition(conditions *PipelineConditions) error {
