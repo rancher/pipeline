@@ -76,7 +76,7 @@ func (s *Server) RemoveAccount(rw http.ResponseWriter, req *http.Request) error 
 		Name:         "resource.change",
 		ResourceType: "gitaccount",
 		Time:         time.Now(),
-		Data:         a,
+		Data:         *a,
 	}
 	return nil
 }
@@ -243,7 +243,7 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 		Name:         "resource.change",
 		ResourceType: "gitaccount",
 		Time:         time.Now(),
-		Data:         account,
+		Data:         *account,
 	}
 	go service.RefreshRepos(account.Id)
 	setting, err := service.GetSCMSetting(scmType)
@@ -255,7 +255,7 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 		Name:         "resource.change",
 		ResourceType: "scmSetting",
 		Time:         time.Now(),
-		Data:         setting,
+		Data:         *setting,
 	}
 	model.ToSCMSettingResource(apiContext, setting)
 	if err = apiContext.WriteResource(setting); err != nil {

@@ -136,7 +136,7 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 		Name:         "resource.change",
 		ResourceType: "activity",
 		Time:         time.Now(),
-		Data:         activity,
+		Data:         *activity,
 	}
 	return nil
 }
@@ -188,7 +188,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 		Name:         "resource.change",
 		ResourceType: "activity",
 		Time:         time.Now(),
-		Data:         activity,
+		Data:         *activity,
 	}
 	s.UpdateLastActivity(activity)
 

@@ -210,7 +210,6 @@ func PaginateGenericObjects(kind string) ([]client.GenericObject, error) {
 	var pageData []client.GenericObject
 	var err error
 	for {
-		logrus.Debugf("paging got:%v,%v,%v", kind, limit, marker)
 		pageData, marker, err = getGenericObjects(kind, limit, marker)
 		if err != nil {
 			logrus.Debugf("get genericobject err:%v", err)

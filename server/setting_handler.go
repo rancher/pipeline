@@ -92,7 +92,7 @@ func (s *Server) UpdateSCMSetting(rw http.ResponseWriter, req *http.Request) err
 		Name:         "resource.change",
 		ResourceType: "scmSetting",
 		Time:         time.Now(),
-		Data:         setting,
+		Data:         *setting,
 	}
 	//TODO check Admin auth
 	if setting.IsAuth == false {
@@ -108,6 +108,11 @@ func (s *Server) UpdateSCMSetting(rw http.ResponseWriter, req *http.Request) err
 func (s *Server) RemoveSCMSetting(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
+
+	if err := service.CleanAccounts(id); err != nil {
+		return err
+	}
+
 	setting, err := service.RemoveSCMSetting(id)
 	if err != nil {
 		return err
@@ -118,11 +123,7 @@ func (s *Server) RemoveSCMSetting(rw http.ResponseWriter, req *http.Request) err
 		Name:         "resource.change",
 		ResourceType: "scmSetting",
 		Time:         time.Now(),
-		Data:         setting,
-	}
-
-	if err := service.CleanAccounts(id); err != nil {
-		return err
+		Data:         *setting,
 	}
 	apiContext.Write(model.ToSCMSettingResource(apiContext, setting))
 	return nil

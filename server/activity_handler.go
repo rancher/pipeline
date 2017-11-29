@@ -148,7 +148,7 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		Name:         "resource.change",
 		ResourceType: "activity",
 		Time:         time.Now(),
-		Data:         r,
+		Data:         *r,
 	}
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
@@ -189,7 +189,7 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 		Name:         "resource.change",
 		ResourceType: "activity",
 		Time:         time.Now(),
-		Data:         r,
+		Data:         *r,
 	}
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
@@ -229,7 +229,7 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 		Name:         "resource.change",
 		ResourceType: "activity",
 		Time:         time.Now(),
-		Data:         r,
+		Data:         *r,
 	}
 	s.UpdateLastActivity(r)
 	model.ToActivityResource(apiContext, r)
@@ -270,7 +270,7 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		Name:         "resource.change",
 		ResourceType: "activity",
 		Time:         time.Now(),
-		Data:         r,
+		Data:         *r,
 	}
 	s.UpdateLastActivity(r)
 	model.ToActivityResource(apiContext, r)
@@ -382,6 +382,6 @@ func (s *Server) UpdateLastActivity(activity *model.Activity) {
 		Name:         "resource.change",
 		ResourceType: "pipeline",
 		Time:         time.Now(),
-		Data:         p,
+		Data:         *p,
 	}
 }
