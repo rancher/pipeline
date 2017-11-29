@@ -66,10 +66,9 @@ func (j JenkinsProvider) RerunActivity(a *model.Activity) error {
 		return err
 	}
 	a.NodeName = nodeName
-	//set to original git commit
-	err = j.SetSCMCommit(a)
+	err = j.UpdateJobConf(a)
 	if err != nil {
-		logrus.Errorf("set scm commit fail,%v", err)
+		logrus.Errorf("fail to update job config before rerun: %v", err)
 	}
 
 	logrus.Infof("rerunpipeline,get nodeName:%v", nodeName)
@@ -191,19 +190,23 @@ func (j JenkinsProvider) DeleteFormerBuild(activity *model.Activity) error {
 
 }
 
-//SetSCMCommit update jenkins job SCM to use commit id in activity
-func (j JenkinsProvider) SetSCMCommit(activity *model.Activity) error {
-	conf := j.generateStepJenkinsProject(activity, 0, 0)
-	if activity.CommitInfo != "" {
-		conf.Scm.GitBranch = activity.CommitInfo
-	}
-	jobName := getJobName(activity, 0, 0)
-	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
-	logrus.Debugf("conf:\n%v", string(bconf))
-	logrus.Debugf("trying to set commit")
-	if err := UpdateJob(jobName, bconf); err != nil {
-		logrus.Errorf("updatejob error:%v", err)
-		return err
+//UpdateJobConf update jenkins job config
+//use commit id in activity and try with a valid node.
+func (j JenkinsProvider) UpdateJobConf(activity *model.Activity) error {
+	for stageNum := 0; stageNum < len(activity.ActivityStages); stageNum++ {
+		for stepNum := 0; stepNum < len(activity.ActivityStages[stageNum].ActivitySteps); stepNum++ {
+			conf := j.generateStepJenkinsProject(activity, stageNum, stepNum)
+			if stageNum == 0 && stepNum == 0 && activity.CommitInfo != "" && activity.CommitInfo != "null" {
+				conf.Scm.GitBranch = activity.CommitInfo
+			}
+			jobName := getJobName(activity, stageNum, stepNum)
+			bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
+			logrus.Debugf("updating jenkins job:%s", jobName)
+			if err := UpdateJob(jobName, bconf); err != nil {
+				logrus.Errorf("updatejob error:%v", err)
+				return err
+			}
+		}
 	}
 	return nil
 }
