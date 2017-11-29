@@ -159,8 +159,11 @@ func (j JenkinsProvider) CreateStage(activity *model.Activity, ordinal int) erro
 //getNodeNameToRun gets a random node name to run
 func getNodeNameToRun() (string, error) {
 	nodes, err := GetActiveNodesName()
-	if err != nil || len(nodes) == 0 {
+	if err != nil {
 		return "", errors.Wrapf(err, "fail to find an active node to work")
+	}
+	if len(nodes) == 0 {
+		return "", errors.New("no active worker node available, please add at least one slave node or check if it is ready")
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	index := r.Intn(len(nodes))

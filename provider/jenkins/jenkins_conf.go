@@ -83,7 +83,6 @@ const GetActiveNodesScript = `for (slave in hudson.model.Hudson.instance.slaves)
 	    println slave.name;
   }
 }
-println "master"
 `
 const upgradeStackScript = `
 set +x
