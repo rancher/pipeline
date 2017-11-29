@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -44,15 +45,11 @@ func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
 	}
 
 	id := req.FormValue("pipelineId")
-	pipeline := service.GetPipelineById(id)
-	if pipeline == nil {
-		err := errors.Wrapf(model.ErrPipelineNotFound, "pipeline <%s>", id)
-		rw.WriteHeader(http.StatusInternalServerError)
-		rw.Write([]byte("pipeline not found!"))
-		return err
+	pipeline, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
 	}
 	if !pipeline.IsActivate {
-		logrus.Errorf("pipeline is not activated!")
 		return errors.New("pipeline is not activated")
 	}
 	if !manager.VerifyWebhookPayload(pipeline, req) {

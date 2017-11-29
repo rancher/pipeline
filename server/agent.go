@@ -184,7 +184,11 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	if cr.Spec != "" {
 		err := cr.AddFunc(cr.Spec, func() {
 			logrus.Debugf("invoke pipeline %v cron job", cr.PipelineId)
-			ppl := service.GetPipelineById(pId)
+			ppl, err := service.GetPipelineById(pId)
+			if err != nil {
+				logrus.Errorf("fail to get pipeline:%v", err)
+				return
+			}
 			latestCommit, err := git.BranchHeadCommit(ppl.Stages[0].Steps[0].Repository, ppl.Stages[0].Steps[0].Branch)
 			if err != nil {
 				logrus.Errorf("cron job fail,Error:%v", err)

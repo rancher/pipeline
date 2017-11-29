@@ -3,6 +3,7 @@ package service
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"time"
 
@@ -13,10 +14,10 @@ import (
 	"github.com/robfig/cron"
 )
 
-func GetPipelineById(id string) *model.Pipeline {
+func GetPipelineById(id string) (*model.Pipeline, error) {
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
-		return nil
+		return nil, err
 	}
 	filters := make(map[string]interface{})
 	filters["key"] = id
@@ -26,17 +27,15 @@ func GetPipelineById(id string) *model.Pipeline {
 	})
 	if err != nil {
 		logrus.Errorf("Error %v filtering genericObjects by key", err)
-		return nil
+		return nil, err
 	}
 	if len(goCollection.Data) == 0 {
-		logrus.Errorf("Error %v filtering genericObjects by key", err)
-		return nil
+		return nil, fmt.Errorf("pipeline '%s' is not found", id)
 	}
 	data := goCollection.Data[0]
 	ppl := &model.Pipeline{}
 	json.Unmarshal([]byte(data.ResourceData["data"].(string)), ppl)
-	logrus.Debugf("get pipeline:%v", ppl)
-	return ppl
+	return ppl, nil
 }
 
 func CreatePipeline(pipeline *model.Pipeline) error {
@@ -61,6 +60,7 @@ func CreatePipeline(pipeline *model.Pipeline) error {
 
 	return err
 }
+
 func UpdatePipeline(pipeline *model.Pipeline) error {
 	b, err := json.Marshal(*pipeline)
 	if err != nil {
@@ -150,9 +150,9 @@ func ListPipelines() []*model.Pipeline {
 }
 
 func RunPipeline(provider model.PipelineProvider, id string, triggerType string) (*model.Activity, error) {
-	pp := GetPipelineById(id)
-	if pp == nil {
-		return nil, model.ErrPipelineNotFound
+	pp, err := GetPipelineById(id)
+	if err != nil {
+		return nil, fmt.Errorf("fail to get pipeline: %v", err)
 	}
 
 	activity, err := provider.RunPipeline(pp, triggerType)

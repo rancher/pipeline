@@ -363,8 +363,8 @@ func priorityPendingActivity(activities []*model.Activity) []interface{} {
 func (s *Server) UpdateLastActivity(activity *model.Activity) {
 	logrus.Debugf("begin UpdateLastActivity")
 	pId := activity.Pipeline.Id
-	p := service.GetPipelineById(pId)
-	if p == nil || p.LastRunId == "" {
+	p, err := service.GetPipelineById(pId)
+	if err != nil {
 		return
 	}
 	if activity.Id != p.LastRunId {
