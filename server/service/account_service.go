@@ -182,28 +182,30 @@ func RemoveAccount(id string) (*model.GitAccount, error) {
 	return account, nil
 }
 
-func CleanAccounts(scmType string) error {
+func CleanAccounts(scmType string) ([]*model.GitAccount, error) {
 
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	geObjList, err := PaginateGenericObjects(GIT_ACCOUNT_TYPE)
 	if err != nil {
 		logrus.Errorf("fail to list acciybt,err:%v", err)
-		return err
+		return nil, err
 	}
+	delAccounts := []*model.GitAccount{}
 	for _, gobj := range geObjList {
 		account := &model.GitAccount{}
 		if err := json.Unmarshal([]byte(gobj.ResourceData["data"].(string)), account); err != nil {
 			logrus.Errorf("parse data got error:%v", err)
 			continue
 		}
+		delAccounts = append(delAccounts, account)
 		if account.AccountType == scmType {
 			apiClient.GenericObject.Delete(&gobj)
 		}
 	}
-	return nil
+	return delAccounts, nil
 }
 
 func CreateAccount(account *model.GitAccount) error {

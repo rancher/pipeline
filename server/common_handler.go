@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/websocket"
@@ -14,7 +13,6 @@ import (
 	"github.com/rancher/pipeline/model"
 	"github.com/rancher/pipeline/server/service"
 	"github.com/rancher/pipeline/util"
-	"github.com/sluu99/uuid"
 )
 
 func (s *Server) Webhook(rw http.ResponseWriter, req *http.Request) error {
@@ -81,7 +79,7 @@ func (s *Server) ServeStatusWS(w http.ResponseWriter, r *http.Request) error {
 	if err != nil || uid == "" {
 		logrus.Errorf("get currentUser fail,%v,%v", uid, err)
 	}
-	connHolder := &ConnHolder{agent: MyAgent, conn: conn, send: make(chan WSMsg)}
+	connHolder := &ConnHolder{agent: GlobalAgent, conn: conn, send: make(chan WSMsg)}
 
 	connHolder.agent.register <- connHolder
 
@@ -111,7 +109,7 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 
-	mutex := MyAgent.getActivityLock(activityId)
+	mutex := GlobalAgent.getActivityLock(activityId)
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -128,13 +126,7 @@ func (s *Server) StepStart(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "activity",
-		Time:         time.Now(),
-		Data:         *activity,
-	}
+	broadcastResourceChange(*activity)
 	return nil
 }
 
@@ -151,7 +143,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	mutex := MyAgent.getActivityLock(activityId)
+	mutex := GlobalAgent.getActivityLock(activityId)
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -180,13 +172,7 @@ func (s *Server) StepFinish(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "activity",
-		Time:         time.Now(),
-		Data:         *activity,
-	}
+	broadcastResourceChange(*activity)
 	s.UpdateLastActivity(activity)
 
 	if service.IsComplete(activity) {

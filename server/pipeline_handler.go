@@ -101,7 +101,7 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 
-	MyAgent.onPipelineChange(ppl)
+	GlobalAgent.onPipelineChange(ppl)
 	apiContext.Write(model.ToPipelineResource(apiContext, ppl))
 	return nil
 }
@@ -161,7 +161,7 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 
-	MyAgent.onPipelineChange(ppl)
+	GlobalAgent.onPipelineChange(ppl)
 	apiContext.Write(model.ToPipelineResource(apiContext, ppl))
 	return nil
 }
@@ -191,7 +191,7 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineDelete(r)
+	GlobalAgent.onPipelineDelete(r)
 	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
 }
@@ -212,7 +212,7 @@ func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) err
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineActivate(r)
+	GlobalAgent.onPipelineActivate(r)
 	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
 
@@ -234,7 +234,7 @@ func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) e
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineDeActivate(r)
+	GlobalAgent.onPipelineDeActivate(r)
 	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
 }
@@ -276,7 +276,6 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	//MyAgent.watchActivityC <- activity
 	apiContext.Write(model.ToActivityResource(apiContext, activity))
 	return nil
 }

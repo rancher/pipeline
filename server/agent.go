@@ -33,10 +33,37 @@ type Agent struct {
 	activityLocks syncmap.Map
 }
 
-var MyAgent *Agent
+var GlobalAgent *Agent
+
+func broadcastResourceChange(obj interface{}) {
+	resourceType := ""
+	switch obj.(type) {
+	case model.Activity:
+		resourceType = "activity"
+	case model.Pipeline:
+		resourceType = "pipeline"
+	case model.GitAccount:
+		resourceType = "gitaccount"
+	case model.PipelineSetting:
+		resourceType = "setting"
+	case model.SCMSetting:
+		resourceType = "scmSetting"
+	default:
+		logrus.Warningf("unsupported resource type to broadcast")
+		return
+
+	}
+	GlobalAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: resourceType,
+		Time:         time.Now(),
+		Data:         obj,
+	}
+}
 
 func InitAgent(s *Server) {
-	MyAgent = &Agent{
+	GlobalAgent = &Agent{
 		Server:                s,
 		connHolders:           make(map[*ConnHolder]bool),
 		register:              make(chan *ConnHolder),
@@ -47,9 +74,9 @@ func InitAgent(s *Server) {
 		unregisterCronRunnerC: make(chan string),
 		activityLocks:         syncmap.Map{},
 	}
-	logrus.Debugf("inited myagent:%v", MyAgent)
-	go MyAgent.handleWS()
-	go MyAgent.RunScheduler()
+	logrus.Debugf("inited GlobalAgent:%v", GlobalAgent)
+	go GlobalAgent.handleWS()
+	go GlobalAgent.RunScheduler()
 
 }
 

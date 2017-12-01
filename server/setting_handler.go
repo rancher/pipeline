@@ -5,14 +5,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/mux"
 	"github.com/rancher/go-rancher/api"
 	v1client "github.com/rancher/go-rancher/client"
 	"github.com/rancher/pipeline/model"
 	"github.com/rancher/pipeline/server/service"
-	"github.com/sluu99/uuid"
 )
 
 //Get pipelineSetting Handler
@@ -87,17 +85,16 @@ func (s *Server) UpdateSCMSetting(rw http.ResponseWriter, req *http.Request) err
 	if err != nil {
 		return err
 	}
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "scmSetting",
-		Time:         time.Now(),
-		Data:         *setting,
-	}
-	//TODO check Admin auth
+	broadcastResourceChange(*setting)
 	if setting.IsAuth == false {
-		//disable github oauth,then remove accounts
-		service.CleanAccounts(setting.ScmType)
+		delAccounts, err := service.CleanAccounts(setting.ScmType)
+		if err != nil {
+			return err
+		}
+		for _, account := range delAccounts {
+			account.Status = "removed"
+			broadcastResourceChange(*account)
+		}
 	}
 	model.ToSCMSettingResource(apiContext, setting)
 	apiContext.Write(setting)
@@ -109,8 +106,13 @@ func (s *Server) RemoveSCMSetting(rw http.ResponseWriter, req *http.Request) err
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 
-	if err := service.CleanAccounts(id); err != nil {
+	delAccounts, err := service.CleanAccounts(id)
+	if err != nil {
 		return err
+	}
+	for _, account := range delAccounts {
+		account.Status = "removed"
+		broadcastResourceChange(*account)
 	}
 
 	setting, err := service.RemoveSCMSetting(id)
@@ -118,13 +120,7 @@ func (s *Server) RemoveSCMSetting(rw http.ResponseWriter, req *http.Request) err
 		return err
 	}
 	setting.Status = "removed"
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "scmSetting",
-		Time:         time.Now(),
-		Data:         *setting,
-	}
+	broadcastResourceChange(*setting)
 	apiContext.Write(model.ToSCMSettingResource(apiContext, setting))
 	return nil
 }

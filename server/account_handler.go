@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
@@ -14,7 +13,6 @@ import (
 	"github.com/rancher/pipeline/model"
 	"github.com/rancher/pipeline/server/service"
 	"github.com/rancher/pipeline/util"
-	"github.com/sluu99/uuid"
 )
 
 func (s *Server) ListAccounts(rw http.ResponseWriter, req *http.Request) error {
@@ -71,13 +69,7 @@ func (s *Server) RemoveAccount(rw http.ResponseWriter, req *http.Request) error 
 		return err
 	}
 	a.Status = "removed"
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "gitaccount",
-		Time:         time.Now(),
-		Data:         *a,
-	}
+	broadcastResourceChange(*a)
 	return nil
 }
 
@@ -238,25 +230,13 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 
 	s.Provider.OnCreateAccount(account)
 
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "gitaccount",
-		Time:         time.Now(),
-		Data:         *account,
-	}
+	broadcastResourceChange(*account)
 	go service.RefreshRepos(account.Id)
 	setting, err := service.GetSCMSetting(scmType)
 	if err != nil {
 		return err
 	}
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "scmSetting",
-		Time:         time.Now(),
-		Data:         *setting,
-	}
+	broadcastResourceChange(*setting)
 	model.ToSCMSettingResource(apiContext, setting)
 	if err = apiContext.WriteResource(setting); err != nil {
 		return err
