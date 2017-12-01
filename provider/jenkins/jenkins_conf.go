@@ -65,8 +65,7 @@ var JenkinsConfig = jenkinsConfig{
 //Script to execute on specific node
 const ScriptSkel = `import hudson.util.RemotingDiagnostics; 
 node = "%s"
-script = "%s"
-cmd = 'def proc = "'+script+'".execute(); proc.waitFor(); println proc.in.text';
+cmd = "def proc = ['bash', '-c', '%s'].execute();proc.waitFor();println proc.in.text;"
 for (slave in hudson.model.Hudson.instance.slaves) {
   if(slave.name==node){
 	println RemotingDiagnostics.executeGroovy(cmd, slave.getChannel());

@@ -479,6 +479,7 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		argsPara := ""
 		svcPara := ""
 		svcCheck := ""
+		labelPara := fmt.Sprintf("-l activityid=%s", activity.Id)
 		if step.ShellScript != "" {
 			entrypointPara = "--entrypoint /bin/sh"
 			entryFileName := fmt.Sprintf(".r_cicd_entrypoint_%s.sh", util.RandStringRunes(4))
@@ -523,6 +524,8 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(envVars)
+		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString(labelPara)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(svcPara)
 		stringBuilder.WriteString(" ")
@@ -833,13 +836,8 @@ func (j JenkinsProvider) SyncActivityStale(activity *model.Activity) (bool, erro
 
 //OnActivityCompelte helps clean up
 func (j JenkinsProvider) OnActivityCompelte(activity *model.Activity) {
-	//clean services in activity
-	services := service.GetAllServices(activity)
-	containerNames := []string{}
-	for _, service := range services {
-		containerNames = append(containerNames, service.ContainerName)
-	}
-	command := "docker rm -f " + strings.Join(containerNames, " ")
+	//clean related container by label
+	command := fmt.Sprintf("docker ps --filter label=activityid=%s -q | xargs docker rm -f", activity.Id)
 	cleanServiceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
 	logrus.Debugf("cleanservicescript is: %v", cleanServiceScript)
 	res, err := ExecScript(cleanServiceScript)
