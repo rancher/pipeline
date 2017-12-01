@@ -71,9 +71,9 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		}
 		logrus.Debugf("got imported pipeline:\n%v", ppl)
 	}
-	model.Clean(ppl)
+	service.CleanPipeline(ppl)
 
-	if err := model.Validate(ppl); err != nil {
+	if err := service.Validate(ppl); err != nil {
 		return err
 	}
 	//valid git account access
@@ -114,7 +114,7 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, ppl); err != nil {
 		return err
 	}
-	if err := model.Validate(ppl); err != nil {
+	if err := service.Validate(ppl); err != nil {
 		return err
 	}
 	//valid git account access
@@ -249,7 +249,7 @@ func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error
 	if !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
-	model.Clean(r)
+	service.CleanPipeline(r)
 	content, err := yaml.Marshal(r.PipelineContent)
 	if err != nil {
 		return err

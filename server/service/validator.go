@@ -1,4 +1,4 @@
-package model
+package service
 
 import (
 	"fmt"
@@ -6,13 +6,14 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/rancher/pipeline/model"
 	"github.com/robfig/cron"
 )
 
 var ErrInvalidPipeline = errors.New("Invalid Pipeline definition")
 var regName = regexp.MustCompile(`^[\w]+[\w-_]*`)
 
-func Clean(p *Pipeline) {
+func CleanPipeline(p *model.Pipeline) {
 	p.VersionSequence = ""
 	p.RunCount = 0
 	p.LastRunId = ""
@@ -42,13 +43,12 @@ func Clean(p *Pipeline) {
 
 }
 
-func Validate(p *Pipeline) error {
-	if p.Name == "" {
-		return errors.New("Pipeline name should not be null!")
+func Validate(p *model.Pipeline) error {
+	if err := checkPipelineName(p); err != nil {
+		return err
 	}
-
 	//check scm step
-	if len(p.Stages) < 1 || len(p.Stages[0].Steps) < 1 || p.Stages[0].Steps[0].Type != StepTypeSCM {
+	if len(p.Stages) < 1 || len(p.Stages[0].Steps) < 1 || p.Stages[0].Steps[0].Type != model.StepTypeSCM {
 		return errors.New("SCM type should be the first step")
 	}
 
@@ -78,9 +78,9 @@ func Validate(p *Pipeline) error {
 	return nil
 }
 
-func validateStep(step *Step) error {
+func validateStep(step *model.Step) error {
 	switch step.Type {
-	case StepTypeSCM:
+	case model.StepTypeSCM:
 		if step.Repository == "" {
 			return errors.Wrap(ErrInvalidPipeline, "repo field should not be null for SCM step")
 		}
@@ -90,26 +90,26 @@ func validateStep(step *Step) error {
 		if !strings.HasSuffix(step.Repository, ".git") {
 			return errors.Wrap(ErrInvalidPipeline, "Invalid repo url for SCM step")
 		}
-	case StepTypeTask:
+	case model.StepTypeTask:
 		if step.Image == "" {
 			return errors.Wrap(ErrInvalidPipeline, "Image field should not be null for task step")
 		}
-	case StepTypeBuild:
+	case model.StepTypeBuild:
 		if step.TargetImage == "" {
 			return errors.Wrap(ErrInvalidPipeline, "Target Image field should not be null for build step")
 		}
-	case StepTypeUpgradeService:
+	case model.StepTypeUpgradeService:
 		if step.ImageTag == "" {
 			return errors.Wrap(ErrInvalidPipeline, "Image field should not be null for upgradeService step")
 		}
 		if len(step.ServiceSelector) == 0 {
 			return errors.Wrap(ErrInvalidPipeline, "Service selector should not be null for upgradeService step")
 		}
-	case StepTypeUpgradeStack:
+	case model.StepTypeUpgradeStack:
 		if step.StackName == "" {
 			return errors.Wrap(ErrInvalidPipeline, "StackName should not be null for upgradeStack step")
 		}
-	case StepTypeUpgradeCatalog:
+	case model.StepTypeUpgradeCatalog:
 		if step.ExternalId == "" {
 			return errors.Wrap(ErrInvalidPipeline, "ExternalId should not be null for upgradeCatalog step")
 		}
@@ -120,7 +120,20 @@ func validateStep(step *Step) error {
 	return nil
 }
 
-func checkStageName(stages []*Stage) error {
+func checkPipelineName(p *model.Pipeline) error {
+	if p.Name == "" {
+		return errors.New("Pipeline name should not be null!")
+	}
+	pipelines := ListPipelines()
+	for _, exist := range pipelines {
+		if exist.Name == p.Name && exist.Id != p.Id {
+			return errors.New("pipeline name is used in existing pipeline, please set a unique name")
+		}
+	}
+	return nil
+}
+
+func checkStageName(stages []*model.Stage) error {
 	names := map[string]bool{}
 	for _, stage := range stages {
 		if stage.Name == "" {
@@ -145,7 +158,7 @@ func checkCronSpec(spec string) error {
 	return nil
 }
 
-func checkCondition(conditions *PipelineConditions) error {
+func checkCondition(conditions *model.PipelineConditions) error {
 	if conditions == nil {
 		return nil
 	}
@@ -162,7 +175,7 @@ func checkCondition(conditions *PipelineConditions) error {
 	return nil
 }
 
-func checkServiceName(p *Pipeline) error {
+func checkServiceName(p *model.Pipeline) error {
 	names := map[string]bool{}
 	for _, stage := range p.Stages {
 		for _, step := range stage.Steps {
