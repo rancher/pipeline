@@ -161,6 +161,7 @@ func ToPipelineResource(apiContext *api.ApiContext, pipeline *Pipeline) *Pipelin
 
 	pipeline.Links["activities"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activities")
 	pipeline.Links["exportConfig"] = apiContext.UrlBuilder.Link(pipeline.Resource, "exportConfig")
+	filterPipeline(pipeline)
 	return pipeline
 }
 
@@ -182,8 +183,7 @@ func ToActivityResource(apiContext *api.ApiContext, a *Activity) *Activity {
 		a.Actions["stop"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=stop"
 	}
 
-	//remove pipeline reference
-	a.Pipeline.Type = ""
+	filterActivity(a)
 	return a
 }
 
@@ -202,7 +202,7 @@ func ToAccountResource(apiContext *api.ApiContext, account *GitAccount) *GitAcco
 	account.Actions["refreshrepos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=refreshrepos"
 	account.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=remove"
 	account.Links["repos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "/repos"
-	account.AccessToken = ""
+	filterAccount(account)
 	return account
 }
 
@@ -239,5 +239,23 @@ func ToSCMSettingResource(apiContext *api.ApiContext, setting *SCMSetting) *SCMS
 	}
 	setting.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
 	setting.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=remove"
+	filterSCMSetting(setting)
 	return setting
+}
+
+func filterPipeline(pipeline *Pipeline) {
+	pipeline.WebHookToken = ""
+}
+
+func filterActivity(activity *Activity) {
+	//remove pipeline reference
+	activity.Pipeline.Type = ""
+}
+
+func filterAccount(account *GitAccount) {
+	account.AccessToken = ""
+}
+
+func filterSCMSetting(setting *SCMSetting) {
+	setting.ClientSecret = ""
 }

@@ -250,6 +250,7 @@ func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	service.CleanPipeline(r)
+	service.FilerToken(r)
 	content, err := yaml.Marshal(r.PipelineContent)
 	if err != nil {
 		return err

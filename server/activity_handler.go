@@ -128,11 +128,6 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
 
-	if err = service.ResetActivity(s.Provider, r); err != nil {
-		logrus.Errorf("reset activity error:%v", err)
-		return err
-	}
-
 	if err = service.RerunActivity(s.Provider, r); err != nil {
 		logrus.Errorf("rerun activity error:%v", err)
 		return err

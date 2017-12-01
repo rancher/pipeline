@@ -60,6 +60,23 @@ func (j JenkinsProvider) RunPipeline(p *model.Pipeline, triggerType string) (*mo
 
 //RerunActivity runs an existing activity
 func (j JenkinsProvider) RerunActivity(a *model.Activity) error {
+
+	jobName := getJobName(a, 0, 0)
+	_, err := GetJobInfo(jobName)
+	if err != nil {
+		//job records are missing in jenkins, regenerate them
+		for i := 0; i < len(a.Pipeline.Stages); i++ {
+			if err := j.CreateStage(a, i); err != nil {
+				logrus.Error(errors.Wrapf(err, "recreate stage <%s> fail", a.Pipeline.Stages[i].Name))
+				return err
+			}
+		}
+	} else {
+		//clean previous build
+		if err := DeleteFormerBuild(a); err != nil {
+			return err
+		}
+	}
 	//find an available node to run
 	nodeName, err := getNodeNameToRun()
 	if err != nil {
@@ -172,10 +189,7 @@ func getNodeNameToRun() (string, error) {
 }
 
 //DeleteFormerBuild delete last build info of a completed activity
-func (j JenkinsProvider) DeleteFormerBuild(activity *model.Activity) error {
-	if activity.Status == model.ActivityBuilding || activity.Status == model.ActivityWaiting {
-		return errors.New("cannot delete lastbuild of running activity!")
-	}
+func DeleteFormerBuild(activity *model.Activity) error {
 	for stageOrdinal, stage := range activity.ActivityStages {
 		for stepOrdinal, step := range stage.ActivitySteps {
 			jobName := getJobName(activity, stageOrdinal, stepOrdinal)

@@ -248,7 +248,6 @@ type PipelineProvider interface {
 	StopActivity(*Activity) error
 	SyncActivity(*Activity) error
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
-	DeleteFormerBuild(*Activity) error
 	OnActivityCompelte(*Activity)
 	OnCreateAccount(*GitAccount) error
 	OnDeleteAccount(*GitAccount) error

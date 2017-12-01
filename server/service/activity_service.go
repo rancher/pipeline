@@ -151,6 +151,11 @@ func DeleteActivity(id string) error {
 
 func RerunActivity(provider model.PipelineProvider, activity *model.Activity) error {
 
+	if activity.Status == model.ActivityBuilding || activity.Status == model.ActivityWaiting {
+		return errors.New("not allow to rerun a running activity")
+	}
+	ResetActivityStatus(activity)
+
 	if err := provider.RerunActivity(activity); err != nil {
 		return err
 	}
@@ -158,18 +163,8 @@ func RerunActivity(provider model.PipelineProvider, activity *model.Activity) er
 	return nil
 }
 
-//ResetActivity delete previous build info and reset activity status
-func ResetActivity(provider model.PipelineProvider, activity *model.Activity) error {
-	if err := provider.DeleteFormerBuild(activity); err != nil {
-		return err
-	}
-	resetActivityStatus(activity)
-	return nil
-
-}
-
 //resetActivityStatus reset status and timestamp
-func resetActivityStatus(activity *model.Activity) {
+func ResetActivityStatus(activity *model.Activity) {
 	activity.Status = model.ActivityWaiting
 	activity.PendingStage = 0
 	activity.StartTS = 0

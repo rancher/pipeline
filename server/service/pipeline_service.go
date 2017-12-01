@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/url"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -62,13 +61,6 @@ func CreatePipeline(pipeline *model.Pipeline) error {
 }
 
 func UpdatePipeline(pipeline *model.Pipeline) error {
-	b, err := json.Marshal(*pipeline)
-	if err != nil {
-		return err
-	}
-	resourceData := map[string]interface{}{
-		"data": string(b),
-	}
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
 		return err
@@ -89,6 +81,20 @@ func UpdatePipeline(pipeline *model.Pipeline) error {
 		return err
 	}
 	existing := goCollection.Data[0]
+	prevPipeline := &model.Pipeline{}
+	if err := json.Unmarshal([]byte(existing.ResourceData["data"].(string)), prevPipeline); err != nil {
+		return err
+	}
+	pipeline.WebHookToken = prevPipeline.WebHookToken
+
+	b, err := json.Marshal(*pipeline)
+	if err != nil {
+		return err
+	}
+	resourceData := map[string]interface{}{
+		"data": string(b),
+	}
+
 	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
 		Name:         pipeline.Name,
 		Key:          pipeline.Id,
@@ -177,6 +183,17 @@ func HasStageCondition(s *model.Stage) bool {
 	return s.Conditions != nil && (len(s.Conditions.All) > 0 || len(s.Conditions.Any) > 0)
 }
 
+func FilerToken(pipeline *model.Pipeline) {
+	pipeline.WebHookToken = ""
+	for _, stage := range pipeline.Stages {
+		for _, step := range stage.Steps {
+			if step.Secretkey != "" {
+				step.Secretkey = "******"
+			}
+		}
+	}
+}
+
 func GetNextRunTime(pipeline *model.Pipeline) int64 {
 	nextRunTime := int64(0)
 	if !pipeline.IsActivate {
@@ -201,55 +218,4 @@ func GetNextRunTime(pipeline *model.Pipeline) int64 {
 	nextRunTime = schedule.Next(time.Now().In(loc)).UnixNano() / int64(time.Millisecond)
 
 	return nextRunTime
-}
-
-func PaginateGenericObjects(kind string) ([]client.GenericObject, error) {
-	result := []client.GenericObject{}
-	limit := "1000"
-	marker := ""
-	var pageData []client.GenericObject
-	var err error
-	for {
-		pageData, marker, err = getGenericObjects(kind, limit, marker)
-		if err != nil {
-			logrus.Debugf("get genericobject err:%v", err)
-			return nil, err
-		}
-		result = append(result, pageData...)
-		if marker == "" {
-			break
-		}
-	}
-	return result, nil
-}
-
-func getGenericObjects(kind string, limit string, marker string) ([]client.GenericObject, string, error) {
-	apiClient, err := util.GetRancherClient()
-	if err != nil {
-		logrus.Errorf("fail to get client:%v", err)
-		return nil, "", err
-	}
-	filters := make(map[string]interface{})
-	filters["kind"] = kind
-	filters["limit"] = limit
-	filters["marker"] = marker
-	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
-		Filters: filters,
-	})
-	if err != nil {
-		logrus.Errorf("fail querying generic objects, error:%v", err)
-		return nil, "", err
-	}
-	//get next marker
-	nextMarker := ""
-	if goCollection.Pagination != nil && goCollection.Pagination.Next != "" {
-		r, err := url.Parse(goCollection.Pagination.Next)
-		if err != nil {
-			logrus.Errorf("fail parsing next url, error:%v", err)
-			return nil, "", err
-		}
-		nextMarker = r.Query().Get("marker")
-	}
-	return goCollection.Data, nextMarker, err
-
 }
