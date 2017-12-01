@@ -90,7 +90,8 @@ func (j JenkinsProvider) StopActivity(a *model.Activity) error {
 		} else {
 			for stepOrdinal := 0; stepOrdinal < len(stage.ActivitySteps); stepOrdinal++ {
 				if err := j.StopStep(a, stageOrdinal, stepOrdinal); err != nil {
-					return err
+					logrus.Errorf("stop step got: %v", err)
+					continue
 				}
 			}
 			logrus.Debugf("aborting stage, current status: %s", stage.Status)
@@ -487,7 +488,8 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		if step.IsService {
 			containerName := activity.Id + step.Alias
 			svcPara = "-itd --name " + containerName
-			svcCheck = fmt.Sprintf("\nsleep 3;if [ \"$(docker inspect -f {{.State.Running}} %s)\" = \"false\" ];then docker logs \"%s\";echo \"Error: service container \\\"%s\\\" is stopped.\ncheck above logs or the task step config.\nA running container is expected when using \\\"as a service\\\" option.\";exit 1;fi", containerName, containerName, step.Alias)
+			svcCheck = fmt.Sprintf("\necho 'run a service container with alias %s.'", step.Alias)
+			svcCheck = svcCheck + fmt.Sprintf("\nsleep 3;if [ \"$(docker inspect -f {{.State.Running}} %s)\" = \"false\" ];then docker logs \"%s\";echo \"Error: service container \\\"%s\\\" is stopped.\ncheck above logs or the task step config.\nA running container is expected when using \\\"as a service\\\" option.\";exit 1;fi", containerName, containerName, step.Alias)
 		}
 
 		//add link service
