@@ -104,7 +104,7 @@ R_CICD_EOF
 #merge yaml file
 cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml
 cihelper mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
+rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
 
 rm -r ../../$TEMPDIR
 
