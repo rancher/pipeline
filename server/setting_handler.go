@@ -103,7 +103,6 @@ func (s *Server) UpdateSCMSetting(rw http.ResponseWriter, req *http.Request) err
 }
 
 func (s *Server) RemoveSCMSetting(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 
 	delAccounts, err := service.CleanAccounts(id)
@@ -121,6 +120,5 @@ func (s *Server) RemoveSCMSetting(rw http.ResponseWriter, req *http.Request) err
 	}
 	setting.Status = "removed"
 	broadcastResourceChange(*setting)
-	apiContext.Write(model.ToSCMSettingResource(apiContext, setting))
 	return nil
 }

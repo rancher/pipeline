@@ -249,7 +249,6 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 }
 
 func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 	r, err := service.GetActivity(id)
 	if err != nil {
@@ -263,7 +262,8 @@ func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
-	apiContext.Write(model.ToActivityResource(apiContext, r))
+	r.Status = "removed"
+	broadcastResourceChange(*r)
 	return nil
 }
 

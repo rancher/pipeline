@@ -167,7 +167,6 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 }
 
 func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 	ppl, err := service.GetPipelineById(id)
 	if err != nil {
@@ -192,7 +191,6 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 	GlobalAgent.onPipelineDelete(r)
-	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
 }
 
