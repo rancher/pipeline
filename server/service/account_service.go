@@ -200,8 +200,8 @@ func CleanAccounts(scmType string) ([]*model.GitAccount, error) {
 			logrus.Errorf("parse data got error:%v", err)
 			continue
 		}
-		delAccounts = append(delAccounts, account)
 		if account.AccountType == scmType {
+			delAccounts = append(delAccounts, account)
 			apiClient.GenericObject.Delete(&gobj)
 		}
 	}
