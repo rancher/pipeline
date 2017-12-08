@@ -306,6 +306,124 @@ func CreateOrUpdateCacheRepoList(accountId string, repos []*model.GitRepository)
 	return err
 }
 
+func CreateCredential(cred *model.Credential) error {
+	b, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	resourceData := map[string]interface{}{
+		"data": string(b),
+	}
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	_, err = apiClient.GenericObject.Create(&client.GenericObject{
+		Name:         cred.Id,
+		Key:          cred.Id,
+		ResourceData: resourceData,
+		Kind:         "pipelineCred",
+	})
+	return err
+}
+
+func UpdateCredential(cred *model.Credential) error {
+	b, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	resourceData := map[string]interface{}{
+		"data": string(b),
+	}
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+
+	filters := make(map[string]interface{})
+	filters["key"] = cred.Id
+	filters["kind"] = "pipelineCred"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		logrus.Errorf("Error querying account:%v", err)
+		return err
+	}
+	if len(goCollection.Data) == 0 {
+		return fmt.Errorf("credential '%s' not found", cred.Id)
+	}
+	existing := goCollection.Data[0]
+	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
+		Name:         cred.Id,
+		Key:          cred.Id,
+		ResourceData: resourceData,
+		Kind:         "pipelineCred",
+	})
+	return err
+}
+
+func GetEnvKey(clientId string) (string, error) {
+	id := "envKey:" + clientId
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return "", err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = "pipelineCred"
+	filters["key"] = id
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		return "", fmt.Errorf("Error %v filtering genericObjects by key", err)
+	}
+	if len(goCollection.Data) == 0 {
+		return "", nil
+	}
+	a := &model.Credential{}
+	data := goCollection.Data[0]
+	if err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), a); err != nil {
+		return "", err
+	}
+	return a.SecretValue, nil
+}
+
+func CreateOrUpdateEnvKey(clientId string, token string) error {
+	id := "envKey:" + clientId
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = "pipelineCred"
+	filters["key"] = id
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		return fmt.Errorf("Error %v filtering genericObjects by key", err)
+	}
+	cred := &model.Credential{
+		CredType:    "envKey",
+		PublicValue: clientId,
+		SecretValue: token,
+	}
+	cred.Id = id
+	if len(goCollection.Data) == 0 {
+		//not exist, create new
+		if err := CreateCredential(cred); err != nil {
+			return err
+		}
+	} else {
+		//update
+		if err := UpdateCredential(cred); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func ValidAccountAccess(req *http.Request, accountId string) bool {
 	return true
 }

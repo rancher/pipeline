@@ -97,6 +97,11 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		logrus.Errorf("fail createWebhook")
 		return err
 	}
+
+	if err = service.UpdatePipelineEnvKey(ppl); err != nil {
+		return err
+	}
+
 	if err = service.CreatePipeline(ppl); err != nil {
 		return err
 	}
@@ -156,8 +161,12 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 			return err
 		}
 	}
-	err = service.UpdatePipeline(ppl)
-	if err != nil {
+
+	if err = service.UpdatePipelineEnvKey(ppl); err != nil {
+		return err
+	}
+
+	if err = service.UpdatePipeline(ppl); err != nil {
 		return err
 	}
 
@@ -248,7 +257,7 @@ func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	service.CleanPipeline(r)
-	service.FilerToken(r)
+	model.FilterPipeline(r)
 	content, err := yaml.Marshal(r.PipelineContent)
 	if err != nil {
 		return err

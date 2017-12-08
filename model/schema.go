@@ -161,7 +161,7 @@ func ToPipelineResource(apiContext *api.ApiContext, pipeline *Pipeline) *Pipelin
 
 	pipeline.Links["activities"] = apiContext.UrlBuilder.Link(pipeline.Resource, "activities")
 	pipeline.Links["exportConfig"] = apiContext.UrlBuilder.Link(pipeline.Resource, "exportConfig")
-	filterPipeline(pipeline)
+	FilterPipeline(pipeline)
 	return pipeline
 }
 
@@ -183,7 +183,7 @@ func ToActivityResource(apiContext *api.ApiContext, a *Activity) *Activity {
 		a.Actions["stop"] = apiContext.UrlBuilder.ReferenceLink(a.Resource) + "?action=stop"
 	}
 
-	filterActivity(a)
+	FilterActivity(a)
 	return a
 }
 
@@ -202,7 +202,7 @@ func ToAccountResource(apiContext *api.ApiContext, account *GitAccount) *GitAcco
 	account.Actions["refreshrepos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=refreshrepos"
 	account.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "?action=remove"
 	account.Links["repos"] = apiContext.UrlBuilder.ReferenceLink(account.Resource) + "/repos"
-	filterAccount(account)
+	FilterAccount(account)
 	return account
 }
 
@@ -239,23 +239,29 @@ func ToSCMSettingResource(apiContext *api.ApiContext, setting *SCMSetting) *SCMS
 	}
 	setting.Actions["update"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=update"
 	setting.Actions["remove"] = apiContext.UrlBuilder.ReferenceLink(setting.Resource) + "?action=remove"
-	filterSCMSetting(setting)
+	FilterSCMSetting(setting)
 	return setting
 }
 
-func filterPipeline(pipeline *Pipeline) {
+func FilterPipeline(pipeline *Pipeline) {
 	pipeline.WebHookToken = ""
+	for _, stage := range pipeline.Stages {
+		for _, step := range stage.Steps {
+			step.Secretkey = ""
+		}
+	}
 }
 
-func filterActivity(activity *Activity) {
+func FilterActivity(activity *Activity) {
 	//remove pipeline reference
 	activity.Pipeline.Type = ""
+	FilterPipeline(&activity.Pipeline)
 }
 
-func filterAccount(account *GitAccount) {
+func FilterAccount(account *GitAccount) {
 	account.AccessToken = ""
 }
 
-func filterSCMSetting(setting *SCMSetting) {
+func FilterSCMSetting(setting *SCMSetting) {
 	setting.ClientSecret = ""
 }

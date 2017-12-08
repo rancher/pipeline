@@ -123,6 +123,9 @@ func Reset() error {
 	if err := cleanGO("repocache"); err != nil {
 		return err
 	}
+	if err := cleanGO("pipelineCred"); err != nil {
+		return err
+	}
 	return nil
 }
 

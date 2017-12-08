@@ -287,3 +287,10 @@ type GitRepository struct {
 	ScmType     string          `json:"scmType,omitempty"`
 	Permissions map[string]bool `json:"permissions,omitempty"`
 }
+
+type Credential struct {
+	client.Resource
+	CredType    string `json:"credType"`
+	PublicValue string `json:"publicValue"`
+	SecretValue string `json:"secretValue"`
+}

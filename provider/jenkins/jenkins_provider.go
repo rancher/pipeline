@@ -602,7 +602,11 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 			stringBuilder.WriteString(" --accesskey ")
 			stringBuilder.WriteString(QuoteShell(step.Accesskey))
 			stringBuilder.WriteString(" --secretkey ")
-			stringBuilder.WriteString(QuoteShell(step.Secretkey))
+			envKey, err := service.GetEnvKey(step.Accesskey)
+			if err != nil {
+				logrus.Errorf("error get env credential:%v", err)
+			}
+			stringBuilder.WriteString(QuoteShell(envKey))
 		} else {
 			//read from env var
 			stringBuilder.WriteString(" --envurl $CATTLE_URL")
@@ -636,7 +640,11 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		} else {
-			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
+			envKey, err := service.GetEnvKey(step.Accesskey)
+			if err != nil {
+				logrus.Errorf("error get env credential:%v", err)
+			}
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, envKey, step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		}
 	case model.StepTypeUpgradeCatalog:
@@ -671,18 +679,22 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		readme = EscapeShell(activity, readme)
 		answers := EscapeShell(activity, step.Answers)
 
-		endpoint := step.Endpoint
-		accessKey := step.Accesskey
-		secretKey := step.Secretkey
+		endpoint := "$CATTLE_URL"
+		accessKey := "$CATTLE_ACCESS_KEY"
+		envKey := "$CATTLE_SECRET_KEY"
+		var err error
+		if endpoint != "" {
 
-		if endpoint == "" {
-			endpoint = "$CATTLE_URL"
-			accessKey = "$CATTLE_ACCESS_KEY"
-			secretKey = "$CATTLE_SECRET_KEY"
+			endpoint = step.Endpoint
+			accessKey = step.Accesskey
+			envKey, err = service.GetEnvKey(step.Accesskey)
+			if err != nil {
+				logrus.Errorf("error get env credential:%v", err)
+			}
 		}
 
 		gitUserName := activity.Pipeline.Stages[0].Steps[0].GitUser
-		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
+		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, envKey, step.StackName)
 		stringBuilder.WriteString(script)
 	}
 
