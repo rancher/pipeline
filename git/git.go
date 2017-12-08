@@ -10,6 +10,11 @@ import (
 	"github.com/pkg/errors"
 )
 
+type GitClient struct {
+	UserName string
+	Password string
+}
+
 func Clone(path, url, branch string) error {
 	return runcmd("git", "clone", "-b", branch, "--single-branch", url, path)
 }
@@ -63,6 +68,35 @@ func HeadCommit(path string) (string, error) {
 func IsValid(url string) bool {
 	err := runcmd("git", "ls-remote", url)
 	return (err == nil)
+}
+
+func GetAuthRepoUrl(url, user, token string) (string, error) {
+	if user != "" && token != "" {
+		userName, err := getUserName(user)
+		if err != nil {
+			return "", err
+		}
+		url = strings.Replace(url, "://", "://"+userName+":"+token+"@", 1)
+	} else {
+		return "", errors.New("credential for git repo not provided")
+	}
+	return url, nil
+}
+
+func getUserName(gitUser string) (string, error) {
+	splits := strings.Split(gitUser, ":")
+	if len(splits) != 2 {
+		return "", fmt.Errorf("invalid gituser format '%s'", gitUser)
+	}
+	scmType := splits[0]
+	userName := splits[1]
+	if scmType == "gitlab" {
+		return "oauth2", nil
+	} else if scmType == "github" {
+		return userName, nil
+	} else {
+		return "", fmt.Errorf("unsupported scmType '%s'", scmType)
+	}
 }
 
 func runcmd(name string, arg ...string) error {
