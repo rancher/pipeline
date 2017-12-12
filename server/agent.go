@@ -33,10 +33,37 @@ type Agent struct {
 	activityLocks syncmap.Map
 }
 
-var MyAgent *Agent
+var GlobalAgent *Agent
+
+func broadcastResourceChange(obj interface{}) {
+	resourceType := ""
+	switch obj.(type) {
+	case model.Activity:
+		resourceType = "activity"
+	case model.Pipeline:
+		resourceType = "pipeline"
+	case model.GitAccount:
+		resourceType = "gitaccount"
+	case model.PipelineSetting:
+		resourceType = "setting"
+	case model.SCMSetting:
+		resourceType = "scmSetting"
+	default:
+		logrus.Warningf("unsupported resource type to broadcast")
+		return
+
+	}
+	GlobalAgent.broadcast <- WSMsg{
+		Id:           uuid.Rand().Hex(),
+		Name:         "resource.change",
+		ResourceType: resourceType,
+		Time:         time.Now(),
+		Data:         obj,
+	}
+}
 
 func InitAgent(s *Server) {
-	MyAgent = &Agent{
+	GlobalAgent = &Agent{
 		Server:                s,
 		connHolders:           make(map[*ConnHolder]bool),
 		register:              make(chan *ConnHolder),
@@ -47,9 +74,9 @@ func InitAgent(s *Server) {
 		unregisterCronRunnerC: make(chan string),
 		activityLocks:         syncmap.Map{},
 	}
-	logrus.Debugf("inited myagent:%v", MyAgent)
-	go MyAgent.handleWS()
-	go MyAgent.RunScheduler()
+	logrus.Debugf("inited GlobalAgent:%v", GlobalAgent)
+	go GlobalAgent.handleWS()
+	go GlobalAgent.RunScheduler()
 
 }
 
@@ -184,28 +211,47 @@ func (a *Agent) registerCronRunner(cr *scheduler.CronRunner) {
 	if cr.Spec != "" {
 		err := cr.AddFunc(cr.Spec, func() {
 			logrus.Debugf("invoke pipeline %v cron job", cr.PipelineId)
-			ppl := service.GetPipelineById(pId)
-			latestCommit, err := git.BranchHeadCommit(ppl.Stages[0].Steps[0].Repository, ppl.Stages[0].Steps[0].Branch)
+			ppl, err := service.GetPipelineById(pId)
 			if err != nil {
-				logrus.Errorf("cron job fail,Error:%v", err)
+				logrus.Errorf("fail to get pipeline:%v", err)
 				return
 			}
-			if ppl.CronTrigger.TriggerOnUpdate && latestCommit == ppl.CommitInfo {
-				//run only when new changes exist
-				//update nextruntime and return
-				ppl.NextRunTime = service.GetNextRunTime(ppl)
 
-				if err := service.UpdatePipeline(ppl); err != nil {
-					logrus.Errorf("update pipeline error,%v", err)
+			if ppl.CronTrigger.TriggerOnUpdate {
+				//run only when new changes exist
+
+				gitUser := ppl.Stages[0].Steps[0].GitUser
+				token, err := service.GetUserToken(gitUser)
+				if err != nil {
+					logrus.Errorf("fail to get user credential for %s: %v", gitUser, err)
+					return
 				}
-				a.broadcast <- WSMsg{
-					Id:           uuid.Rand().Hex(),
-					Name:         "resource.change",
-					ResourceType: "pipeline",
-					Time:         time.Now(),
-					Data:         ppl,
+				repoUrl, err := git.GetAuthRepoUrl(ppl.Stages[0].Steps[0].Repository, gitUser, token)
+				if err != nil {
+					logrus.Errorf("get repo credential got error: %v", err)
+					return
 				}
-				return
+				latestCommit, err := git.BranchHeadCommit(repoUrl, ppl.Stages[0].Steps[0].Branch)
+				if err != nil {
+					logrus.Errorf("cron job fail,Error:%v", err)
+					return
+				}
+				if latestCommit == ppl.CommitInfo {
+					//update nextruntime and return
+					ppl.NextRunTime = service.GetNextRunTime(ppl)
+
+					if err := service.UpdatePipeline(ppl); err != nil {
+						logrus.Errorf("update pipeline error,%v", err)
+					}
+					a.broadcast <- WSMsg{
+						Id:           uuid.Rand().Hex(),
+						Name:         "resource.change",
+						ResourceType: "pipeline",
+						Time:         time.Now(),
+						Data:         ppl,
+					}
+					return
+				}
 			}
 			_, err = service.RunPipeline(a.Server.Provider, pId, model.TriggerTypeCron)
 			if err != nil {

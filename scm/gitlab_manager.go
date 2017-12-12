@@ -18,18 +18,19 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const gitlabAPI = "%s%s/api/v4"
+//use v3 endpoint for compatibility
+const gitlabAPI = "%s%s/api/v3"
 
 type GitlabManager struct {
 	host   string
-	schema string
+	scheme string
 }
 
 func (g GitlabManager) Config(setting *model.SCMSetting) model.SCManager {
-	if setting.Schema != "" {
-		g.schema = setting.Schema
+	if setting.Scheme != "" {
+		g.scheme = setting.Scheme
 	} else {
-		g.schema = "https://"
+		g.scheme = "https://"
 	}
 	if setting.HostName != "" {
 		g.host = setting.HostName
@@ -64,15 +65,14 @@ func (g GitlabManager) GetRepos(account *model.GitAccount) ([]*model.GitReposito
 
 func (g GitlabManager) OAuth(redirectURL string, clientID string, clientSecret string, code string) (*model.GitAccount, error) {
 
-	logrus.Debugf("gitlab oauth get vars:%v,%v,%v,%v", redirectURL, clientID, clientSecret, code)
 	gitlabOauthConfig := &oauth2.Config{
 		RedirectURL:  redirectURL,
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Scopes:       []string{"api"},
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  fmt.Sprintf("%s%s/oauth/authorize", g.schema, g.host),
-			TokenURL: fmt.Sprintf("%s%s/oauth/token", g.schema, g.host),
+			AuthURL:  fmt.Sprintf("%s%s/oauth/authorize", g.scheme, g.host),
+			TokenURL: fmt.Sprintf("%s%s/oauth/token", g.scheme, g.host),
 		},
 	}
 
@@ -89,7 +89,7 @@ func (g GitlabManager) OAuth(redirectURL string, clientID string, clientSecret s
 
 func (g GitlabManager) getGitlabUser(gitlabAccessToken string) (*gitlab.User, error) {
 
-	url := fmt.Sprintf(gitlabAPI+"/user", g.schema, g.host)
+	url := fmt.Sprintf(gitlabAPI+"/user", g.scheme, g.host)
 	resp, err := getFromGitlab(gitlabAccessToken, url)
 	if err != nil {
 		logrus.Errorf("Gitlab getGitlabUser: GET url %v received error from gitlab, err: %v", url, err)
@@ -127,7 +127,7 @@ func toGitlabAccount(gitaccount *gitlab.User) *model.GitAccount {
 }
 
 func (g GitlabManager) getGitlabRepos(gitlabAccessToken string) ([]*model.GitRepository, error) {
-	url := fmt.Sprintf(gitlabAPI+"/projects?membership=true", g.schema, g.host)
+	url := fmt.Sprintf(gitlabAPI+"/projects?membership=true", g.scheme, g.host)
 	var repos []gitlab.Project
 	responses, err := paginateGitlab(gitlabAccessToken, url)
 	if err != nil {
@@ -338,7 +338,7 @@ func (g GitlabManager) createGitlabWebhook(user string, repo string, accesstoken
 
 	project := url.QueryEscape(user + "/" + repo)
 	client := http.Client{}
-	APIURL := fmt.Sprintf(gitlabAPI+"/projects/%s/hooks", g.schema, g.host, project)
+	APIURL := fmt.Sprintf(gitlabAPI+"/projects/%s/hooks", g.scheme, g.host, project)
 	req, err := http.NewRequest("POST", APIURL, nil)
 
 	opt := &gitlab.AddProjectHookOptions{
@@ -375,7 +375,7 @@ func (g GitlabManager) createGitlabWebhook(user string, repo string, accesstoken
 func (g GitlabManager) deleteGitlabWebhook(user string, repo string, accesstoken string, id int) error {
 	client := http.Client{}
 	project := url.QueryEscape(user + "/" + repo)
-	APIURL := fmt.Sprintf(gitlabAPI+"/projects/%s/hooks/%d", g.schema, g.host, project, id)
+	APIURL := fmt.Sprintf(gitlabAPI+"/projects/%s/hooks/%d", g.scheme, g.host, project, id)
 	req, err := http.NewRequest("DELETE", APIURL, nil)
 	if err != nil {
 		return err

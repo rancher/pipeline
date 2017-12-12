@@ -157,8 +157,7 @@ func ExecScript(script string) (string, error) {
 	data, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode < 200 || resp.StatusCode >= 400 {
 		logrus.Errorf("jenkins run script fail,response code is :%v", resp.StatusCode)
-		logrus.Error(ErrDeleteBuildFail)
-		return string(data), ErrDeleteBuildFail
+		return string(data), errors.New("fail exec script")
 	}
 	return string(data), nil
 }

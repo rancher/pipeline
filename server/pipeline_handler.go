@@ -10,7 +10,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
-	"github.com/pkg/errors"
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
 	v2client "github.com/rancher/go-rancher/v2"
@@ -29,15 +28,8 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 	if err != nil || uid == "" {
 		logrus.Debugf("getAccessibleAccounts unrecognized user")
 	}
-	accessibleAccounts := service.GetAccessibleAccounts(uid)
-	var pipelines []*model.Pipeline
-	allpipelines := service.ListPipelines()
-	//filter by git account access
-	for _, pipeline := range allpipelines {
-		if accessibleAccounts[pipeline.Stages[0].Steps[0].GitUser] {
-			pipelines = append(pipelines, pipeline)
-		}
-	}
+	pipelines := service.ListPipelines()
+
 	apiContext.Write(&client.GenericCollection{
 		Data: model.ToPipelineCollections(apiContext, pipelines),
 	})
@@ -47,9 +39,9 @@ func (s *Server) ListPipelines(rw http.ResponseWriter, req *http.Request) error 
 func (s *Server) ListPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	r := service.GetPipelineById(id)
-	if r == nil {
-		return model.ErrPipelineNotFound
+	r, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
 	}
 	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
@@ -79,9 +71,9 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		}
 		logrus.Debugf("got imported pipeline:\n%v", ppl)
 	}
-	model.Clean(ppl)
+	service.CleanPipeline(ppl)
 
-	if err := model.Validate(ppl); err != nil {
+	if err := service.Validate(ppl); err != nil {
 		return err
 	}
 	//valid git account access
@@ -105,11 +97,16 @@ func (s *Server) CreatePipeline(rw http.ResponseWriter, req *http.Request) error
 		logrus.Errorf("fail createWebhook")
 		return err
 	}
+
+	if err = service.UpdatePipelineEnvKey(ppl); err != nil {
+		return err
+	}
+
 	if err = service.CreatePipeline(ppl); err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(ppl)
+	GlobalAgent.onPipelineChange(ppl)
 	apiContext.Write(model.ToPipelineResource(apiContext, ppl))
 	return nil
 }
@@ -122,7 +119,7 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err := json.Unmarshal(data, ppl); err != nil {
 		return err
 	}
-	if err := model.Validate(ppl); err != nil {
+	if err := service.Validate(ppl); err != nil {
 		return err
 	}
 	//valid git account access
@@ -140,7 +137,10 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 		return err
 	}
 	// Update webhook
-	prevPipeline := service.GetPipelineById(id)
+	prevPipeline, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
+	}
 	if prevPipeline.Stages[0].Steps[0].Webhook && !ppl.Stages[0].Steps[0].Webhook {
 		if err = scManager.DeleteWebhook(prevPipeline, token); err != nil {
 			logrus.Error(err)
@@ -161,20 +161,26 @@ func (s *Server) UpdatePipeline(rw http.ResponseWriter, req *http.Request) error
 			return err
 		}
 	}
-	err = service.UpdatePipeline(ppl)
-	if err != nil {
+
+	if err = service.UpdatePipelineEnvKey(ppl); err != nil {
 		return err
 	}
 
-	MyAgent.onPipelineChange(ppl)
+	if err = service.UpdatePipeline(ppl); err != nil {
+		return err
+	}
+
+	GlobalAgent.onPipelineChange(ppl)
 	apiContext.Write(model.ToPipelineResource(apiContext, ppl))
 	return nil
 }
 
 func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	ppl := service.GetPipelineById(id)
+	ppl, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
+	}
 	//valid git account access
 	if !service.ValidAccountAccess(req, ppl.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", ppl.Stages[0].Steps[0].GitUser)
@@ -193,29 +199,27 @@ func (s *Server) DeletePipeline(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineDelete(r)
-	apiContext.Write(model.ToPipelineResource(apiContext, r))
+	GlobalAgent.onPipelineDelete(r)
 	return nil
 }
 
 func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	r := service.GetPipelineById(id)
-	if r == nil {
-		err := errors.Wrapf(model.ErrPipelineNotFound, "pipeline <%s>", id)
-		return err
+	r, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
 	}
 	//valid git account access
 	if !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	r.IsActivate = true
-	err := service.UpdatePipeline(r)
+	err = service.UpdatePipeline(r)
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineActivate(r)
+	GlobalAgent.onPipelineActivate(r)
 	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
 
@@ -224,36 +228,36 @@ func (s *Server) ActivatePipeline(rw http.ResponseWriter, req *http.Request) err
 func (s *Server) DeActivatePipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	r := service.GetPipelineById(id)
-	if r == nil {
-		err := errors.Wrapf(model.ErrPipelineNotFound, "pipeline <%s>", id)
-		return err
+	r, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
 	}
 	//valid git account access
 	if !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	r.IsActivate = false
-	err := service.UpdatePipeline(r)
+	err = service.UpdatePipeline(r)
 	if err != nil {
 		return err
 	}
-	MyAgent.onPipelineDeActivate(r)
+	GlobalAgent.onPipelineDeActivate(r)
 	apiContext.Write(model.ToPipelineResource(apiContext, r))
 	return nil
 }
 
 func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["id"]
-	r := service.GetPipelineById(id)
-	if r == nil {
-		return model.ErrPipelineNotFound
+	r, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
 	}
 	//valid git account access
 	if !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
-	model.Clean(r)
+	service.CleanPipeline(r)
+	model.FilterPipeline(r)
 	content, err := yaml.Marshal(r.PipelineContent)
 	if err != nil {
 		return err
@@ -268,9 +272,9 @@ func (s *Server) ExportPipeline(rw http.ResponseWriter, req *http.Request) error
 func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
-	r := service.GetPipelineById(id)
-	if r == nil {
-		return model.ErrPipelineNotFound
+	r, err := service.GetPipelineById(id)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
 	}
 	//valid git account access
 	if !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
@@ -280,7 +284,6 @@ func (s *Server) RunPipeline(rw http.ResponseWriter, req *http.Request) error {
 	if err != nil {
 		return err
 	}
-	//MyAgent.watchActivityC <- activity
 	apiContext.Write(model.ToActivityResource(apiContext, activity))
 	return nil
 }
@@ -292,9 +295,12 @@ func (s *Server) ListActivitiesOfPipeline(rw http.ResponseWriter, req *http.Requ
 		return err
 	}
 	pId := mux.Vars(req)["id"]
-	r := service.GetPipelineById(pId)
+	r, err := service.GetPipelineById(pId)
+	if err != nil {
+		return fmt.Errorf("fail to get pipeline: %v", err)
+	}
 	//valid git account access
-	if r != nil && !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
+	if !service.ValidAccountAccess(req, r.Stages[0].Steps[0].GitUser) {
 		return fmt.Errorf("no access to '%s' git account", r.Stages[0].Steps[0].GitUser)
 	}
 	filters := make(map[string]interface{})

@@ -2,12 +2,66 @@ package service
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/rancher/go-rancher/v2"
 	"github.com/rancher/pipeline/model"
 	"github.com/rancher/pipeline/scm"
 	"github.com/rancher/pipeline/util"
 )
+
+func PaginateGenericObjects(kind string) ([]client.GenericObject, error) {
+	result := []client.GenericObject{}
+	limit := "1000"
+	marker := ""
+	var pageData []client.GenericObject
+	var err error
+	for {
+		pageData, marker, err = getGenericObjects(kind, limit, marker)
+		if err != nil {
+			logrus.Debugf("get genericobject err:%v", err)
+			return nil, err
+		}
+		result = append(result, pageData...)
+		if marker == "" {
+			break
+		}
+	}
+	return result, nil
+}
+
+func getGenericObjects(kind string, limit string, marker string) ([]client.GenericObject, string, error) {
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		logrus.Errorf("fail to get client:%v", err)
+		return nil, "", err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = kind
+	filters["limit"] = limit
+	filters["marker"] = marker
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		logrus.Errorf("fail querying generic objects, error:%v", err)
+		return nil, "", err
+	}
+	//get next marker
+	nextMarker := ""
+	if goCollection.Pagination != nil && goCollection.Pagination.Next != "" {
+		r, err := url.Parse(goCollection.Pagination.Next)
+		if err != nil {
+			logrus.Errorf("fail parsing next url, error:%v", err)
+			return nil, "", err
+		}
+		nextMarker = r.Query().Get("marker")
+	}
+	return goCollection.Data, nextMarker, err
+
+}
 
 func GetSCManager(scmType string) (model.SCManager, error) {
 	s, err := GetSCMSetting(scmType)
@@ -67,6 +121,9 @@ func Reset() error {
 		return err
 	}
 	if err := cleanGO("repocache"); err != nil {
+		return err
+	}
+	if err := cleanGO("pipelineCred"); err != nil {
 		return err
 	}
 	return nil

@@ -64,7 +64,7 @@ type SCMSetting struct {
 	Status       string `json:"status,omitempty" yaml:"status,omitempty"`
 	ScmType      string `json:"scmType,omitempty" yaml:"scmType,omitempty"`
 	HostName     string `json:"hostName,omitempty" yaml:"hostName,omitempty"`
-	Schema       string `json:"schema,omitempty" yaml:"schema,omitempty"`
+	Scheme       string `json:"scheme,omitempty" yaml:"scheme,omitempty"`
 	HomePage     string `json:"homepage,omitempty" yaml:"homepage,omitempty"`
 	ClientID     string `json:"clientID,omitempty" yaml:"clientID,omitempty"`
 	ClientSecret string `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
@@ -98,8 +98,9 @@ type PipelineContent struct {
 	//for import
 	Templates map[string]string `json:"templates,omitempty" yaml:"templates,omitempty"`
 	//trigger
-	CronTrigger CronTrigger `json:"cronTrigger,omitempty" yaml:"cronTrigger,omitempty"`
-	Stages      []*Stage    `json:"stages,omitempty" yaml:"stages,omitempty"`
+	CronTrigger   CronTrigger `json:"cronTrigger,omitempty" yaml:"cronTrigger,omitempty"`
+	Stages        []*Stage    `json:"stages,omitempty" yaml:"stages,omitempty"`
+	KeepWorkspace bool        `json:"keepWorkspace,omitempty" yaml:"keepWorkspace,omitempty"`
 }
 
 type CronTrigger struct {
@@ -247,7 +248,6 @@ type PipelineProvider interface {
 	StopActivity(*Activity) error
 	SyncActivity(*Activity) error
 	GetStepLog(*Activity, int, int, map[string]interface{}) (string, error)
-	DeleteFormerBuild(*Activity) error
 	OnActivityCompelte(*Activity)
 	OnCreateAccount(*GitAccount) error
 	OnDeleteAccount(*GitAccount) error
@@ -286,4 +286,11 @@ type GitRepository struct {
 	CloneURL    string          `json:"clone_url,omitempty"`
 	ScmType     string          `json:"scmType,omitempty"`
 	Permissions map[string]bool `json:"permissions,omitempty"`
+}
+
+type Credential struct {
+	client.Resource
+	CredType    string `json:"credType"`
+	PublicValue string `json:"publicValue"`
+	SecretValue string `json:"secretValue"`
 }

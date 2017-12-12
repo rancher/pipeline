@@ -182,17 +182,18 @@ func RemoveAccount(id string) (*model.GitAccount, error) {
 	return account, nil
 }
 
-func CleanAccounts(scmType string) error {
+func CleanAccounts(scmType string) ([]*model.GitAccount, error) {
 
 	apiClient, err := util.GetRancherClient()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	geObjList, err := PaginateGenericObjects(GIT_ACCOUNT_TYPE)
 	if err != nil {
 		logrus.Errorf("fail to list acciybt,err:%v", err)
-		return err
+		return nil, err
 	}
+	delAccounts := []*model.GitAccount{}
 	for _, gobj := range geObjList {
 		account := &model.GitAccount{}
 		if err := json.Unmarshal([]byte(gobj.ResourceData["data"].(string)), account); err != nil {
@@ -200,10 +201,11 @@ func CleanAccounts(scmType string) error {
 			continue
 		}
 		if account.AccountType == scmType {
+			delAccounts = append(delAccounts, account)
 			apiClient.GenericObject.Delete(&gobj)
 		}
 	}
-	return nil
+	return delAccounts, nil
 }
 
 func CreateAccount(account *model.GitAccount) error {
@@ -304,45 +306,130 @@ func CreateOrUpdateCacheRepoList(accountId string, repos []*model.GitRepository)
 	return err
 }
 
-func ValidAccountAccess(req *http.Request, accountId string) bool {
-	uid, err := util.GetCurrentUser(req.Cookies())
-	if err != nil || uid == "" {
-		logrus.Debugf("validAccountAccess unrecognized user")
-	}
-	r, err := GetAccount(accountId)
+func CreateCredential(cred *model.Credential) error {
+	b, err := json.Marshal(cred)
 	if err != nil {
-		logrus.Errorf("get account error:%v", err)
-		return false
+		return err
 	}
-	if !r.Private || r.RancherUserID == uid {
-		return true
+	resourceData := map[string]interface{}{
+		"data": string(b),
 	}
-	return false
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	_, err = apiClient.GenericObject.Create(&client.GenericObject{
+		Name:         cred.Id,
+		Key:          cred.Id,
+		ResourceData: resourceData,
+		Kind:         "pipelineCred",
+	})
+	return err
+}
+
+func UpdateCredential(cred *model.Credential) error {
+	b, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	resourceData := map[string]interface{}{
+		"data": string(b),
+	}
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+
+	filters := make(map[string]interface{})
+	filters["key"] = cred.Id
+	filters["kind"] = "pipelineCred"
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		logrus.Errorf("Error querying account:%v", err)
+		return err
+	}
+	if len(goCollection.Data) == 0 {
+		return fmt.Errorf("credential '%s' not found", cred.Id)
+	}
+	existing := goCollection.Data[0]
+	_, err = apiClient.GenericObject.Update(&existing, &client.GenericObject{
+		Name:         cred.Id,
+		Key:          cred.Id,
+		ResourceData: resourceData,
+		Kind:         "pipelineCred",
+	})
+	return err
+}
+
+func GetEnvKey(clientId string) (string, error) {
+	id := "envKey:" + clientId
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return "", err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = "pipelineCred"
+	filters["key"] = id
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		return "", fmt.Errorf("Error %v filtering genericObjects by key", err)
+	}
+	if len(goCollection.Data) == 0 {
+		return "", nil
+	}
+	a := &model.Credential{}
+	data := goCollection.Data[0]
+	if err = json.Unmarshal([]byte(data.ResourceData["data"].(string)), a); err != nil {
+		return "", err
+	}
+	return a.SecretValue, nil
+}
+
+func CreateOrUpdateEnvKey(clientId string, token string) error {
+	id := "envKey:" + clientId
+	apiClient, err := util.GetRancherClient()
+	if err != nil {
+		return err
+	}
+	filters := make(map[string]interface{})
+	filters["kind"] = "pipelineCred"
+	filters["key"] = id
+	goCollection, err := apiClient.GenericObject.List(&client.ListOpts{
+		Filters: filters,
+	})
+	if err != nil {
+		return fmt.Errorf("Error %v filtering genericObjects by key", err)
+	}
+	cred := &model.Credential{
+		CredType:    "envKey",
+		PublicValue: clientId,
+		SecretValue: token,
+	}
+	cred.Id = id
+	if len(goCollection.Data) == 0 {
+		//not exist, create new
+		if err := CreateCredential(cred); err != nil {
+			return err
+		}
+	} else {
+		//update
+		if err := UpdateCredential(cred); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ValidAccountAccess(req *http.Request, accountId string) bool {
+	return true
 }
 
 func ValidAccountAccessById(uid string, accountId string) bool {
-	r, err := GetAccount(accountId)
-	if err != nil {
-		logrus.Errorf("get account error:%v", err)
-		return false
-	}
-	if !r.Private || r.RancherUserID == uid {
-		return true
-	}
-	return false
-}
-
-func GetAccessibleAccounts(uid string) map[string]bool {
-	result := map[string]bool{}
-	accounts, err := ListAccounts(uid)
-	if err != nil {
-		logrus.Errorf("getAccessibleAccounts error:%v", err)
-		return result
-	}
-	for _, account := range accounts {
-		result[account.Id] = true
-	}
-	return result
+	return true
 }
 
 func GetUserToken(gitUser string) (string, error) {

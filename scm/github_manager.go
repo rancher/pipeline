@@ -39,18 +39,18 @@ type GithubAccount struct {
 }
 
 type GithubManager struct {
-	schema      string
+	scheme      string
 	hostName    string
 	apiEndpoint string
 }
 
 func (g GithubManager) Config(setting *model.SCMSetting) model.SCManager {
 	if setting.HostName != "" {
-		g.schema = setting.Schema
+		g.scheme = setting.Scheme
 		g.hostName = setting.HostName
-		g.apiEndpoint = setting.Schema + setting.HostName + gheAPI
+		g.apiEndpoint = setting.Scheme + setting.HostName + gheAPI
 	} else {
-		g.schema = "https://"
+		g.scheme = "https://"
 		g.hostName = "github.com"
 		g.apiEndpoint = defaultGithubAPI
 	}
@@ -306,10 +306,6 @@ func (g GithubManager) VerifyWebhookPayload(p *model.Pipeline, req *http.Request
 	if event_type = req.Header.Get("X-GitHub-Event"); len(event_type) == 0 {
 		logrus.Errorf("receive github webhook,no event")
 		return false
-	}
-
-	if event_type == "ping" {
-		return true
 	}
 	if event_type != "push" {
 		logrus.Errorf("receive github webhook,not push event")

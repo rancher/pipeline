@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/gorilla/mux"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/rancher/pipeline/server/service"
 	"github.com/rancher/pipeline/util"
-	"github.com/sluu99/uuid"
 )
 
 //List All Activities
@@ -33,14 +31,10 @@ func (s *Server) ListActivities(rw http.ResponseWriter, req *http.Request) error
 		logrus.Errorf("cannot get currentUser,%v,%v", uid, err)
 	}
 
-	accessibleAccounts := service.GetAccessibleAccounts(uid)
 	for _, gobj := range geObjList {
 		b := []byte(gobj.ResourceData["data"].(string))
 		a := &model.Activity{}
 		json.Unmarshal(b, a)
-		if a == nil || !accessibleAccounts[a.Pipeline.Stages[0].Steps[0].GitUser] {
-			continue
-		}
 		model.ToActivityResource(apiContext, a)
 		if a.CanApprove(uid) {
 			//add approve action
@@ -119,7 +113,7 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 	id := mux.Vars(req)["id"]
 	apiContext := api.GetApiContext(req)
 
-	mutex := MyAgent.getActivityLock(id)
+	mutex := GlobalAgent.getActivityLock(id)
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -134,11 +128,6 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		return fmt.Errorf("no access to '%s' git account", r.Pipeline.Stages[0].Steps[0].GitUser)
 	}
 
-	if err = service.ResetActivity(s.Provider, r); err != nil {
-		logrus.Errorf("reset activity error:%v", err)
-		return err
-	}
-
 	if err = service.RerunActivity(s.Provider, r); err != nil {
 		logrus.Errorf("rerun activity error:%v", err)
 		return err
@@ -147,13 +136,7 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 		logrus.Errorf("update activity error:%v", err)
 		return err
 	}
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "activity",
-		Time:         time.Now(),
-		Data:         r,
-	}
+	broadcastResourceChange(*r)
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
 	return nil
@@ -162,7 +145,7 @@ func (s *Server) RerunActivity(rw http.ResponseWriter, req *http.Request) error 
 func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["id"]
 	apiContext := api.GetApiContext(req)
-	mutex := MyAgent.getActivityLock(id)
+	mutex := GlobalAgent.getActivityLock(id)
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -188,13 +171,7 @@ func (s *Server) ApproveActivity(rw http.ResponseWriter, req *http.Request) erro
 		return err
 	}
 	s.UpdateLastActivity(r)
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "activity",
-		Time:         time.Now(),
-		Data:         r,
-	}
+	broadcastResourceChange(*r)
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
 	return nil
@@ -205,7 +182,7 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["id"]
 	apiContext := api.GetApiContext(req)
 
-	mutex := MyAgent.getActivityLock(id)
+	mutex := GlobalAgent.getActivityLock(id)
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -228,13 +205,7 @@ func (s *Server) DenyActivity(rw http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "activity",
-		Time:         time.Now(),
-		Data:         r,
-	}
+	broadcastResourceChange(*r)
 	s.UpdateLastActivity(r)
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
@@ -246,7 +217,7 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 	id := mux.Vars(req)["id"]
 	apiContext := api.GetApiContext(req)
 
-	mutex := MyAgent.getActivityLock(id)
+	mutex := GlobalAgent.getActivityLock(id)
 	mutex.Lock()
 	defer mutex.Unlock()
 
@@ -268,15 +239,9 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 		logrus.Errorf("fail update activity:%v", err)
 		return err
 	}
-
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "activity",
-		Time:         time.Now(),
-		Data:         r,
-	}
+	broadcastResourceChange(*r)
 	s.UpdateLastActivity(r)
+	s.Provider.OnActivityCompelte(r)
 	model.ToActivityResource(apiContext, r)
 	apiContext.Write(r)
 	return nil
@@ -284,7 +249,6 @@ func (s *Server) StopActivity(rw http.ResponseWriter, req *http.Request) error {
 }
 
 func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error {
-	apiContext := api.GetApiContext(req)
 	id := mux.Vars(req)["id"]
 	r, err := service.GetActivity(id)
 	if err != nil {
@@ -298,7 +262,8 @@ func (s *Server) DeleteActivity(rw http.ResponseWriter, req *http.Request) error
 	if err != nil {
 		return err
 	}
-	apiContext.Write(model.ToActivityResource(apiContext, r))
+	r.Status = "removed"
+	broadcastResourceChange(*r)
 	return nil
 }
 
@@ -367,8 +332,8 @@ func priorityPendingActivity(activities []*model.Activity) []interface{} {
 func (s *Server) UpdateLastActivity(activity *model.Activity) {
 	logrus.Debugf("begin UpdateLastActivity")
 	pId := activity.Pipeline.Id
-	p := service.GetPipelineById(pId)
-	if p == nil || p.LastRunId == "" {
+	p, err := service.GetPipelineById(pId)
+	if err != nil {
 		return
 	}
 	if activity.Id != p.LastRunId {
@@ -381,11 +346,5 @@ func (s *Server) UpdateLastActivity(activity *model.Activity) {
 	if err := service.UpdatePipeline(p); err != nil {
 		logrus.Errorf("fail update pipeline last run status,%v", err)
 	}
-	MyAgent.broadcast <- WSMsg{
-		Id:           uuid.Rand().Hex(),
-		Name:         "resource.change",
-		ResourceType: "pipeline",
-		Time:         time.Now(),
-		Data:         p,
-	}
+	broadcastResourceChange(*p)
 }

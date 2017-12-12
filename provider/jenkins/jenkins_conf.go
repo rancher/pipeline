@@ -65,8 +65,7 @@ var JenkinsConfig = jenkinsConfig{
 //Script to execute on specific node
 const ScriptSkel = `import hudson.util.RemotingDiagnostics; 
 node = "%s"
-script = "%s"
-cmd = 'def proc = "'+script+'".execute(); proc.waitFor(); println proc.in.text';
+cmd = "def proc = ['bash', '-c', '%s'].execute();proc.waitFor();println proc.in.text;"
 for (slave in hudson.model.Hudson.instance.slaves) {
   if(slave.name==node){
 	println RemotingDiagnostics.executeGroovy(cmd, slave.getChannel());
@@ -83,7 +82,6 @@ const GetActiveNodesScript = `for (slave in hudson.model.Hudson.instance.slaves)
 	    println slave.name;
   }
 }
-println "master"
 `
 const upgradeStackScript = `
 set +x
@@ -105,7 +103,7 @@ R_CICD_EOF
 #merge yaml file
 cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml
 cihelper mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --force-upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
+rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
 
 rm -r ../../$TEMPDIR
 

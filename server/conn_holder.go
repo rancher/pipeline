@@ -61,34 +61,34 @@ func (c *ConnHolder) DoWrite(apiContext *api.ApiContext, uid string) {
 				return
 			}
 			switch v := message.Data.(type) {
-			case *model.Activity:
+			case model.Activity:
 				if !service.ValidAccountAccessById(uid, v.Pipeline.Stages[0].Steps[0].GitUser) {
 					continue
 				}
-				model.ToActivityResource(apiContext, v)
+				model.ToActivityResource(apiContext, &v)
 				if v.CanApprove(uid) {
 					//add approve action
 					v.Actions["approve"] = apiContext.UrlBuilder.ReferenceLink(v.Resource) + "?action=approve"
 					v.Actions["deny"] = apiContext.UrlBuilder.ReferenceLink(v.Resource) + "?action=deny"
 				}
 				message.Data = v
-			case *model.Pipeline:
+			case model.Pipeline:
 				if !service.ValidAccountAccessById(uid, v.Stages[0].Steps[0].GitUser) {
 					continue
 				}
-				model.ToPipelineResource(apiContext, v)
+				model.ToPipelineResource(apiContext, &v)
 				message.Data = v
-			case *model.GitAccount:
+			case model.GitAccount:
 				if v.RancherUserID != uid && v.Private {
 					continue
 				}
-				model.ToAccountResource(apiContext, v)
+				model.ToAccountResource(apiContext, &v)
 				message.Data = v
-			case *model.PipelineSetting:
-				model.ToPipelineSettingResource(apiContext, v)
+			case model.PipelineSetting:
+				model.ToPipelineSettingResource(apiContext, &v)
 				message.Data = v
-			case *model.SCMSetting:
-				model.ToSCMSettingResource(apiContext, v)
+			case model.SCMSetting:
+				model.ToSCMSettingResource(apiContext, &v)
 				message.Data = v
 			}
 

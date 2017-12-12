@@ -60,16 +60,32 @@ func (j JenkinsProvider) RunPipeline(p *model.Pipeline, triggerType string) (*mo
 
 //RerunActivity runs an existing activity
 func (j JenkinsProvider) RerunActivity(a *model.Activity) error {
+
+	jobName := getJobName(a, 0, 0)
+	_, err := GetJobInfo(jobName)
+	if err != nil {
+		//job records are missing in jenkins, regenerate them
+		for i := 0; i < len(a.Pipeline.Stages); i++ {
+			if err := j.CreateStage(a, i); err != nil {
+				logrus.Error(errors.Wrapf(err, "recreate stage <%s> fail", a.Pipeline.Stages[i].Name))
+				return err
+			}
+		}
+	} else {
+		//clean previous build
+		if err := DeleteFormerBuild(a); err != nil {
+			return err
+		}
+	}
 	//find an available node to run
 	nodeName, err := getNodeNameToRun()
 	if err != nil {
 		return err
 	}
 	a.NodeName = nodeName
-	//set to original git commit
-	err = j.SetSCMCommit(a)
+	err = j.UpdateJobConf(a)
 	if err != nil {
-		logrus.Errorf("set scm commit fail,%v", err)
+		logrus.Errorf("fail to update job config before rerun: %v", err)
 	}
 
 	logrus.Infof("rerunpipeline,get nodeName:%v", nodeName)
@@ -91,7 +107,8 @@ func (j JenkinsProvider) StopActivity(a *model.Activity) error {
 		} else {
 			for stepOrdinal := 0; stepOrdinal < len(stage.ActivitySteps); stepOrdinal++ {
 				if err := j.StopStep(a, stageOrdinal, stepOrdinal); err != nil {
-					return err
+					logrus.Errorf("stop step got: %v", err)
+					continue
 				}
 			}
 			logrus.Debugf("aborting stage, current status: %s", stage.Status)
@@ -159,8 +176,11 @@ func (j JenkinsProvider) CreateStage(activity *model.Activity, ordinal int) erro
 //getNodeNameToRun gets a random node name to run
 func getNodeNameToRun() (string, error) {
 	nodes, err := GetActiveNodesName()
-	if err != nil || len(nodes) == 0 {
+	if err != nil {
 		return "", errors.Wrapf(err, "fail to find an active node to work")
+	}
+	if len(nodes) == 0 {
+		return "", errors.New("no active worker node available, please add at least one slave node or check if it is ready")
 	}
 	r := rand.New(rand.NewSource(time.Now().UnixNano()))
 	index := r.Intn(len(nodes))
@@ -169,10 +189,7 @@ func getNodeNameToRun() (string, error) {
 }
 
 //DeleteFormerBuild delete last build info of a completed activity
-func (j JenkinsProvider) DeleteFormerBuild(activity *model.Activity) error {
-	if activity.Status == model.ActivityBuilding || activity.Status == model.ActivityWaiting {
-		return errors.New("cannot delete lastbuild of running activity!")
-	}
+func DeleteFormerBuild(activity *model.Activity) error {
 	for stageOrdinal, stage := range activity.ActivityStages {
 		for stepOrdinal, step := range stage.ActivitySteps {
 			jobName := getJobName(activity, stageOrdinal, stepOrdinal)
@@ -188,19 +205,23 @@ func (j JenkinsProvider) DeleteFormerBuild(activity *model.Activity) error {
 
 }
 
-//SetSCMCommit update jenkins job SCM to use commit id in activity
-func (j JenkinsProvider) SetSCMCommit(activity *model.Activity) error {
-	conf := j.generateStepJenkinsProject(activity, 0, 0)
-	if activity.CommitInfo != "" {
-		conf.Scm.GitBranch = activity.CommitInfo
-	}
-	jobName := getJobName(activity, 0, 0)
-	bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
-	logrus.Debugf("conf:\n%v", string(bconf))
-	logrus.Debugf("trying to set commit")
-	if err := UpdateJob(jobName, bconf); err != nil {
-		logrus.Errorf("updatejob error:%v", err)
-		return err
+//UpdateJobConf update jenkins job config
+//use commit id in activity and try with a valid node.
+func (j JenkinsProvider) UpdateJobConf(activity *model.Activity) error {
+	for stageNum := 0; stageNum < len(activity.ActivityStages); stageNum++ {
+		for stepNum := 0; stepNum < len(activity.ActivityStages[stageNum].ActivitySteps); stepNum++ {
+			conf := j.generateStepJenkinsProject(activity, stageNum, stepNum)
+			if stageNum == 0 && stepNum == 0 && activity.CommitInfo != "" && activity.CommitInfo != "null" {
+				conf.Scm.GitBranch = activity.CommitInfo
+			}
+			jobName := getJobName(activity, stageNum, stepNum)
+			bconf, _ := xml.MarshalIndent(conf, "  ", "    ")
+			logrus.Debugf("updating jenkins job:%s", jobName)
+			if err := UpdateJob(jobName, bconf); err != nil {
+				logrus.Errorf("updatejob error:%v", err)
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -458,6 +479,7 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		argsPara := ""
 		svcPara := ""
 		svcCheck := ""
+		labelPara := fmt.Sprintf("-l activityid=%s", activity.Id)
 		if step.ShellScript != "" {
 			entrypointPara = "--entrypoint /bin/sh"
 			entryFileName := fmt.Sprintf(".r_cicd_entrypoint_%s.sh", util.RandStringRunes(4))
@@ -481,7 +503,8 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		if step.IsService {
 			containerName := activity.Id + step.Alias
 			svcPara = "-itd --name " + containerName
-			svcCheck = fmt.Sprintf("\nsleep 3;if [ \"$(docker inspect -f {{.State.Running}} %s)\" = \"false\" ];then docker logs \"%s\";echo \"Error: service container \\\"%s\\\" is stopped.\ncheck above logs or the task step config.\nA running container is expected when using \\\"as a service\\\" option.\";exit 1;fi", containerName, containerName, step.Alias)
+			svcCheck = fmt.Sprintf("\necho 'run a service container with alias %s.'", step.Alias)
+			svcCheck = svcCheck + fmt.Sprintf("\nsleep 3;if [ \"$(docker inspect -f {{.State.Running}} %s)\" = \"false\" ];then docker logs \"%s\";echo \"Error: service container \\\"%s\\\" is stopped.\ncheck above logs or the task step config.\nA running container is expected when using \\\"as a service\\\" option.\";exit 1;fi", containerName, containerName, step.Alias)
 		}
 
 		//add link service
@@ -501,6 +524,8 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		stringBuilder.WriteString("--env-file ${PWD}/.r_cicd.env")
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(envVars)
+		stringBuilder.WriteString(" ")
+		stringBuilder.WriteString(labelPara)
 		stringBuilder.WriteString(" ")
 		stringBuilder.WriteString(svcPara)
 		stringBuilder.WriteString(" ")
@@ -577,7 +602,11 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 			stringBuilder.WriteString(" --accesskey ")
 			stringBuilder.WriteString(QuoteShell(step.Accesskey))
 			stringBuilder.WriteString(" --secretkey ")
-			stringBuilder.WriteString(QuoteShell(step.Secretkey))
+			envKey, err := service.GetEnvKey(step.Accesskey)
+			if err != nil {
+				logrus.Errorf("error get env credential:%v", err)
+			}
+			stringBuilder.WriteString(QuoteShell(envKey))
 		} else {
 			//read from env var
 			stringBuilder.WriteString(" --envurl $CATTLE_URL")
@@ -611,7 +640,11 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 			script := fmt.Sprintf(upgradeStackScript, "$CATTLE_URL", "$CATTLE_ACCESS_KEY", "$CATTLE_SECRET_KEY", step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		} else {
-			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, step.Secretkey, step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
+			envKey, err := service.GetEnvKey(step.Accesskey)
+			if err != nil {
+				logrus.Errorf("error get env credential:%v", err)
+			}
+			script := fmt.Sprintf(upgradeStackScript, step.Endpoint, step.Accesskey, envKey, step.StackName, EscapeShell(activity, step.DockerCompose), EscapeShell(activity, step.RancherCompose))
 			stringBuilder.WriteString(script)
 		}
 	case model.StepTypeUpgradeCatalog:
@@ -646,18 +679,22 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		readme = EscapeShell(activity, readme)
 		answers := EscapeShell(activity, step.Answers)
 
-		endpoint := step.Endpoint
-		accessKey := step.Accesskey
-		secretKey := step.Secretkey
+		endpoint := "$CATTLE_URL"
+		accessKey := "$CATTLE_ACCESS_KEY"
+		envKey := "$CATTLE_SECRET_KEY"
+		var err error
+		if endpoint != "" {
 
-		if endpoint == "" {
-			endpoint = "$CATTLE_URL"
-			accessKey = "$CATTLE_ACCESS_KEY"
-			secretKey = "$CATTLE_SECRET_KEY"
+			endpoint = step.Endpoint
+			accessKey = step.Accesskey
+			envKey, err = service.GetEnvKey(step.Accesskey)
+			if err != nil {
+				logrus.Errorf("error get env credential:%v", err)
+			}
 		}
 
 		gitUserName := activity.Pipeline.Stages[0].Steps[0].GitUser
-		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, secretKey, step.StackName)
+		script := fmt.Sprintf(upgradeCatalogScript, step.Repository, step.Branch, gitUserName, systemFlag, templateName, deployFlag, dockerCompose, rancherCompose, readme, answers, endpoint, accessKey, envKey, step.StackName)
 		stringBuilder.WriteString(script)
 	}
 
@@ -811,23 +848,26 @@ func (j JenkinsProvider) SyncActivityStale(activity *model.Activity) (bool, erro
 
 //OnActivityCompelte helps clean up
 func (j JenkinsProvider) OnActivityCompelte(activity *model.Activity) {
-	//clean services in activity
-	services := service.GetAllServices(activity)
-	containerNames := []string{}
-	for _, service := range services {
-		containerNames = append(containerNames, service.ContainerName)
-	}
-	command := "docker rm -f " + strings.Join(containerNames, " ")
+	//clean related container by label
+	command := fmt.Sprintf("docker ps --filter label=activityid=%s -q | xargs docker rm -f", activity.Id)
 	cleanServiceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
 	logrus.Debugf("cleanservicescript is: %v", cleanServiceScript)
 	res, err := ExecScript(cleanServiceScript)
 	logrus.Debugf("clean services result:%v,%v", res, err)
+	if err != nil {
+		logrus.Errorf("error cleanning up on worker node: %v, got result '%s'", err, res)
+	}
 	logrus.Infof("activity '%s' complete", activity.Id)
 	//clean workspace
-	// command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
-	// cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
-	// res, err = ExecScript(cleanWorkspaceScript)
-	// logrus.Infof("clean workspace result:%v,%v", res, err)
+	if !activity.Pipeline.KeepWorkspace {
+		command = "rm -rf ${System.getenv('JENKINS_HOME')}/workspace/" + activity.Id
+		cleanWorkspaceScript := fmt.Sprintf(ScriptSkel, activity.NodeName, strings.Replace(command, "\"", "\\\"", -1))
+		res, err = ExecScript(cleanWorkspaceScript)
+		if err != nil {
+			logrus.Errorf("error cleanning up on worker node: %v, got result '%s'", err, res)
+		}
+		logrus.Debugf("clean workspace result:%v,%v", res, err)
+	}
 
 }
 
