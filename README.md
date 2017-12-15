@@ -1,79 +1,96 @@
 # Quick Start Guide
 
-In this guide, we will deploy the Rancher Pipeline service and create a pipeline for a simple nodeJS service as an example.
+In this guide, you'll learn how to deploy the Rancher Pipeline service and create a pipeline for a simple nodeJS service as an example.
 
 ## Prerequisites
 
-* A Rancher environment. For each host, it is recommended to have more than 2 cores and 4 GB memory for running Rancher Pipeline.
+* **A Rancher environment** &mdash; To run Rancher Pipeline, we recommend more than two cores and 4GB memory for each host.
 
-* A GitHub account which has a repository forked from this [pipeline-example repository](https://github.com/biblesyme/pipeline-example). 
+* **A GitHub account** &mdash; Fork a repository from this [pipeline-example repository](https://github.com/biblesyme/pipeline-example). 
 
-## Deploy Rancher Pipeline
+## Deploying Rancher Pipeline
 
-Rancher Pipeline is available in [community-catalog](https://github.com/rancher/community-catalog). 
+Rancher Pipeline is available in the [community-catalog](https://github.com/rancher/community-catalog). 
 
-1. Navigate to the **Catalog** tab, search **Rancher Pipeline** and click on Rancher Pipeline template. 
-2. You will see configuration options for the template. For now, just simply click **Launch** to deploy the Pipeline stack, all components will be up shortly and a new tab named `PIPELINE` will appear in the top navigation bar.
+### To Deploy Rancher Pipeline:
 
-When all services in pipeline stack are in the `Active` state, click on the **PIPELINE** tab on the top navigation bar to access Pipeline UI.
+1. On the Rancher UI menu, click Catalog **Catalog**. The Catalog page displays.
+2. Search for the **Rancher Pipeline** template, and then click **View Details**. Configuration options for the template display.
+2. Ignore the configuration options for now, and click **Launch** to deploy the Pipeline stack. This process might take a few minutes. All components of your stack begin running, and a new Pipeline tab displays on the UI menu.
 
+When all services in the Pipeline stack are in an `Active` state, click **Pipeline** to access Pipeline UI.
 
-## Configure Source Code Management authentication
+## Configuring Source Code Management Authentication
 
-Before adding a pipeline, we need to configure source code management authentication first. We will use Github OAuth for authentication in this quick start guide.
+Before adding a pipeline, first we need to configure source code management authentication. We will use Github OAuth for authentication in this Quick Start Guide.
 
-1. Click on the gear icon in the top right corner of the Pipeline UI, which will redirect you to the setting page.
+### To Configure Source Code Management Authentication:
 
-2. In the setting page, under the **Git Authentication** section, you need to follow the instructions to complete the authentication. You should be able to see your GitHub username in the **Authenticated Users** after the authentication has been completed correctly.
+1. In the top-right corner of the Pipeline UI, click the gear icon. The Settings page displays.
 
-## Add a pipeline
+2. In the **Git Authentication** section, follow the instructions to complete the authentication. Once complete, your GitHub username  displays in the **Authenticated Users** section.
 
-1. Click on **Pipelines** tab in pipeline UI.
-2. Click **Add Pipeline** button on the right to create a new pipeline.
+## Adding a Pipeline
 
-First, you will need to configure the source code repository for the pipeline. Select the user and the forked repository, then click **Add** button.
+Now we're going to add a pipeline and set up a source code management stage, a test stage to run a 'mock' test and build CI jobs, and a package stage for it. 
 
-### Add a Stage named `test_stage`
-Next, we will add some more stages/steps to run 'mock' test & build CI jobs.
-1. Click **Add a Stage** on the pipeline graph. Name it as `test_stage` and click **Add** button. 
+### To Add a Pipeline:
+
+1. In the Pipeline UI, click **Pipelines**.
+2. Click **Add Pipeline** to create a new pipeline.
+
+### To Set up a Source Code Management Stage:
+
+1. To configure the source code repository for the pipeline, select the user and the forked repository.
+2. Click **Add**.
+
+### To Add a Test Stage: 
+
+1. On the pipeline graph, click **Add a Stage**. Name it `test_stage` and click **Add**. 
 2. Click **Add a Step** under the `test_stage`. 
-3. Check the `Run as a Service` checkbox, cause we need to test this server in the next Step. 
-4. Fill **Name** with `nodeserver`. We will use the name `nodeserver` in the next Step.
-5. Fill **Image** with `node:8`. We will use it as the Docker image to run our server container.
-6. Fill **Command** with
+3. Select **Run as a Service** because we need to test this server in the next section. 
+4. For **Name**, type `nodeserver`. We'll use this name in the next section.
+5. For **Image**, select `node:8`. We're using this Docker image to run our server container.
+6. For **Command**, type:
 ```
 npm start
 ```
-7. Click **Save** button.
+7. Click **Save**.
 
-We will need another Step in `test_stage` to test our server. 
+Next, we need to add another step in `test_stage` to test our server. 
+
+### To Test Our Server:
+
 1. Click **Add a Step** under the `test_stage`. 
-2. Fill **Image** with `node:8`.
-3. Fill **Command** with
+2. For **Image**, select `node:8`.
+3. For **Command**, type:
 ```
 npm install
 npm test
 ```
-4. Under **Environment Variables**, click `Add Variable`, fill the **Variable** with `SERVER` and **Value** with `nodeserver`. It's because the testing code requires environment variable `SERVER` to be set as the server address it will test against.
-5. Click **Save** button.
+4. Under **Environment Variables**, click **Add Variable**. 
+5. For **Variable**, type `SERVER`. For **Value**, type `nodeserver`. The testing code requires you to set the environment variable `SERVER` as the server address it will test against.
+6. Click **Save**.
 
-### Add a Stage named `package_stage`
-We will package our newly created server to a Docker image in this stage.
-1. Click **Add a Stage** and add another stage named `package_stage`. 
+Lastly, we need to package our newly created server to a Docker image.
+
+### To Add a Package Stage:
+
+1. Click **Add a Stage** and name it `package_stage`. 
 2. Click **Add a Step** under the `package_stage`.
-3. Select **Step Type** as `build`. We're going to build and push an image. 
-4. Fill the **Image Tag** with `<your dockerhub-id>/pipeline-helloword:latest`.
-5. Select the **push** option. You will see a notification for registry authentication if you haven't registered in the Rancher Registry setting. Follow it to complete the authentication. Then go back to the Step configuration.
-6. Double click the **push** option to refresh and confirm that registry is ready. 
-7. Then click **Save**.
+3. For **Step Type**, select `build`. We're going to build and push an image. 
+4. For **Image Tag**, enter `<your dockerhub-id>/pipeline-helloword:latest`.
+5. Select **Push**. 
+   >**Note:** If you haven't registered in the Rancher Registry setting, a notification for registry authentication displays. Before proceeding to the next step, follow the instructions to complete the authentication. Then, double-click **Push** to refresh and confirm that your registry is ready. 
+6. Click **Save**.
 
-Now we've set up a source code management stage, a test stage and a package stage for the pipeline. Give a name to the pipeline as `hello-world` in the left-top input, then click **Save** to save our pipeline. You should see the `hello-world` pipeline in the pipeline list page.
+Now we've set up a source code management stage, a test stage, and a package stage for the pipeline. Give a name to the pipeline, such as `hello-world`, and then click **Save**. Your `hello-world` pipeline displays in the list on the Pipeline page.
 
-## Run a pipeline
+## Running a Pipeline
 
-To manually run the pipeline, click the dropdown of the pipeline actions on the right and click **run**.
+To manually run the pipeline, from the pipeline actions drop-down list on the right, click **run**.
 
-By default, we've also registered a Webhook in GitHub. So when you make a push to the GitHub repository, it will trigger a run of the associated pipeline. Notice that it will only work if your Rancher Server is accessible from GitHub.
+By default, we've also registered a Webhook in GitHub. When you push to the GitHub repository, it will trigger a run of the associated pipeline. This Webhook only works if your Rancher Server is accessible from GitHub.
 
 # Development
 
