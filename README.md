@@ -75,6 +75,39 @@ To manually run the pipeline, click the dropdown of the pipeline actions on the 
 
 By default, we've also registered a Webhook in GitHub. So when you make a push to the GitHub repository, it will trigger a run of the associated pipeline. Notice that it will only work if your Rancher Server is accessible from GitHub.
 
+# Development
+
+If you wanna make and test Rancher Pipeline yourself, just follow steps below.
+
+## Build
+
+1. Clone this repository.
+2. Run `make` under your cloned directory.
+3. After success of step 2, there will be four images(rancher/jenkins-slave:<-version->, rancher/pipeline:<-version->, rancher/pipeline-ui:<-version->, rancher/jenkins-boot:<-version->) built. Tag and Push them to your Registry.
+
+## Set Up Test Environment
+
+### Prerequisites
+
+* A Rancher environment. For each host, it is recommended to have more than 2 cores and 4 GB memory for running Rancher Pipeline.
+
+### Steps
+There are two options you can select to set up the test environment.
+
+#### Option 1
+1. [Deploy Rancher Pipeline](#deploy-rancher-pipeline)
+
+2. Upgrade every service under `pipeline` stack to the image you built.
+
+#### Option 2
+1. Fork [community-catalog](https://github.com/rancher/community-catalog) to your GitHub account.
+
+2. Under your forked repository from step 1, modify images used in `infra-templates/pipeline/<-version->/docker-compose.yml.tpl` to the images you built.
+
+3. Add this forked repository as a Catalog in your Rancher Environment.
+
+4. [Deploy Rancher Pipeline](#deploy-rancher-pipeline) in the Catalog of Step 3
+
 # License
 Copyright (c) 2014-2017 [Rancher Labs, Inc.](http://rancher.com)
 
