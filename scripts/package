@@ -13,8 +13,7 @@ SUFFIX=""
 cd $(dirname $0)/../package
 cp ../bin/pipeline ./pipeline/
 
-TAG=${TAG:-dev}
-#${VERSION}${SUFFIX}}
+TAG=${TAG:-${VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
 
 Folders="$(dirname $0)/../package"
