@@ -248,6 +248,7 @@ func FilterPipeline(pipeline *Pipeline) {
 	for _, stage := range pipeline.Stages {
 		for _, step := range stage.Steps {
 			step.Secretkey = ""
+			step.Services = nil
 		}
 	}
 }
