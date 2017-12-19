@@ -141,5 +141,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 
 # Reference Guide
-Please refer to [Reference Guide](https://github.com/rancher/pipeline/blob/docs/docs/README.md) for more information.
+Please refer to [Reference Guide](./docs/README.md) for more information.
 
