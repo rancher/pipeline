@@ -9,5 +9,7 @@ else
      echo "$DIR is Empty"
      echo "Start copy jenkins_home by running cp -r /var/rancher/jenkins_home/* $DIR"
      cp -r /var/rancher/jenkins_home/* $DIR
+     # set owner to jenkins user
+     chown -R 1000 $DIR
      echo "Copy Finishied"
 fi
