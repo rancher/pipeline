@@ -893,7 +893,6 @@ func (j JenkinsProvider) OnCreateAccount(account *model.GitAccount) error {
 	}
 	buff := bytes.NewBufferString("json=")
 	buff.Write(b)
-	fmt.Print(string(buff.Bytes()))
 	if err := CreateCredential(buff.Bytes()); err != nil {
 		return err
 	}

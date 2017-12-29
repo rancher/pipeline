@@ -167,7 +167,6 @@ func (s *Server) Oauth(rw http.ResponseWriter, req *http.Request) error {
 		scmType = requestBody["scmType"].(string)
 	}
 
-	logrus.Debugf("get vars:%v,%v,%v,%v", code, clientID, clientSecret, redirectURL)
 	var account *model.GitAccount
 	if clientID == "" || clientSecret == "" || redirectURL == "" {
 		setting, err := service.GetSCMSetting(scmType)

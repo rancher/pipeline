@@ -81,7 +81,6 @@ func (g GithubManager) GetRepos(account *model.GitAccount) ([]*model.GitReposito
 
 func (g GithubManager) OAuth(redirectURL string, clientID string, clientSecret string, code string) (*model.GitAccount, error) {
 
-	logrus.Debugf("github oauth get vars:%v,%v,%v,%v", redirectURL, clientID, clientSecret, code)
 	githubOauthConfig := &oauth2.Config{
 		RedirectURL:  redirectURL,
 		ClientID:     clientID,
@@ -98,7 +97,6 @@ func (g GithubManager) OAuth(redirectURL string, clientID string, clientSecret s
 	} else if token.TokenType != "bearer" || token.AccessToken == "" {
 		return nil, fmt.Errorf("Fail to get accesstoken with oauth config")
 	}
-	logrus.Debugf("get accesstoken:%v", token)
 	return g.GetAccount(token.AccessToken)
 }
 func (g GithubManager) getGithubUser(githubAccessToken string) (*GithubAccount, error) {
