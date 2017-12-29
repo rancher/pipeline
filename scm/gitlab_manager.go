@@ -158,14 +158,36 @@ func (g GitlabManager) toGitRepo(repos []gitlab.Project) []*model.GitRepository 
 		r := &model.GitRepository{}
 		r.CloneURL = repo.HTTPURLToRepo
 		r.Permissions = map[string]bool{}
-		r.Permissions["pull"] = true
-		if repo.Permissions.ProjectAccess.AccessLevel >= 30 {
-			r.Permissions["admin"] = true
+		accessLevel := getAccessLevel(repo)
+		if accessLevel >= 20 {
+			// 20 for 'Reporter' level
+			r.Permissions["pull"] = true
+		}
+		if accessLevel >= 30 {
+			// 30 for 'Developer' level
 			r.Permissions["push"] = true
+		}
+		if accessLevel >= 40 {
+			// 40 for 'Master' level and 50 for 'Owner' level
+			r.Permissions["admin"] = true
 		}
 		result = append(result, r)
 	}
 	return result
+}
+
+func getAccessLevel(repo gitlab.Project) int {
+	accessLevel := 0
+	if repo.Permissions == nil {
+		return accessLevel
+	}
+	if repo.Permissions.ProjectAccess != nil && int(repo.Permissions.ProjectAccess.AccessLevel) > accessLevel {
+		accessLevel = int(repo.Permissions.ProjectAccess.AccessLevel)
+	}
+	if repo.Permissions.GroupAccess != nil && int(repo.Permissions.GroupAccess.AccessLevel) > accessLevel {
+		accessLevel = int(repo.Permissions.GroupAccess.AccessLevel)
+	}
+	return accessLevel
 }
 
 func paginateGitlab(gitlabAccessToken string, url string) ([]*http.Response, error) {
