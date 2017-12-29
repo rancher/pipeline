@@ -83,7 +83,6 @@ func (g GitlabManager) OAuth(redirectURL string, clientID string, clientSecret s
 	} else if token.TokenType != "bearer" || token.AccessToken == "" {
 		return nil, fmt.Errorf("Fail to get accesstoken with oauth config")
 	}
-	logrus.Debugf("get accesstoken:%v", token)
 	return g.GetAccount(token.AccessToken)
 }
 
