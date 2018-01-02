@@ -1124,10 +1124,10 @@ func EscapeShell(activity *model.Activity, script string) string {
 	escaped := strings.Replace(script, "\\", "\\\\", -1)
 	escaped = strings.Replace(escaped, "$", "\\$", -1)
 
-	for k, v := range activity.EnvVars {
-		escaped = strings.Replace(escaped, "\\$"+k+" ", v, -1)
-		escaped = strings.Replace(escaped, "\\$"+k+"\n", v, -1)
-		escaped = strings.Replace(escaped, "\\${"+k+"}", v, -1)
+	for k, _ := range activity.EnvVars {
+		escaped = strings.Replace(escaped, "\\$"+k+" ", "$"+k+" ", -1)
+		escaped = strings.Replace(escaped, "\\$"+k+"\n", "$"+k+"\n", -1)
+		escaped = strings.Replace(escaped, "\\${"+k+"}", "${"+k+"}", -1)
 
 	}
 	return escaped
