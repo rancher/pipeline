@@ -679,18 +679,21 @@ func commandBuilder(activity *model.Activity, step *model.Step) string {
 		readme = EscapeShell(activity, readme)
 		answers := EscapeShell(activity, step.Answers)
 
-		endpoint := "$CATTLE_URL"
-		accessKey := "$CATTLE_ACCESS_KEY"
-		envKey := "$CATTLE_SECRET_KEY"
+		var endpoint string
+		var accessKey string
+		var envKey string
 		var err error
-		if endpoint != "" {
-
+		if step.Endpoint != "" {
 			endpoint = step.Endpoint
 			accessKey = step.Accesskey
 			envKey, err = service.GetEnvKey(step.Accesskey)
 			if err != nil {
 				logrus.Errorf("error get env credential:%v", err)
 			}
+		} else {
+			endpoint = "$CATTLE_URL"
+			accessKey = "$CATTLE_ACCESS_KEY"
+			envKey = "$CATTLE_SECRET_KEY"
 		}
 
 		gitUserName := activity.Pipeline.Stages[0].Steps[0].GitUser

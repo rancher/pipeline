@@ -91,7 +91,7 @@ R_UPGRADESTACK_ENDPOINT=%s
 R_UPGRADESTACK_ACCESSKEY=%s
 R_UPGRADESTACK_SECRETKEY=%s
 R_UPGRADESTACK_STACKNAME=%s
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY export $R_UPGRADESTACK_STACKNAME
+rancher --url "$R_UPGRADESTACK_ENDPOINT" --access-key "$R_UPGRADESTACK_ACCESSKEY" --secret-key "$R_UPGRADESTACK_SECRETKEY" export "$R_UPGRADESTACK_STACKNAME"
 
 cd $R_UPGRADESTACK_STACKNAME
 cat>new-docker-compose.yml<<R_CICD_EOF
@@ -103,14 +103,14 @@ R_CICD_EOF
 #merge yaml file
 cihelper mergeyaml -o new-docker-compose.yml new-docker-compose.yml docker-compose.yml
 cihelper mergeyaml -o new-rancher-compose.yml new-rancher-compose.yml rancher-compose.yml
-rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY up --upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
+rancher --url "$R_UPGRADESTACK_ENDPOINT" --access-key "$R_UPGRADESTACK_ACCESSKEY" --secret-key "$R_UPGRADESTACK_SECRETKEY" up --upgrade --confirm-upgrade --pull --file new-docker-compose.yml --rancher-file new-rancher-compose.yml -d
 
 rm -r ../../$TEMPDIR
 
 #check stack upgrade
 checkSvc()
 {
-	SvcStatus=$(rancher --url $R_UPGRADESTACK_ENDPOINT --access-key $R_UPGRADESTACK_ACCESSKEY --secret-key $R_UPGRADESTACK_SECRETKEY ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}"|awk '$2 == "$R_UPGRADESTACK_STACKNAME" {print}')
+	SvcStatus=$(rancher --url "$R_UPGRADESTACK_ENDPOINT" --access-key "$R_UPGRADESTACK_ACCESSKEY" --secret-key "$R_UPGRADESTACK_SECRETKEY" ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}"|awk '$2 == "$R_UPGRADESTACK_STACKNAME" {print}')
 	if [ $? -ne 0 ]; then
 		echo "upgrade stack $R_UPGRADESTACK_STACKNAME fail: $SvcStatus"
 		exit 1
@@ -168,8 +168,8 @@ cat>env_file<<R_CICD_EOF
 %s
 R_CICD_EOF
 
-cihelper upgrade catalog --repourl $R_UPGRADECATALOG_REPO --branch $R_UPGRADECATALOG_BRANCH --user $R_UPGRADECATALOG_GITUSER \
---cacheroot catalog --foldername $R_UPGRADECATALOG_FOLDERNAME --readme README.md $R_UPGRADECATALOG_SYSTEMFLAG
+cihelper upgrade catalog --repourl "$R_UPGRADECATALOG_REPO" --branch "$R_UPGRADECATALOG_BRANCH" --user "$R_UPGRADECATALOG_GITUSER" \
+--cacheroot catalog --foldername "$R_UPGRADECATALOG_FOLDERNAME" --readme README.md $R_UPGRADECATALOG_SYSTEMFLAG
 
 if [ $? -eq 0 ]; then
 	echo "upgrade catalog success."
@@ -187,7 +187,7 @@ R_UPGRADESTACK_ACCESSKEY=%s
 R_UPGRADESTACK_SECRETKEY=%s
 R_UPGRADESTACK_STACKNAME=%s
 
-cihelper --envurl $R_UPGRADESTACK_ENDPOINT --accesskey $R_UPGRADESTACK_ACCESSKEY --secretkey $R_UPGRADESTACK_SECRETKEY upgrade stack --tolatest --stackname $R_UPGRADESTACK_STACKNAME --env-file env_file
+cihelper --envurl "$R_UPGRADESTACK_ENDPOINT" --accesskey "$R_UPGRADESTACK_ACCESSKEY" --secretkey "$R_UPGRADESTACK_SECRETKEY" upgrade stack --tolatest --stackname "$R_UPGRADESTACK_STACKNAME" --env-file env_file
 
 rm -r ../$TEMPDIR
 `
