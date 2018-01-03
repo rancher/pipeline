@@ -21,7 +21,6 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/rancher/pipeline/model"
 	"github.com/tomnomnom/linkheader"
-	ogithub "golang.org/x/oauth2/github"
 )
 
 const (
@@ -87,7 +86,10 @@ func (g GithubManager) OAuth(redirectURL string, clientID string, clientSecret s
 		ClientSecret: clientSecret,
 		Scopes: []string{"repo",
 			"admin:repo_hook"},
-		Endpoint: ogithub.Endpoint,
+		Endpoint: oauth2.Endpoint{
+			AuthURL:  fmt.Sprintf("%s%s/login/oauth/authorize", g.scheme, g.hostName),
+			TokenURL: fmt.Sprintf("%s%s/login/oauth/access_token", g.scheme, g.hostName),
+		},
 	}
 
 	token, err := githubOauthConfig.Exchange(oauth2.NoContext, code)
