@@ -110,7 +110,7 @@ rm -r ../../$TEMPDIR
 #check stack upgrade
 checkSvc()
 {
-	SvcStatus=$(rancher --url "$R_UPGRADESTACK_ENDPOINT" --access-key "$R_UPGRADESTACK_ACCESSKEY" --secret-key "$R_UPGRADESTACK_SECRETKEY" ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}"|awk '$2 == "$R_UPGRADESTACK_STACKNAME" {print}')
+	SvcStatus=$(rancher --url "$R_UPGRADESTACK_ENDPOINT" --access-key "$R_UPGRADESTACK_ACCESSKEY" --secret-key "$R_UPGRADESTACK_SECRETKEY" ps --format "{{.Service.Id}} {{.Stack.Name}} {{.Service.Name}} {{.Service.Transitioning}} {{.Service.TransitioningMessage}}"|awk -v STACKNAME="$R_UPGRADESTACK_STACKNAME" '$2 == STACKNAME {print}')
 	if [ $? -ne 0 ]; then
 		echo "upgrade stack $R_UPGRADESTACK_STACKNAME fail: $SvcStatus"
 		exit 1
@@ -118,7 +118,7 @@ checkSvc()
 
 	ErrorSvcCount=$(echo "$SvcStatus"|awk '$4=="error" {print $1}'|wc -l);
 	if [ $ErrorSvcCount -ne 0 ]; then
-		echo "$SvcStatus"|awk '$4=="error" {print "upgrade service ",$1," fail:",}'|cut -f2,5-
+		echo "$SvcStatus"|awk '$4=="error" {print "upgrade service",$2,"fail:";$1=$2=$3=$4="";print}'
 		exit 1
 	fi
 	UpgradingSvcCount=$(echo "$SvcStatus"|awk '$4=="yes" {print $1}'|wc -l);
