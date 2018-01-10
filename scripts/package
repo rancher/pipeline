@@ -15,12 +15,19 @@ cp ../bin/pipeline ./pipeline/
 
 TAG=${TAG:-${VERSION}${SUFFIX}}
 REPO=${REPO:-rancher}
+#Version for dependent images
+PIPELINE_UI_VERSION=1.0.1
+PIPELINE_JENKINS_BOOT_VERSION=1.0.0
+PIPELINE_JENKINS_SLAVE_VERSION=1.0.0
 
-Folders="$(dirname $0)/../package"
+docker build -t ${REPO}/pipeline:${TAG} ./pipeline
+echo ${REPO}/pipeline:${TAG} >> $(dirname $0)/../dist/images
+docker build --build-arg UI_VERSION=${PIPELINE_UI_VERSION} -t ${REPO}/pipeline-ui:v${PIPELINE_UI_VERSION} ./pipeline-ui
+echo ${REPO}/pipeline-ui:v${PIPELINE_UI_VERSION} >> $(dirname $0)/../dist/images
+docker build --build-arg SLAVE_VERSION=${PIPELINE_JENKINS_SLAVE_VERSION} -t ${REPO}/pipeline-jenkins-slave:v${PIPELINE_JENKINS_SLAVE_VERSION} ./pipeline-jenkins-slave
+echo ${REPO}/pipeline-jenkins-slave:v${PIPELINE_JENKINS_SLAVE_VERSION} >> $(dirname $0)/../dist/images
+docker build --build-arg BOOT_VERSION=${PIPELINE_JENKINS_BOOT_VERSION} -t ${REPO}/pipeline-jenkins-boot:v${PIPELINE_JENKINS_BOOT_VERSION} ./pipeline-jenkins-boot
+echo ${REPO}/pipeline-jenkins-boot:v${PIPELINE_JENKINS_BOOT_VERSION} >> $(dirname $0)/../dist/images
 
-for Folder_a in ${Folders}/*; do
-  Folder_a_name=`echo "$Folder_a" | awk -F '\/' '{print $NF}'`
-  docker build -t ${REPO}/${Folder_a_name}:${TAG} $Folder_a/.
-  echo ${REPO}/${Folder_a_name}:${TAG} >> $(dirname $0)/../dist/images
-done
+echo built images:
 cat $(dirname $0)/../dist/images
