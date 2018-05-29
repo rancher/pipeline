@@ -259,7 +259,7 @@ func (g GithubManager) DeleteWebhook(p *model.Pipeline, token string) error {
 			if err != nil {
 				return nil
 			}
-			if err := deleteGithubWebhook(user, repo, token, p.WebHookId); err != nil {
+			if err := deleteGithubWebhook(g.apiEndpoint, user, repo, token, p.WebHookId); err != nil {
 				logrus.Errorf("error delete webhook,%v", err)
 				return err
 			}
@@ -284,7 +284,7 @@ func (g GithubManager) CreateWebhook(p *model.Pipeline, token string, ciWebhookE
 			}
 			secret := p.WebHookToken
 			webhookUrl := fmt.Sprintf("%s&pipelineId=%s", ciWebhookEndpoint, p.Id)
-			id, err := createGithubWebhook(user, repo, token, webhookUrl, secret)
+			id, err := createGithubWebhook(g.apiEndpoint, user, repo, token, webhookUrl, secret)
 			logrus.Debugf("Creating webhook:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
 			if err != nil {
 				logrus.Errorf("error delete webhook,%v", err)
@@ -354,7 +354,7 @@ func VerifyGithubWebhookSignature(secret []byte, signature string, body []byte) 
 }
 
 //create webhook,return id of webhook
-func createGithubWebhook(user string, repo string, accesstoken string, webhookUrl string, secret string) (int, error) {
+func createGithubWebhook(apiEndpoint string, user string, repo string, accesstoken string, webhookUrl string, secret string) (int, error) {
 	data := user + ":" + accesstoken
 	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
 	name := "web"
@@ -375,7 +375,7 @@ func createGithubWebhook(user string, repo string, accesstoken string, webhookUr
 	b := new(bytes.Buffer)
 	json.NewEncoder(b).Encode(hook)
 	client := http.Client{}
-	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks", user, repo)
+	APIURL := fmt.Sprintf("%v/repos/%v/%v/hooks", apiEndpoint, user, repo)
 	req, err := http.NewRequest("POST", APIURL, b)
 
 	req.Header.Add("Authorization", "Basic "+sEnc)
@@ -397,12 +397,12 @@ func createGithubWebhook(user string, repo string, accesstoken string, webhookUr
 	return hook.GetID(), err
 }
 
-func deleteGithubWebhook(user string, repo string, accesstoken string, id int) error {
+func deleteGithubWebhook(apiEndpoint string, user string, repo string, accesstoken string, id int) error {
 
 	data := user + ":" + accesstoken
 	sEnc := base64.StdEncoding.EncodeToString([]byte(data))
 	client := http.Client{}
-	APIURL := fmt.Sprintf("https://api.github.com/repos/%v/%v/hooks/%v", user, repo, id)
+	APIURL := fmt.Sprintf("%v/repos/%v/%v/hooks/%v", apiEndpoint, user, repo, id)
 	req, err := http.NewRequest("DELETE", APIURL, nil)
 	if err != nil {
 		return err
