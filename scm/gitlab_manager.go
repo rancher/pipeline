@@ -18,8 +18,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
-//use v3 endpoint for compatibility
-const gitlabAPI = "%s%s/api/v3"
+//use v4 endpoint for compatibility
+const gitlabAPI = "%s%s/api/v4"
 
 type GitlabManager struct {
 	host   string
