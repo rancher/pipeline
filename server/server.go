@@ -31,6 +31,7 @@ func ListenAndServe(provider model.PipelineProvider, errChan chan bool) {
 	Preset(provider)
 	InitAgent(server)
 	router := http.Handler(NewRouter(server))
+	router = proxyProtoHandler(router)
 	router = handlers.LoggingHandler(os.Stdout, router)
 	router = handlers.ProxyHeaders(router)
 	if err := http.ListenAndServe(":60080", router); err != nil {
