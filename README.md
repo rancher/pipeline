@@ -125,6 +125,13 @@ There are two options you can select to set up the test environment.
 
 4. [Deploy Rancher Pipeline](#deploy-rancher-pipeline) in the Catalog of Step 3
 
+# Contact
+
+For bugs, questions, comments, corrections, suggestions, etc., open an issue in
+[rancher/rancher](//github.com/rancher/rancher/issues) with labels `area/pipeline, version/1.6`.
+
+Or just [click here](//github.com/rancher/rancher/issues/new?title=%5Bpipeline%5D%20&labels=area%2Fpipeline,version%2F1.6) to create a new issue.
+
 # License
 Copyright (c) 2014-2017 [Rancher Labs, Inc.](http://rancher.com)
 
