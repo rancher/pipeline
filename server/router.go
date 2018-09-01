@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/go-rancher/api"
 	"github.com/rancher/go-rancher/client"
 	"github.com/rancher/pipeline/model"
+	"net/url"
 )
 
 //HandleError handle error from operation
@@ -28,6 +29,28 @@ func HandleError(s *client.Schemas, t func(http.ResponseWriter, *http.Request) e
 			api.GetApiContext(req).Write(&e)
 		}
 	}))
+}
+
+func proxyProtoHandler(h http.Handler) http.Handler {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		requestUrl := r.Header.Get(api.DEFAULT_OVERRIDE_URL_HEADER)
+		if requestUrl != "" {
+			u, err := url.Parse(requestUrl)
+			if err != nil {
+				logrus.Errorf("invalid format in request url")
+			} else {
+				xForwardedProto := r.Header.Get(api.FORWARDED_PROTO_HEADER)
+				if xForwardedProto != u.Scheme {
+					u.Scheme = xForwardedProto
+					r.Header.Set(api.DEFAULT_OVERRIDE_URL_HEADER, u.String())
+				}
+			}
+		}
+		// Call the next handler in the chain.
+		h.ServeHTTP(w, r)
+	}
+
+	return http.HandlerFunc(fn)
 }
 
 //NewRouter router for schema
