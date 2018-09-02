@@ -299,7 +299,7 @@ func (g GitlabManager) CreateWebhook(p *model.Pipeline, token string, ciWebhookE
 			id, err := g.createGitlabWebhook(user, repo, token, webhookUrl, secret)
 			logrus.Debugf("Creating webhook:%v,%v,%v,%v,%v,%v", user, repo, token, webhookUrl, secret, id)
 			if err != nil {
-				logrus.Errorf("error delete webhook,%v", err)
+				logrus.Errorf("error create webhook,%v", err)
 				return err
 			}
 			p.WebHookId = id

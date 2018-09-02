@@ -50,6 +50,7 @@ func (t TreeNode) String() string {
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/repositories.html#list-repository-tree
 type ListTreeOptions struct {
+	ListOptions
 	Path      *string `url:"path,omitempty" json:"path,omitempty"`
 	Ref       *string `url:"ref,omitempty" json:"ref,omitempty"`
 	Recursive *bool   `url:"recursive,omitempty" json:"recursive,omitempty"`
@@ -184,8 +185,9 @@ func (c Compare) String() string {
 // GitLab API docs:
 // https://docs.gitlab.com/ce/api/repositories.html#compare-branches-tags-or-commits
 type CompareOptions struct {
-	From *string `url:"from,omitempty" json:"from,omitempty"`
-	To   *string `url:"to,omitempty" json:"to,omitempty"`
+	From     *string `url:"from,omitempty" json:"from,omitempty"`
+	To       *string `url:"to,omitempty" json:"to,omitempty"`
+	Straight *bool   `url:"straight,omitempty" json:"straight,omitempty"`
 }
 
 // Compare compares branches, tags or commits.
@@ -215,7 +217,7 @@ func (s *RepositoriesService) Compare(pid interface{}, opt *CompareOptions, opti
 
 // Contributor represents a GitLap contributor.
 //
-// GitLab API docs: https://docs.gitlab.com/ce/api/repositories.html#contributer
+// GitLab API docs: https://docs.gitlab.com/ce/api/repositories.html#contributors
 type Contributor struct {
 	Name      string `json:"name,omitempty"`
 	Email     string `json:"email,omitempty"`
@@ -228,17 +230,23 @@ func (c Contributor) String() string {
 	return Stringify(c)
 }
 
+// ListContributorsOptions represents the available ListContributorsOptions()
+// options.
+//
+// GitLab API docs: https://docs.gitlab.com/ce/api/repositories.html#contributors
+type ListContributorsOptions ListOptions
+
 // Contributors gets the repository contributors list.
 //
-// GitLab API docs: https://docs.gitlab.com/ce/api/repositories.html#contributer
-func (s *RepositoriesService) Contributors(pid interface{}, options ...OptionFunc) ([]*Contributor, *Response, error) {
+// GitLab API docs: https://docs.gitlab.com/ce/api/repositories.html#contributors
+func (s *RepositoriesService) Contributors(pid interface{}, opt *ListContributorsOptions, options ...OptionFunc) ([]*Contributor, *Response, error) {
 	project, err := parseID(pid)
 	if err != nil {
 		return nil, nil, err
 	}
 	u := fmt.Sprintf("projects/%s/repository/contributors", url.QueryEscape(project))
 
-	req, err := s.client.NewRequest("GET", u, nil, options)
+	req, err := s.client.NewRequest("GET", u, opt, options)
 	if err != nil {
 		return nil, nil, err
 	}
