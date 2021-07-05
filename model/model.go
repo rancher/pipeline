@@ -52,7 +52,7 @@ var PreservedEnvs = [...]string{"CICD_GIT_COMMIT", "CICD_GIT_BRANCH",
 	"CICD_TRIGGER_TYPE", "CICD_NODE_NAME", "CICD_ACTIVITY_ID",
 	"CICD_ACTIVITY_SEQUENCE",
 }
-
+//origin test
 type PipelineSetting struct {
 	client.Resource
 	Status string `json:"status,omitempty" yaml:"status,omitempty"`
